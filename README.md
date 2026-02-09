@@ -17,6 +17,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_role` | Custom roles with fine-grained permissions |
 | `braintrust_acl` | Access control list entries (bind groups to roles/permissions on objects) |
 | `braintrust_env_var` | Environment variables scoped to org, project, or function |
+| `braintrust_ai_secret` | AI provider credentials (OpenAI, Anthropic, etc.) at org level |
 | `braintrust_api_key` | API keys for user-level authentication |
 | `braintrust_service_token` | Service tokens for programmatic access via service accounts |
 | `braintrust_project_score` | Score definitions for labeling experiments |
