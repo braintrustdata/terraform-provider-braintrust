@@ -36,9 +36,12 @@ func (r *aiSecretResource) Metadata(_ context.Context, req resource.MetadataRequ
 func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Braintrust AI provider secret.",
-		MarkdownDescription: "Manages a Braintrust AI provider secret (e.g. OpenAI, Anthropic, Azure API keys).\n\n" +
-			"AI secrets are **organization-scoped** — they are available to all projects within the org. " +
-			"For project-scoped credentials, use [`braintrust_env_var`](env_var) with `object_type = \"project\"` instead.\n\n" +
+		MarkdownDescription: "Manages a Braintrust **organization-level** AI provider secret " +
+			"(e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI " +
+			"under Organization > \"AI providers\" and are available to all projects.\n\n" +
+			"For **project-level** AI provider credentials (visible under Project Settings > " +
+			"\"Project AI providers\"), use [`braintrust_env_var`](env_var) with " +
+			"`secret_type` set to the provider name instead.\n\n" +
 			"The `secret` attribute is write-only. Terraform sends it during create/update but the API " +
 			"never returns it. A masked `preview_secret` is available for verification.\n\n" +
 			"**Tip:** Use Terraform variables with `sensitive = true` for the secret value:\n\n" +
