@@ -152,11 +152,21 @@ func (r *aclResource) Create(ctx context.Context, req resource.CreateRequest, re
 		"object_id":   createReq.ObjectID,
 	})
 
-	acl, err := r.client.CreateACL(ctx, createReq)
+	created, err := r.client.CreateACL(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust ACL",
 			"Could not create ACL, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Re-read to get the full state.
+	acl, err := r.client.GetACL(ctx, created.ID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Braintrust ACL After Create",
+			"ACL was created (ID: "+created.ID+") but could not be read: "+err.Error(),
 		)
 		return
 	}

@@ -12,7 +12,7 @@ const projectTagBasePath = "/v1/project_tag"
 type ProjectTag struct {
 	ID          string  `json:"id"`
 	ProjectID   string  `json:"project_id"`
-	UserID      string  `json:"user_id"`
+	UserID      *string `json:"user_id,omitempty"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
 	Color       *string `json:"color,omitempty"`

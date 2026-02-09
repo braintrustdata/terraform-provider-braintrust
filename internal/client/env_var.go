@@ -32,7 +32,7 @@ type CreateEnvVarRequest struct {
 
 // UpdateEnvVarRequest is the request body for updating an env var.
 type UpdateEnvVarRequest struct {
-	Name       string  `json:"name"`
+	Name       *string `json:"name,omitempty"`
 	Value      *string `json:"value,omitempty"`
 	SecretType *string `json:"secret_type,omitempty"`
 }

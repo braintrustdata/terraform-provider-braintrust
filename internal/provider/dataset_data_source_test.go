@@ -16,6 +16,7 @@ func TestAccDatasetDataSource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckDatasetDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDatasetDataSourceConfig(rName),

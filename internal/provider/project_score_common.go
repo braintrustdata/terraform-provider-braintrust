@@ -20,7 +20,7 @@ type projectScoreModel struct {
 func mapProjectScoreToModel(score *client.ProjectScore, model *projectScoreModel) {
 	model.ID = types.StringValue(score.ID)
 	model.ProjectID = types.StringValue(score.ProjectID)
-	model.UserID = types.StringValue(score.UserID)
+	model.UserID = stringPtrToTFValue(score.UserID)
 	model.Name = types.StringValue(score.Name)
 	model.Description = stringPtrToTFValue(score.Description)
 	model.ScoreType = types.StringValue(score.ScoreType)

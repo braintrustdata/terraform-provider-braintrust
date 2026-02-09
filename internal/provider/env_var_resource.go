@@ -183,10 +183,27 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	name := plan.Name.ValueString()
 	updateReq := client.UpdateEnvVarRequest{
-		Name:       plan.Name.ValueString(),
-		Value:      tfStringToPtr(plan.Value),
-		SecretType: tfStringToPtr(plan.SecretType),
+		Name: &name,
+	}
+
+	// Handle value: send explicitly if set, clear if removed from config.
+	if !plan.Value.IsNull() && !plan.Value.IsUnknown() {
+		v := plan.Value.ValueString()
+		updateReq.Value = &v
+	} else if plan.Value.IsNull() && !state.Value.IsNull() {
+		empty := ""
+		updateReq.Value = &empty
+	}
+
+	// Handle secret_type: send explicitly if set, clear if removed from config.
+	if !plan.SecretType.IsNull() && !plan.SecretType.IsUnknown() {
+		st := plan.SecretType.ValueString()
+		updateReq.SecretType = &st
+	} else if plan.SecretType.IsNull() && !state.SecretType.IsNull() {
+		empty := ""
+		updateReq.SecretType = &empty
 	}
 
 	tflog.Debug(ctx, "Updating env var", map[string]any{"id": state.ID.ValueString()})

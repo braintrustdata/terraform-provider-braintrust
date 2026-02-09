@@ -32,6 +32,11 @@ func TestAccACLResource_withRole(t *testing.T) {
 					resource.TestCheckResourceAttrSet(resourceName, "object_org_id"),
 				),
 			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
 		},
 	})
 }
@@ -53,6 +58,11 @@ func TestAccACLResource_withPermission(t *testing.T) {
 					resource.TestCheckResourceAttr(resourceName, "permission", "read"),
 					resource.TestCheckResourceAttrSet(resourceName, "group_id"),
 				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
 			},
 		},
 	})
