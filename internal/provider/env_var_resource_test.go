@@ -30,6 +30,13 @@ func TestAccEnvVarResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet(resourceName, "object_id"),
 				),
 			},
+			// ImportState (value is write-only so it won't be verified).
+			{
+				ResourceName:            resourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"value"},
+			},
 			// Update the value.
 			{
 				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET", "secret-value-2"),

@@ -20,7 +20,7 @@ type projectTagModel struct {
 func mapProjectTagToModel(tag *client.ProjectTag, model *projectTagModel) {
 	model.ID = types.StringValue(tag.ID)
 	model.ProjectID = types.StringValue(tag.ProjectID)
-	model.UserID = types.StringValue(tag.UserID)
+	model.UserID = stringPtrToTFValue(tag.UserID)
 	model.Name = types.StringValue(tag.Name)
 	model.Description = stringPtrToTFValue(tag.Description)
 	model.Color = stringPtrToTFValue(tag.Color)

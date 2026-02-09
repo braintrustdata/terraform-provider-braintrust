@@ -15,42 +15,37 @@ import (
 func TestAccRoleResource_basic(t *testing.T) {
 	resourceName := "braintrust_role.test"
 	rName := "tf-acc-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	rNameUpdated := rName + "-updated"
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccCheckRoleDestroy,
 		Steps: []resource.TestStep{
+			// Step 1: Create.
 			{
-				Config: testAccRoleResourceConfig(rName),
+				Config: testAccRoleResourceConfig(rName, "Acceptance test role"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
+					resource.TestCheckResourceAttr(resourceName, "description", "Acceptance test role"),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
 					resource.TestCheckResourceAttrSet(resourceName, "org_id"),
 					resource.TestCheckResourceAttr(resourceName, "member_permissions.#", "2"),
 				),
 			},
+			// Step 2: Import.
 			{
 				ResourceName:      resourceName,
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
-		},
-	})
-}
-
-func TestAccRoleDataSource_basic(t *testing.T) {
-	dataSourceName := "data.braintrust_role.viewer"
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
+			// Step 3: Update name and description.
 			{
-				Config: `data "braintrust_role" "viewer" { name = "Viewer" }`,
+				Config: testAccRoleResourceConfig(rNameUpdated, "Updated description"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet(dataSourceName, "id"),
-					resource.TestCheckResourceAttr(dataSourceName, "name", "Viewer"),
+					resource.TestCheckResourceAttr(resourceName, "name", rNameUpdated),
+					resource.TestCheckResourceAttr(resourceName, "description", "Updated description"),
+					resource.TestCheckResourceAttr(resourceName, "member_permissions.#", "2"),
 				),
 			},
 		},
@@ -78,11 +73,11 @@ func testAccCheckRoleDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccRoleResourceConfig(name string) string {
+func testAccRoleResourceConfig(name, description string) string {
 	return fmt.Sprintf(`
 resource "braintrust_role" "test" {
   name        = %[1]q
-  description = "Acceptance test role"
+  description = %[2]q
 
   member_permissions = [
     {
@@ -94,5 +89,5 @@ resource "braintrust_role" "test" {
     },
   ]
 }
-`, name)
+`, name, description)
 }

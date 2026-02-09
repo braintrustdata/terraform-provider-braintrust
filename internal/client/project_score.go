@@ -12,7 +12,7 @@ const projectScoreBasePath = "/v1/project_score"
 type ProjectScore struct {
 	ID          string  `json:"id"`
 	ProjectID   string  `json:"project_id"`
-	UserID      string  `json:"user_id"`
+	UserID      *string `json:"user_id,omitempty"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
 	ScoreType   string  `json:"score_type"`
