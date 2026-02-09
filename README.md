@@ -31,6 +31,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_dataset` | Look up a dataset by ID |
 | `braintrust_group` | Look up a group by name |
 | `braintrust_role` | Look up a role by name (e.g. built-in `Viewer`, `Admin`) |
+| `braintrust_user` | Look up a user by email or ID (useful for group membership) |
 
 ## Usage
 
