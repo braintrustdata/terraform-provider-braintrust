@@ -1,0 +1,254 @@
+package provider
+
+import (
+	"context"
+
+	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+)
+
+var (
+	_ resource.Resource                = &roleResource{}
+	_ resource.ResourceWithConfigure   = &roleResource{}
+	_ resource.ResourceWithImportState = &roleResource{}
+)
+
+// NewRoleResource returns a new role resource.
+func NewRoleResource() resource.Resource {
+	return &roleResource{}
+}
+
+type roleResource struct {
+	client *client.Client
+}
+
+func (r *roleResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_role"
+}
+
+func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description:         "Manages a custom Braintrust role.",
+		MarkdownDescription: "Manages a custom Braintrust role. Roles are collections of permissions that can be granted via ACLs. Use the `braintrust_role` data source to reference built-in system roles.",
+		Attributes: map[string]schema.Attribute{
+			"id":         computedStringAttribute("Unique identifier for the role (UUID)."),
+			"org_id":     computedStringAttribute("Organization the role belongs to."),
+			"created":    computedStringAttribute("Date of role creation."),
+			"deleted_at": computedStringAttribute("Date of role deletion, or null if the role is still active."),
+			"user_id":    computedStringAttribute("Identifies the user who created the role."),
+			"name": schema.StringAttribute{
+				Required:    true,
+				Description: "Name of the role.",
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"description": optionalComputedStringAttribute("Textual description of the role."),
+			"member_permissions": schema.ListNestedAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Permissions that belong to this role. Each entry is a (permission, restrict_object_type) tuple.",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"permission": schema.StringAttribute{
+							Required:    true,
+							Description: "The permission type (create, read, update, delete, create_acls, read_acls, update_acls, delete_acls).",
+							Validators: []validator.String{
+								stringvalidator.OneOf(
+									"create", "read", "update", "delete",
+									"create_acls", "read_acls", "update_acls", "delete_acls",
+								),
+							},
+						},
+						"restrict_object_type": schema.StringAttribute{
+							Optional:    true,
+							Description: "Optionally restricts the permission to a specific object type.",
+							Validators: []validator.String{
+								stringvalidator.OneOf(aclObjectTypes...),
+							},
+						},
+					},
+				},
+			},
+			"member_roles": schema.ListAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "IDs of roles this role inherits from. An inheriting role has all the permissions of its member roles.",
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+		},
+	}
+}
+
+func (r *roleResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	r.client = clientFromProviderData(req.ProviderData, &resp.Diagnostics)
+}
+
+func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan roleModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !requireClient(r.client, &resp.Diagnostics) {
+		return
+	}
+
+	createReq := client.CreateRoleRequest{
+		Name:              plan.Name.ValueString(),
+		Description:       tfStringToPtr(plan.Description),
+		MemberPermissions: memberPermissionsFromModel(plan.MemberPermissions),
+		MemberRoles:       stringListFromModel(plan.MemberRoles),
+	}
+
+	tflog.Debug(ctx, "Creating role", map[string]any{"name": createReq.Name})
+
+	created, err := r.client.CreateRole(ctx, createReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Creating Braintrust Role",
+			"Could not create role, unexpected error: "+err.Error(),
+		)
+		return
+	}
+
+	// Re-read to get the full state.
+	role, err := r.client.GetRole(ctx, created.ID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Braintrust Role After Create",
+			"Role was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+		)
+		return
+	}
+
+	mapRoleToModel(role, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
+
+func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state roleModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !requireClient(r.client, &resp.Diagnostics) {
+		return
+	}
+
+	role, err := r.client.GetRole(ctx, state.ID.ValueString())
+	if err != nil {
+		if client.IsNotFoundError(err) {
+			tflog.Warn(ctx, "Role not found, removing from state", map[string]any{
+				"id": state.ID.ValueString(),
+			})
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error Reading Braintrust Role",
+			"Could not read role ID "+state.ID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	mapRoleToModel(role, &state)
+	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+}
+
+func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan roleModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	var state roleModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !requireClient(r.client, &resp.Diagnostics) {
+		return
+	}
+
+	// Compute add/remove diffs for member_permissions and member_roles.
+	currentPerms := memberPermissionsFromModel(state.MemberPermissions)
+	desiredPerms := memberPermissionsFromModel(plan.MemberPermissions)
+	addPerms, removePerms := diffMemberPermissions(currentPerms, desiredPerms)
+
+	currentRoles := stringListFromModel(state.MemberRoles)
+	desiredRoles := stringListFromModel(plan.MemberRoles)
+	addRoles, removeRoles := diffStringSlices(currentRoles, desiredRoles)
+
+	name := plan.Name.ValueString()
+	updateReq := client.UpdateRoleRequest{
+		Name:                    &name,
+		AddMemberPermissions:    addPerms,
+		RemoveMemberPermissions: removePerms,
+		AddMemberRoles:          addRoles,
+		RemoveMemberRoles:       removeRoles,
+	}
+
+	// Handle description clearing.
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		desc := plan.Description.ValueString()
+		updateReq.Description = &desc
+	} else if plan.Description.IsNull() && !state.Description.IsNull() {
+		empty := ""
+		updateReq.Description = &empty
+	}
+
+	tflog.Debug(ctx, "Updating role", map[string]any{"id": state.ID.ValueString()})
+
+	role, err := r.client.UpdateRole(ctx, state.ID.ValueString(), updateReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Updating Braintrust Role",
+			"Could not update role ID "+state.ID.ValueString()+": "+err.Error(),
+		)
+		return
+	}
+
+	mapRoleToModel(role, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
+
+func (r *roleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state roleModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !requireClient(r.client, &resp.Diagnostics) {
+		return
+	}
+
+	err := r.client.DeleteRole(ctx, state.ID.ValueString())
+	if err != nil {
+		if client.IsNotFoundError(err) {
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Error Deleting Braintrust Role",
+			"Could not delete role ID "+state.ID.ValueString()+": "+err.Error(),
+		)
+	}
+}
+
+func (r *roleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}

@@ -1,0 +1,22 @@
+---
+page_title: "Braintrust Provider"
+subcategory: ""
+description: |-
+  The Braintrust provider allows you to manage Braintrust resources.
+---
+
+# Braintrust Provider
+
+The Braintrust provider allows you to manage [Braintrust](https://www.braintrustdata.com/) resources such as projects, experiments, datasets, and more.
+
+## Authentication
+
+The provider requires a Braintrust API key for authentication. You can create an API key in the Braintrust [organization settings page](https://www.braintrustdata.com/app/settings?subroute=api-keys).
+
+The API key can be provided in the provider configuration block or via the `BRAINTRUST_API_KEY` environment variable.
+
+## Example Usage
+
+{{ tffile "examples/provider/main.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
