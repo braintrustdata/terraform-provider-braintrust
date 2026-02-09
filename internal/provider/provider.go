@@ -119,6 +119,9 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 		NewACLResource,
 		NewEnvVarResource,
 		NewAPIKeyResource,
+		NewProjectTagResource,
+		NewProjectScoreResource,
+		NewServiceTokenResource,
 	}
 }
 
