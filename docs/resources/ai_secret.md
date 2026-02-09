@@ -3,8 +3,8 @@
 page_title: "braintrust_ai_secret Resource - braintrust"
 subcategory: ""
 description: |-
-  Manages a Braintrust AI provider secret (e.g. OpenAI, Anthropic, Azure API keys).
-  AI secrets are organization-scoped — they are available to all projects within the org. For project-scoped credentials, use braintrust_env_var env_var with object_type = "project" instead.
+  Manages a Braintrust organization-level AI provider secret (e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI under Organization > "AI providers" and are available to all projects.
+  For project-level AI provider credentials (visible under Project Settings > "Project AI providers"), use braintrust_env_var env_var with secret_type set to the provider name instead.
   The secret attribute is write-only. Terraform sends it during create/update but the API never returns it. A masked preview_secret is available for verification.
   Tip: Use Terraform variables with sensitive = true for the secret value:
   
@@ -22,9 +22,9 @@ description: |-
 
 # braintrust_ai_secret (Resource)
 
-Manages a Braintrust AI provider secret (e.g. OpenAI, Anthropic, Azure API keys).
+Manages a Braintrust **organization-level** AI provider secret (e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI under Organization > "AI providers" and are available to all projects.
 
-AI secrets are **organization-scoped** — they are available to all projects within the org. For project-scoped credentials, use [`braintrust_env_var`](env_var) with `object_type = "project"` instead.
+For **project-level** AI provider credentials (visible under Project Settings > "Project AI providers"), use [`braintrust_env_var`](env_var) with `secret_type` set to the provider name instead.
 
 The `secret` attribute is write-only. Terraform sends it during create/update but the API never returns it. A masked `preview_secret` is available for verification.
 

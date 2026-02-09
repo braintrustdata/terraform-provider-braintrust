@@ -38,6 +38,12 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		Description: "Manages a Braintrust environment variable.",
 		MarkdownDescription: "Manages a Braintrust environment variable. Environment variables can be scoped " +
 			"to an organization, project, or function. Values are encrypted at rest.\n\n" +
+			"This resource also manages **project-level AI provider credentials**. To configure a " +
+			"project-scoped AI provider key (visible in the Braintrust UI under Project Settings > " +
+			"\"Project AI providers\"), set `secret_type` to the provider name (e.g. `\"openai\"`, " +
+			"`\"anthropic\"`). The API will automatically categorize it as an AI provider.\n\n" +
+			"For **organization-level** AI provider credentials (visible under Organization > " +
+			"\"AI providers\"), use [`braintrust_ai_secret`](ai_secret) instead.\n\n" +
 			"**Note:** The `value` attribute is write-only. Terraform stores it in state but the API " +
 			"never returns it, so it cannot be imported.",
 		Attributes: map[string]schema.Attribute{
@@ -73,7 +79,7 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 			"created":    computedStringAttribute("Date of environment variable creation."),
 			"used":       computedStringAttribute("Date the environment variable was last used."),
-			"secret_type": optionalComputedStringAttribute("Optional classification for the secret (for example, the AI provider name)."),
+			"secret_type": optionalComputedStringAttribute("The AI provider name (e.g. \"openai\", \"anthropic\"). When set, the env var appears under \"Project AI providers\" in the Braintrust UI."),
 			"secret_category": schema.StringAttribute{
 				Computed:    true,
 				Description: "The category of the secret: env_var for regular environment variables, ai_provider for AI provider API keys.",

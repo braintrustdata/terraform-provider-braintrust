@@ -4,12 +4,18 @@ page_title: "braintrust_env_var Resource - braintrust"
 subcategory: ""
 description: |-
   Manages a Braintrust environment variable. Environment variables can be scoped to an organization, project, or function. Values are encrypted at rest.
+  This resource also manages project-level AI provider credentials. To configure a project-scoped AI provider key (visible in the Braintrust UI under Project Settings > "Project AI providers"), set secret_type to the provider name (e.g. "openai", "anthropic"). The API will automatically categorize it as an AI provider.
+  For organization-level AI provider credentials (visible under Organization > "AI providers"), use braintrust_ai_secret ai_secret instead.
   Note: The value attribute is write-only. Terraform stores it in state but the API never returns it, so it cannot be imported.
 ---
 
 # braintrust_env_var (Resource)
 
 Manages a Braintrust environment variable. Environment variables can be scoped to an organization, project, or function. Values are encrypted at rest.
+
+This resource also manages **project-level AI provider credentials**. To configure a project-scoped AI provider key (visible in the Braintrust UI under Project Settings > "Project AI providers"), set `secret_type` to the provider name (e.g. `"openai"`, `"anthropic"`). The API will automatically categorize it as an AI provider.
+
+For **organization-level** AI provider credentials (visible under Organization > "AI providers"), use [`braintrust_ai_secret`](ai_secret) instead.
 
 **Note:** The `value` attribute is write-only. Terraform stores it in state but the API never returns it, so it cannot be imported.
 
@@ -26,7 +32,7 @@ Manages a Braintrust environment variable. Environment variables can be scoped t
 
 ### Optional
 
-- `secret_type` (String) Optional classification for the secret (for example, the AI provider name).
+- `secret_type` (String) The AI provider name (e.g. "openai", "anthropic"). When set, the env var appears under "Project AI providers" in the Braintrust UI.
 - `value` (String, Sensitive) The value of the environment variable. Encrypted at rest. Write-only: the API never returns this value.
 
 ### Read-Only
