@@ -22,6 +22,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_service_token` | Service tokens for programmatic access via service accounts |
 | `braintrust_project_score` | Score definitions for labeling experiments |
 | `braintrust_project_tag` | Tags for filtering experiments and logs |
+| `braintrust_project_automation` | Automation rules (alerts, exports, retention, env notifications) |
 
 ## Data Sources
 
