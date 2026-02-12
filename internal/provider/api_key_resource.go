@@ -33,6 +33,7 @@ func (r *apiKeyResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *apiKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     0,
 		Description: "Manages a Braintrust API key.",
 		MarkdownDescription: "Manages a Braintrust API key.\n\n" +
 			"**Important:** The raw API key (`key`) is only exposed at creation time and stored in Terraform state. " +

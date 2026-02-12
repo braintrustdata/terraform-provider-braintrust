@@ -35,6 +35,7 @@ func (r *envVarResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     0,
 		Description: "Manages a Braintrust environment variable.",
 		MarkdownDescription: "Manages a Braintrust environment variable. Environment variables can be scoped " +
 			"to an organization, project, or function. Values are encrypted at rest.\n\n" +

@@ -46,6 +46,7 @@ func (r *projectScoreResource) Metadata(_ context.Context, req resource.Metadata
 
 func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     0,
 		Description: "Manages a Braintrust project score.",
 		MarkdownDescription: "Manages a Braintrust project score. Scores are user-configured metrics " +
 			"that can be manually labeled through the UI or computed programmatically.\n\n" +

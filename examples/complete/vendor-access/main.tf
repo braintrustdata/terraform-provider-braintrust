@@ -20,7 +20,8 @@
 terraform {
   required_providers {
     braintrust = {
-      source = "braintrustdata/braintrust"
+      source  = "braintrustdata/braintrust"
+      version = "~> 0.1"
     }
   }
 }

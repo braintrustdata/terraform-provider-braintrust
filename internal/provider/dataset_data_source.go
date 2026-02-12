@@ -4,8 +4,11 @@ import (
 	"context"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -30,19 +33,25 @@ func (d *datasetDataSource) Metadata(_ context.Context, req datasource.MetadataR
 func (d *datasetDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "Use this data source to get information about an existing Braintrust dataset.",
-		MarkdownDescription: "Use this data source to get information about an existing Braintrust [dataset](https://www.braintrustdata.com/docs/guides/datasets).",
+		MarkdownDescription: "Use this data source to get information about an existing Braintrust [dataset](https://www.braintrustdata.com/docs/guides/datasets). Look up by `id` or by `name` + `project_id`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Required:    true,
-				Description: "The unique identifier (UUID) of the dataset to look up.",
+				Optional:    true,
+				Computed:    true,
+				Description: "The unique identifier (UUID) of the dataset. Provide either `id` or `name` (with `project_id`).",
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")),
+				},
 			},
 			"project_id": schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: "Unique identifier for the project that the dataset belongs to.",
+				Description: "The project the dataset belongs to. Required when looking up by `name`.",
 			},
 			"name": schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: "Name of the dataset.",
+				Description: "The name of the dataset. Provide `name` together with `project_id`, or use `id` instead.",
 			},
 			"description": schema.StringAttribute{
 				Computed:    true,
@@ -78,17 +87,56 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	tflog.Debug(ctx, "Reading dataset data source", map[string]any{
-		"id": config.ID.ValueString(),
-	})
+	var dataset *client.Dataset
+	var err error
 
-	dataset, err := d.client.GetDataset(ctx, config.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Braintrust Dataset",
-			"Could not read dataset ID "+config.ID.ValueString()+": "+err.Error(),
-		)
-		return
+	if !config.Name.IsNull() && !config.Name.IsUnknown() {
+		// Look up by name — project_id is required for scoping.
+		name := config.Name.ValueString()
+
+		if config.ProjectID.IsNull() || config.ProjectID.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Missing Required Attribute",
+				"\"project_id\" is required when looking up a dataset by name.",
+			)
+			return
+		}
+		projectID := config.ProjectID.ValueString()
+
+		tflog.Debug(ctx, "Looking up dataset by name", map[string]any{
+			"name":       name,
+			"project_id": projectID,
+		})
+
+		datasets, listErr := d.client.ListDatasets(ctx, name, projectID)
+		if listErr != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Braintrust Dataset",
+				"Could not list datasets: "+listErr.Error(),
+			)
+			return
+		}
+		if len(datasets) == 0 {
+			resp.Diagnostics.AddError(
+				"Dataset Not Found",
+				"No dataset found with name: "+name,
+			)
+			return
+		}
+		dataset = &datasets[0]
+	} else {
+		// Look up by ID.
+		id := config.ID.ValueString()
+		tflog.Debug(ctx, "Reading dataset data source", map[string]any{"id": id})
+
+		dataset, err = d.client.GetDataset(ctx, id)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Braintrust Dataset",
+				"Could not read dataset ID "+id+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	var state datasetModel

@@ -1,12 +1,17 @@
 # Look up an existing Braintrust project by ID
-data "braintrust_project" "example" {
+data "braintrust_project" "by_id" {
   id = "00000000-0000-0000-0000-000000000000"
 }
 
+# Or look up by name
+data "braintrust_project" "by_name" {
+  name = "my-ml-project"
+}
+
 output "project_name" {
-  value = data.braintrust_project.example.name
+  value = data.braintrust_project.by_name.name
 }
 
 output "project_org_id" {
-  value = data.braintrust_project.example.org_id
+  value = data.braintrust_project.by_name.org_id
 }

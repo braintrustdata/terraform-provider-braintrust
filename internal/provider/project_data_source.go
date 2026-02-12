@@ -3,11 +3,13 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-
-	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -35,19 +37,24 @@ func (d *projectDataSource) Metadata(_ context.Context, req datasource.MetadataR
 func (d *projectDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "Use this data source to get information about an existing Braintrust project.",
-		MarkdownDescription: "Use this data source to get information about an existing Braintrust [project](https://www.braintrustdata.com/docs/guides/projects).",
+		MarkdownDescription: "Use this data source to get information about an existing Braintrust [project](https://www.braintrustdata.com/docs/guides/projects). Look up by `id` or `name`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Required:    true,
-				Description: "The unique identifier (UUID) of the project to look up.",
+				Optional:    true,
+				Computed:    true,
+				Description: "The unique identifier (UUID) of the project. Provide either `id` or `name`.",
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")),
+				},
+			},
+			"name": schema.StringAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "The name of the project. Provide either `name` or `id`.",
 			},
 			"org_id": schema.StringAttribute{
 				Computed:    true,
 				Description: "Unique identifier for the organization that the project belongs to.",
-			},
-			"name": schema.StringAttribute{
-				Computed:    true,
-				Description: "Name of the project.",
 			},
 			"description": schema.StringAttribute{
 				Computed:    true,
@@ -94,17 +101,43 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	tflog.Debug(ctx, "Reading project data source", map[string]any{
-		"id": config.ID.ValueString(),
-	})
+	var project *client.Project
+	var err error
 
-	project, err := d.client.GetProject(ctx, config.ID.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Braintrust Project",
-			"Could not read project ID "+config.ID.ValueString()+": "+err.Error(),
-		)
-		return
+	if !config.Name.IsNull() && !config.Name.IsUnknown() {
+		// Look up by name.
+		name := config.Name.ValueString()
+		tflog.Debug(ctx, "Looking up project by name", map[string]any{"name": name})
+
+		projects, listErr := d.client.ListProjects(ctx, name)
+		if listErr != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Braintrust Project",
+				"Could not list projects: "+listErr.Error(),
+			)
+			return
+		}
+		if len(projects) == 0 {
+			resp.Diagnostics.AddError(
+				"Project Not Found",
+				"No project found with name: "+name,
+			)
+			return
+		}
+		project = &projects[0]
+	} else {
+		// Look up by ID.
+		id := config.ID.ValueString()
+		tflog.Debug(ctx, "Reading project data source", map[string]any{"id": id})
+
+		project, err = d.client.GetProject(ctx, id)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Reading Braintrust Project",
+				"Could not read project ID "+id+": "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Map response to the shared model.

@@ -53,6 +53,31 @@ func (c *Client) GetDataset(ctx context.Context, id string) (*Dataset, error) {
 	return &dataset, nil
 }
 
+// ListDatasetsResponse is the response from listing datasets.
+type ListDatasetsResponse struct {
+	Objects []Dataset `json:"objects"`
+}
+
+// ListDatasets lists datasets, optionally filtered by name and/or project ID.
+func (c *Client) ListDatasets(ctx context.Context, name string, projectID string) ([]Dataset, error) {
+	path := datasetBasePath
+	params := url.Values{}
+	if name != "" {
+		params.Set("dataset_name", name)
+	}
+	if projectID != "" {
+		params.Set("project_id", projectID)
+	}
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+	var resp ListDatasetsResponse
+	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Objects, nil
+}
+
 // UpdateDataset updates a dataset by ID.
 func (c *Client) UpdateDataset(ctx context.Context, id string, req UpdateDatasetRequest) (*Dataset, error) {
 	if id == "" {

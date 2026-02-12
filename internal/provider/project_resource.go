@@ -39,6 +39,7 @@ func (r *projectResource) Metadata(_ context.Context, req resource.MetadataReque
 // Schema defines the schema for the resource.
 func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:             0,
 		Description:         "Manages a Braintrust project.",
 		MarkdownDescription: "Manages a Braintrust [project](https://www.braintrustdata.com/docs/guides/projects). Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.",
 		Attributes: map[string]schema.Attribute{

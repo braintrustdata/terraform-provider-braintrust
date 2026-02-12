@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -77,6 +76,7 @@ func slackActionAttribute() schema.SingleNestedAttribute {
 
 func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 0,
 		MarkdownDescription: "Manages a Braintrust project automation rule. Automations allow you to " +
 			"set up alerts (webhook or Slack), scheduled data exports, data retention policies, " +
 			"and environment-update notifications for a project.\n\n" +
@@ -283,7 +283,7 @@ func (r *projectAutomationResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	mapProjectAutomationToModel(automation, &plan)
+	mapProjectAutomationToModel(ctx, automation, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -310,7 +310,7 @@ func (r *projectAutomationResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	mapProjectAutomationToModel(automation, &state)
+	mapProjectAutomationToModel(ctx, automation, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -349,7 +349,7 @@ func (r *projectAutomationResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	mapProjectAutomationToModel(automation, &plan)
+	mapProjectAutomationToModel(ctx, automation, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -381,7 +381,7 @@ func (r *projectAutomationResource) ImportState(ctx context.Context, req resourc
 // Mapping: API response → Terraform model
 // ---------------------------------------------------------------------------
 
-func mapProjectAutomationToModel(a *client.ProjectAutomation, model *projectAutomationModel) {
+func mapProjectAutomationToModel(ctx context.Context, a *client.ProjectAutomation, model *projectAutomationModel) {
 	model.ID = types.StringValue(a.ID)
 	model.ProjectID = types.StringValue(a.ProjectID)
 	model.Name = types.StringValue(a.Name)
@@ -393,7 +393,7 @@ func mapProjectAutomationToModel(a *client.ProjectAutomation, model *projectAuto
 		// Errors here are logged but don't block — state will be partially
 		// populated and a subsequent plan will detect drift.
 		if err := parseConfigToModel(a.Config, model); err != nil {
-			fmt.Printf("[WARN] failed to parse project_automation config: %v\n", err)
+			tflog.Warn(ctx, "failed to parse project_automation config", map[string]any{"error": err.Error()})
 		}
 	}
 }

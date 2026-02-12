@@ -33,6 +33,7 @@ func (r *serviceTokenResource) Metadata(_ context.Context, req resource.Metadata
 
 func (r *serviceTokenResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     0,
 		Description: "Manages a Braintrust service token.",
 		MarkdownDescription: "Manages a Braintrust service token.\n\n" +
 			"Service tokens are scoped to a service account and are used for programmatic API access.\n\n" +

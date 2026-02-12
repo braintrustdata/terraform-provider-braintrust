@@ -61,6 +61,24 @@ func (c *Client) GetProject(ctx context.Context, id string) (*Project, error) {
 	return &project, nil
 }
 
+// ListProjectsResponse is the response from listing projects.
+type ListProjectsResponse struct {
+	Objects []Project `json:"objects"`
+}
+
+// ListProjects lists projects, optionally filtered by name.
+func (c *Client) ListProjects(ctx context.Context, name string) ([]Project, error) {
+	path := projectBasePath
+	if name != "" {
+		path += "?project_name=" + url.QueryEscape(name)
+	}
+	var resp ListProjectsResponse
+	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Objects, nil
+}
+
 // UpdateProject updates a project by ID.
 func (c *Client) UpdateProject(ctx context.Context, id string, req UpdateProjectRequest) (*Project, error) {
 	if id == "" {

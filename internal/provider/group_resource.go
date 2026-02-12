@@ -36,6 +36,7 @@ func (r *groupResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:             0,
 		Description:         "Manages a Braintrust group.",
 		MarkdownDescription: "Manages a Braintrust group. Groups are collections of users that can be assigned permissions via ACLs. Groups can also inherit from other groups.",
 		Attributes: map[string]schema.Attribute{

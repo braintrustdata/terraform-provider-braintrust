@@ -35,6 +35,7 @@ func (r *aiSecretResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:     0,
 		Description: "Manages a Braintrust AI provider secret.",
 		MarkdownDescription: "Manages a Braintrust **organization-level** AI provider secret " +
 			"(e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI " +

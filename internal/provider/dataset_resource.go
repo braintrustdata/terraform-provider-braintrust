@@ -35,6 +35,7 @@ func (r *datasetResource) Metadata(_ context.Context, req resource.MetadataReque
 
 func (r *datasetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:             0,
 		Description:         "Manages a Braintrust dataset.",
 		MarkdownDescription: "Manages a Braintrust [dataset](https://www.braintrustdata.com/docs/guides/datasets). Datasets belong to a project and store evaluation data.",
 		Attributes: map[string]schema.Attribute{

@@ -35,6 +35,7 @@ func (r *projectTagResource) Metadata(_ context.Context, req resource.MetadataRe
 
 func (r *projectTagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:             0,
 		Description:         "Manages a Braintrust project tag.",
 		MarkdownDescription: "Manages a Braintrust project tag. Tags are user-configured labels for tracking and filtering experiments, logs, and other data within a project.",
 		Attributes: map[string]schema.Attribute{

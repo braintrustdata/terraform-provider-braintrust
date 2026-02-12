@@ -37,6 +37,7 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	requiresReplace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 
 	resp.Schema = schema.Schema{
+		Version:     0,
 		Description: "Manages a Braintrust ACL (access control list) entry.",
 		MarkdownDescription: "Manages a Braintrust ACL (access control list) entry. ACLs grant a permission or " +
 			"role to a user or group on a specific object.\n\n" +

@@ -51,6 +51,38 @@ func TestAccProjectDataSource_basic(t *testing.T) {
 	})
 }
 
+func TestAccProjectDataSource_byName(t *testing.T) {
+	resourceName := "braintrust_project.test"
+	dataSourceName := "data.braintrust_project.by_name"
+	rName := "tf-acc-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckProjectDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectDataSourceByNameConfig(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPair(
+						dataSourceName, "id",
+						resourceName, "id",
+					),
+					resource.TestCheckResourceAttrPair(
+						dataSourceName, "name",
+						resourceName, "name",
+					),
+					resource.TestCheckResourceAttrPair(
+						dataSourceName, "org_id",
+						resourceName, "org_id",
+					),
+					resource.TestCheckResourceAttr(dataSourceName, "name", rName),
+				),
+			},
+		},
+	})
+}
+
 func testAccProjectDataSourceConfig(name string) string {
 	return fmt.Sprintf(`
 resource "braintrust_project" "test" {
@@ -59,6 +91,18 @@ resource "braintrust_project" "test" {
 
 data "braintrust_project" "test" {
   id = braintrust_project.test.id
+}
+`, name)
+}
+
+func testAccProjectDataSourceByNameConfig(name string) string {
+	return fmt.Sprintf(`
+resource "braintrust_project" "test" {
+  name = %[1]q
+}
+
+data "braintrust_project" "by_name" {
+  name = braintrust_project.test.name
 }
 `, name)
 }

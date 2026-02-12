@@ -36,6 +36,7 @@ func (r *roleResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version:             0,
 		Description:         "Manages a custom Braintrust role.",
 		MarkdownDescription: "Manages a custom Braintrust role. Roles are collections of permissions that can be granted via ACLs. Use the `braintrust_role` data source to reference built-in system roles.",
 		Attributes: map[string]schema.Attribute{
