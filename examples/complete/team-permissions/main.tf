@@ -358,16 +358,16 @@ resource "braintrust_acl" "product_viewers_rag_readonly" {
 # --- RAG Pipeline project scaffolding ---
 
 resource "braintrust_project_score" "rag_relevance" {
-  project_id = braintrust_project.rag_pipeline.id
-  name       = "Relevance"
-  score_type = "slider"
+  project_id  = braintrust_project.rag_pipeline.id
+  name        = "Relevance"
+  score_type  = "slider"
   description = "How relevant is the retrieved context to the question?"
 }
 
 resource "braintrust_project_score" "rag_faithfulness" {
-  project_id = braintrust_project.rag_pipeline.id
-  name       = "Faithfulness"
-  score_type = "slider"
+  project_id  = braintrust_project.rag_pipeline.id
+  name        = "Faithfulness"
+  score_type  = "slider"
   description = "Does the answer stay faithful to the retrieved context?"
 }
 
@@ -403,11 +403,6 @@ resource "braintrust_project_score" "support_resolution" {
   name        = "Resolution"
   score_type  = "categorical"
   description = "Did the bot resolve the customer issue?"
-  categories = [
-    { name = "Resolved",  value = 1.0 },
-    { name = "Escalated", value = 0.5 },
-    { name = "Failed",    value = 0.0 },
-  ]
 }
 
 resource "braintrust_dataset" "support_test_cases" {
@@ -469,12 +464,12 @@ output "project_ids" {
 output "group_ids" {
   description = "Map of group name → ID"
   value = {
-    ml_leads           = braintrust_group.ml_leads.id
-    ml_engineers       = braintrust_group.ml_engineers.id
-    ml_viewers         = braintrust_group.ml_viewers.id
-    product_leads      = braintrust_group.product_leads.id
-    product_engineers  = braintrust_group.product_engineers.id
-    product_viewers    = braintrust_group.product_viewers.id
+    ml_leads          = braintrust_group.ml_leads.id
+    ml_engineers      = braintrust_group.ml_engineers.id
+    ml_viewers        = braintrust_group.ml_viewers.id
+    product_leads     = braintrust_group.product_leads.id
+    product_engineers = braintrust_group.product_engineers.id
+    product_viewers   = braintrust_group.product_viewers.id
   }
 }
 
