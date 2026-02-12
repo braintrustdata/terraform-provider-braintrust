@@ -5,7 +5,7 @@ data "braintrust_dataset" "by_id" {
 
 # Or look up by name within a project
 data "braintrust_dataset" "by_name" {
-  project_id = data.braintrust_project.example.id
+  project_id = "00000000-0000-0000-0000-000000000000"
   name       = "eval-dataset"
 }
 

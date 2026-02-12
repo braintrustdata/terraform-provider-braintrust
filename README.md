@@ -28,23 +28,36 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 
 | Data Source | Description |
 |---|---|
-| `braintrust_project` | Look up a project by ID |
-| `braintrust_dataset` | Look up a dataset by ID |
+| `braintrust_project` | Look up a project by ID or name |
+| `braintrust_dataset` | Look up a dataset by ID or by name + project |
 | `braintrust_group` | Look up a group by name |
 | `braintrust_role` | Look up a role by name (e.g. built-in `Viewer`, `Admin`) |
 | `braintrust_user` | Look up a user by email or ID (useful for group membership) |
 
-## Usage
+## Installation
+
+Add the provider to your `required_providers` block and run `terraform init`:
 
 ```hcl
 terraform {
   required_providers {
     braintrust = {
-      source = "braintrustdata/braintrust"
+      source  = "braintrustdata/braintrust"
+      version = "~> 0.1"
     }
   }
 }
+```
 
+## Authentication
+
+The provider requires a Braintrust API key. You can create one in the Braintrust [organization settings](https://www.braintrustdata.com/app/settings?subroute=api-keys).
+
+Set it via the `BRAINTRUST_API_KEY` environment variable (recommended) or in the provider block.
+
+## Usage
+
+```hcl
 provider "braintrust" {
   # api_key = "..."  # or set BRAINTRUST_API_KEY env var
 }
@@ -59,13 +72,12 @@ resource "braintrust_dataset" "eval_data" {
   name        = "eval-dataset"
   description = "Golden evaluation dataset"
 }
+
+# Look up an existing project by name
+data "braintrust_project" "existing" {
+  name = "my-ml-project"
+}
 ```
-
-## Authentication
-
-The provider requires a Braintrust API key. You can create one in the Braintrust [organization settings](https://www.braintrustdata.com/app/settings?subroute=api-keys).
-
-Set it via the `BRAINTRUST_API_KEY` environment variable (recommended) or in the provider block.
 
 ## Development
 

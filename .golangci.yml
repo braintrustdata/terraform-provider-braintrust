@@ -1,0 +1,36 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosimple
+    - gocritic
+    - gofmt
+    - misspell
+    - nolintlint
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+    disabled-checks:
+      - ifElseChain
+  misspell:
+    locale: US
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+
+issues:
+  exclude-dirs:
+    - dist
+  exclude-rules:
+    # Allow fmt.Errorf without wrapping in test files
+    - path: _test\.go
+      linters:
+        - errcheck
