@@ -5,7 +5,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.23 (to build the provider plugin)
+- [Go](https://golang.org/doc/install) >= 1.24 (to build the provider plugin)
 
 ## Resources
 
@@ -105,4 +105,4 @@ go generate ./...
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+This project is licensed under the [MPL-2.0](LICENSE).
