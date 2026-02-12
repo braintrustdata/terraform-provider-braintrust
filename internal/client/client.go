@@ -174,7 +174,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to execute request: %w", err)
-			// Don't retry if the context is done (cancelled or deadline exceeded).
+			// Don't retry if the context is done (canceled or deadline exceeded).
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}

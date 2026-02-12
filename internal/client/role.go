@@ -86,7 +86,7 @@ func (c *Client) ListRoles(ctx context.Context, name string) ([]Role, error) {
 }
 
 // UpdateRole updates a role by ID.
-func (c *Client) UpdateRole(ctx context.Context, id string, req UpdateRoleRequest) (*Role, error) {
+func (c *Client) UpdateRole(ctx context.Context, id string, req *UpdateRoleRequest) (*Role, error) {
 	if id == "" {
 		return nil, fmt.Errorf("role id is required")
 	}

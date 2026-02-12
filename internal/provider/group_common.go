@@ -31,4 +31,3 @@ func mapGroupToModel(group *client.Group, model *groupModel) {
 	model.MemberUsers = stringSliceToTFList(group.MemberUsers)
 	model.MemberGroups = stringSliceToTFList(group.MemberGroups)
 }
-

@@ -156,7 +156,11 @@ func stringListFromModel(list types.List) []string {
 	}
 	result := make([]string, len(list.Elements()))
 	for i, elem := range list.Elements() {
-		result[i] = elem.(types.String).ValueString()
+		s, ok := elem.(types.String)
+		if !ok {
+			continue
+		}
+		result[i] = s.ValueString()
 	}
 	return result
 }

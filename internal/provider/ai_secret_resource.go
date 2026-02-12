@@ -49,9 +49,9 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"```hcl\nvariable \"openai_api_key\" {\n  type      = string\n  sensitive = true\n}\n\n" +
 			"resource \"braintrust_ai_secret\" \"openai\" {\n  name   = \"OpenAI\"\n  type   = \"openai\"\n  secret = var.openai_api_key\n}\n```",
 		Attributes: map[string]schema.Attribute{
-			"id":        computedStringAttribute("Unique identifier for the AI secret (UUID)."),
-			"org_id":    computedStringAttribute("Unique identifier for the organization."),
-			"created":   computedStringAttribute("Date of AI secret creation."),
+			"id":         computedStringAttribute("Unique identifier for the AI secret (UUID)."),
+			"org_id":     computedStringAttribute("Unique identifier for the organization."),
+			"created":    computedStringAttribute("Date of AI secret creation."),
 			"updated_at": computedStringAttribute("Date of last AI secret update."),
 			"preview_secret": schema.StringAttribute{
 				Computed:    true,

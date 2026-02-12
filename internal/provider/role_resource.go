@@ -215,7 +215,7 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	tflog.Debug(ctx, "Updating role", map[string]any{"id": state.ID.ValueString()})
 
-	role, err := r.client.UpdateRole(ctx, state.ID.ValueString(), updateReq)
+	role, err := r.client.UpdateRole(ctx, state.ID.ValueString(), &updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Role",

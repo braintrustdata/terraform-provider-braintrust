@@ -20,6 +20,9 @@ linters-settings:
       - performance
     disabled-checks:
       - ifElseChain
+      # hugeParam flags every Terraform Plugin Framework CRUD method because
+      # the interfaces pass request structs by value. We can't change them.
+      - hugeParam
   misspell:
     locale: US
   nolintlint:

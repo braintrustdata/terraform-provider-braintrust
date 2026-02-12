@@ -42,10 +42,10 @@ func (r *serviceTokenResource) Schema(_ context.Context, _ resource.SchemaReques
 			"Service tokens are **immutable** — any attribute change requires destroying and recreating the token. " +
 			"Import is not supported because the raw key cannot be recovered.",
 		Attributes: map[string]schema.Attribute{
-			"id":           computedStringAttribute("Unique identifier for the service token (UUID)."),
-			"preview_name": computedStringAttribute("A preview/masked version of the token name."),
-			"created":      computedStringAttribute("Date of service token creation."),
-			"org_id":       computedStringAttribute("Unique identifier for the organization."),
+			"id":                    computedStringAttribute("Unique identifier for the service token (UUID)."),
+			"preview_name":          computedStringAttribute("A preview/masked version of the token name."),
+			"created":               computedStringAttribute("Date of service token creation."),
+			"org_id":                computedStringAttribute("Unique identifier for the organization."),
 			"service_account_email": computedStringAttribute("The service account email (not routable)."),
 			"service_account_name":  computedStringAttribute("The service account name."),
 			"name": schema.StringAttribute{

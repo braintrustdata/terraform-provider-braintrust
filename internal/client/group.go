@@ -80,7 +80,7 @@ func (c *Client) ListGroups(ctx context.Context, name string) ([]Group, error) {
 }
 
 // UpdateGroup updates a group by ID.
-func (c *Client) UpdateGroup(ctx context.Context, id string, req UpdateGroupRequest) (*Group, error) {
+func (c *Client) UpdateGroup(ctx context.Context, id string, req *UpdateGroupRequest) (*Group, error) {
 	if id == "" {
 		return nil, fmt.Errorf("group id is required")
 	}

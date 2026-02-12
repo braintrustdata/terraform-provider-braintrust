@@ -195,7 +195,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	tflog.Debug(ctx, "Updating group", map[string]any{"id": state.ID.ValueString()})
 
-	group, err := r.client.UpdateGroup(ctx, state.ID.ValueString(), updateReq)
+	group, err := r.client.UpdateGroup(ctx, state.ID.ValueString(), &updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Group",

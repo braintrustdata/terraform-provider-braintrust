@@ -52,21 +52,21 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"object_type": schema.StringAttribute{
-				Required:    true,
-				Description: "The type of object the ACL applies to.",
+				Required:      true,
+				Description:   "The type of object the ACL applies to.",
 				PlanModifiers: requiresReplace,
 				Validators: []validator.String{
 					stringvalidator.OneOf(aclObjectTypes...),
 				},
 			},
 			"object_id": schema.StringAttribute{
-				Required:    true,
-				Description: "The ID of the object the ACL applies to.",
+				Required:      true,
+				Description:   "The ID of the object the ACL applies to.",
 				PlanModifiers: requiresReplace,
 			},
 			"user_id": schema.StringAttribute{
-				Optional:    true,
-				Description: "ID of the user the ACL applies to. Exactly one of user_id and group_id must be provided.",
+				Optional:      true,
+				Description:   "ID of the user the ACL applies to. Exactly one of user_id and group_id must be provided.",
 				PlanModifiers: requiresReplace,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
@@ -75,13 +75,13 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"group_id": schema.StringAttribute{
-				Optional:    true,
-				Description: "ID of the group the ACL applies to. Exactly one of user_id and group_id must be provided.",
+				Optional:      true,
+				Description:   "ID of the group the ACL applies to. Exactly one of user_id and group_id must be provided.",
 				PlanModifiers: requiresReplace,
 			},
 			"permission": schema.StringAttribute{
-				Optional:    true,
-				Description: "The permission the ACL grants. Exactly one of permission and role_id must be provided.",
+				Optional:      true,
+				Description:   "The permission the ACL grants. Exactly one of permission and role_id must be provided.",
 				PlanModifiers: requiresReplace,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
@@ -91,8 +91,8 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"restrict_object_type": schema.StringAttribute{
-				Optional:    true,
-				Description: "Optionally restricts the permission to a specific object type. Cannot be set when role_id is used.",
+				Optional:      true,
+				Description:   "Optionally restricts the permission to a specific object type. Cannot be set when role_id is used.",
 				PlanModifiers: requiresReplace,
 				Validators: []validator.String{
 					stringvalidator.OneOf(aclObjectTypes...),
@@ -102,8 +102,8 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 				},
 			},
 			"role_id": schema.StringAttribute{
-				Optional:    true,
-				Description: "ID of the role the ACL grants. Exactly one of permission and role_id must be provided.",
+				Optional:      true,
+				Description:   "ID of the role the ACL grants. Exactly one of permission and role_id must be provided.",
 				PlanModifiers: requiresReplace,
 			},
 			"object_org_id": schema.StringAttribute{

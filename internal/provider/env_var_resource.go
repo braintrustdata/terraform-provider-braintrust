@@ -78,8 +78,8 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Sensitive:   true,
 				Description: "The value of the environment variable. Encrypted at rest. Write-only: the API never returns this value.",
 			},
-			"created":    computedStringAttribute("Date of environment variable creation."),
-			"used":       computedStringAttribute("Date the environment variable was last used."),
+			"created":     computedStringAttribute("Date of environment variable creation."),
+			"used":        computedStringAttribute("Date the environment variable was last used."),
 			"secret_type": optionalComputedStringAttribute("The AI provider name (e.g. \"openai\", \"anthropic\"). When set, the env var appears under \"Project AI providers\" in the Braintrust UI."),
 			"secret_category": schema.StringAttribute{
 				Computed:    true,

@@ -85,4 +85,3 @@ func memberPermissionsFromModel(perms []memberPermissionModel) []client.MemberPe
 	}
 	return result
 }
-

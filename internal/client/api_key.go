@@ -10,12 +10,12 @@ const apiKeyBasePath = "/v1/api_key"
 
 // APIKey represents a Braintrust API key (GET response — no raw key).
 type APIKey struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	PreviewName    string  `json:"preview_name"`
-	Created        *string `json:"created,omitempty"`
-	UserID         *string `json:"user_id,omitempty"`
-	OrgID          *string `json:"org_id,omitempty"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	PreviewName string  `json:"preview_name"`
+	Created     *string `json:"created,omitempty"`
+	UserID      *string `json:"user_id,omitempty"`
+	OrgID       *string `json:"org_id,omitempty"`
 }
 
 // CreateAPIKeyOutput is the POST response, which includes the raw key.
