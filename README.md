@@ -79,6 +79,25 @@ data "braintrust_project" "existing" {
 }
 ```
 
+## Adopting Existing Orgs
+
+If you already have a Braintrust organization and want an initial Terraform baseline, use
+[braintrust-terraforming](https://github.com/braintrustdata/braintrust-terraforming) to generate
+resource blocks (and optional import blocks) from your current org state.
+
+```sh
+export BRAINTRUST_API_KEY="sk-..."
+
+# Generate resource config
+braintrust-terraforming generate --resource-types all -o braintrust.tf
+
+# Or generate config + import blocks together
+braintrust-terraforming genimport --resource-types all -o braintrust.tf
+```
+
+After generating, review and trim the output to the resources you want to manage, then run
+`terraform init` and `terraform apply` to import them into state.
+
 ## Development
 
 ### Building
