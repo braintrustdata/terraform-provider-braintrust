@@ -183,11 +183,9 @@ resource "braintrust_acl" "consultants" {
 # 6. Vendor integration — service token for machine-to-machine access.
 # =============================================================================
 
-# You need an existing service account. Create one in the Braintrust UI
-# under Organization Settings → Service Accounts.
-variable "vendor_service_account_id" {
-  description = "Service account ID for vendor integration token"
-  type        = string
+# Create a service account for vendor integration automation.
+resource "braintrust_service_account" "vendor_integration" {
+  name = "vendor-integration"
 }
 
 # This token is shared with a vendor's system to push eval results.
@@ -195,7 +193,7 @@ variable "vendor_service_account_id" {
 # we'd scope via ACLs in a production setup.
 resource "braintrust_service_token" "vendor_integration" {
   name               = "vendor-eval-pusher"
-  service_account_id = var.vendor_service_account_id
+  service_account_id = braintrust_service_account.vendor_integration.id
 }
 
 # =============================================================================

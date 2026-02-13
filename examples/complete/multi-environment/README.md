@@ -62,6 +62,7 @@ Each environment gets its own CI service token, so CI pipelines can only write t
 | Custom roles | 4 | Dev Engineer, Staging Engineer, Prod Reader, Prod Operator |
 | Groups | 4 | Engineers, SRE, QA, Tech Leads |
 | ACLs | 9 | 3 environments × 2-3 group bindings each |
+| Service accounts | 3 | One CI identity per environment |
 | Service tokens | 3 | One per environment |
 | Automations | 6 | 3 alerts + 3 retention policies |
 | AI secrets | 1 | OpenAI |
@@ -81,10 +82,6 @@ The `ci_tokens` output is marked sensitive — use it to configure CI secrets:
 ```bash
 terraform output -json ci_tokens
 ```
-
-## Prerequisites
-
-Service tokens require pre-existing service accounts. Create them in the Braintrust UI under **Organization Settings → Service Accounts**, then pass the IDs via `ci_service_account_ids`.
 
 ## Related Examples
 

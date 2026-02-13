@@ -54,6 +54,7 @@ Vendor systems that push eval results programmatically use a service token (not 
 | Custom roles | 3 | External Labeler, External Consultant, Project Owner |
 | Groups | 3 | Internal Leads, External Labelers, External Consultants |
 | ACLs | 3 | One per group |
+| Service accounts | 1 | Vendor integration identity |
 | Service tokens | 1 | Vendor integration |
 | Datasets | 2 | Labeling Queue, Golden Test Set |
 | Scores | 3 | Helpfulness, Safety, Accuracy |
@@ -66,23 +67,17 @@ Vendor systems that push eval results programmatically use a service token (not 
 export BRAINTRUST_API_KEY="sk-..."
 
 terraform apply \
-  -var="openai_api_key=sk-..." \
-  -var="vendor_service_account_id=your-uuid"
+  -var="openai_api_key=sk-..."
 ```
 
 Or use a `terraform.tfvars`:
 
 ```hcl
 openai_api_key            = "sk-..."
-vendor_service_account_id = "your-service-account-uuid"
 
 labeler_emails    = ["labeler1@contractor.com", "labeler2@contractor.com"]
 consultant_emails = ["advisor@consulting.com"]
 ```
-
-## Prerequisites
-
-The `vendor_service_account_id` must reference an existing service account. Create one in the Braintrust UI under **Organization Settings → Service Accounts**.
 
 ## Security Checklist
 

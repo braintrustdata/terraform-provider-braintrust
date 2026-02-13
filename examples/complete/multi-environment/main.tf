@@ -265,34 +265,33 @@ resource "braintrust_acl" "leads_prod" {
 
 # =============================================================================
 # 6. Service tokens per environment.
-#
-# You need an existing service account per environment. Create them in the
-# Braintrust UI under Organization Settings → Service Accounts.
 # =============================================================================
 
-variable "ci_service_account_ids" {
-  description = "Map of environment → service account ID for CI tokens"
-  type        = map(string)
-  default = {
-    dev     = "your-dev-service-account-uuid"
-    staging = "your-staging-service-account-uuid"
-    prod    = "your-prod-service-account-uuid"
-  }
+resource "braintrust_service_account" "ci_dev" {
+  name = "ci-dev"
+}
+
+resource "braintrust_service_account" "ci_staging" {
+  name = "ci-staging"
+}
+
+resource "braintrust_service_account" "ci_prod" {
+  name = "ci-prod"
 }
 
 resource "braintrust_service_token" "ci_dev" {
   name               = "ci-dev"
-  service_account_id = var.ci_service_account_ids["dev"]
+  service_account_id = braintrust_service_account.ci_dev.id
 }
 
 resource "braintrust_service_token" "ci_staging" {
   name               = "ci-staging"
-  service_account_id = var.ci_service_account_ids["staging"]
+  service_account_id = braintrust_service_account.ci_staging.id
 }
 
 resource "braintrust_service_token" "ci_prod" {
   name               = "ci-prod"
-  service_account_id = var.ci_service_account_ids["prod"]
+  service_account_id = braintrust_service_account.ci_prod.id
 }
 
 # =============================================================================

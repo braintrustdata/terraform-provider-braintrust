@@ -1,7 +1,12 @@
+# Create a service account first.
+resource "braintrust_service_account" "ci" {
+  name = "ci-pipeline"
+}
+
 # Create a service token for programmatic API access.
 resource "braintrust_service_token" "ci" {
   name               = "ci-pipeline"
-  service_account_id = "your-service-account-uuid"
+  service_account_id = braintrust_service_account.ci.id
 }
 
 # The raw token is only available at creation time.
