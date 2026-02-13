@@ -8,8 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -53,12 +53,12 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"description": optionalComputedStringAttribute("Textual description of the role."),
-			"member_permissions": schema.ListNestedAttribute{
+			"member_permissions": schema.SetNestedAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Permissions that belong to this role. Each entry is a (permission, restrict_object_type) tuple.",
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
 				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -82,13 +82,13 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					},
 				},
 			},
-			"member_roles": schema.ListAttribute{
+			"member_roles": schema.SetAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "IDs of roles this role inherits from. An inheriting role has all the permissions of its member roles.",
 				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -113,7 +113,7 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Name:              plan.Name.ValueString(),
 		Description:       tfStringToPtr(plan.Description),
 		MemberPermissions: memberPermissionsFromModel(plan.MemberPermissions),
-		MemberRoles:       stringListFromModel(plan.MemberRoles),
+		MemberRoles:       stringSetFromModel(plan.MemberRoles),
 	}
 
 	tflog.Debug(ctx, "Creating role", map[string]any{"name": createReq.Name})
@@ -191,8 +191,8 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	desiredPerms := memberPermissionsFromModel(plan.MemberPermissions)
 	addPerms, removePerms := diffMemberPermissions(currentPerms, desiredPerms)
 
-	currentRoles := stringListFromModel(state.MemberRoles)
-	desiredRoles := stringListFromModel(plan.MemberRoles)
+	currentRoles := stringSetFromModel(state.MemberRoles)
+	desiredRoles := stringSetFromModel(plan.MemberRoles)
 	addRoles, removeRoles := diffStringSlices(currentRoles, desiredRoles)
 
 	name := plan.Name.ValueString()

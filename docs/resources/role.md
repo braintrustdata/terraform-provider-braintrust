@@ -22,8 +22,8 @@ Manages a custom Braintrust role. Roles are collections of permissions that can 
 ### Optional
 
 - `description` (String) Textual description of the role.
-- `member_permissions` (Attributes List) Permissions that belong to this role. Each entry is a (permission, restrict_object_type) tuple. (see [below for nested schema](#nestedatt--member_permissions))
-- `member_roles` (List of String) IDs of roles this role inherits from. An inheriting role has all the permissions of its member roles.
+- `member_permissions` (Attributes Set) Permissions that belong to this role. Each entry is a (permission, restrict_object_type) tuple. (see [below for nested schema](#nestedatt--member_permissions))
+- `member_roles` (Set of String) IDs of roles this role inherits from. An inheriting role has all the permissions of its member roles.
 
 ### Read-Only
 

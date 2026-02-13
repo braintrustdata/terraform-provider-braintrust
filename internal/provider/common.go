@@ -165,6 +165,35 @@ func stringListFromModel(list types.List) []string {
 	return result
 }
 
+// stringSliceToTFSet converts a Go string slice to a Terraform types.Set of strings.
+func stringSliceToTFSet(ss []string) types.Set {
+	if len(ss) == 0 {
+		return types.SetValueMust(types.StringType, []attr.Value{})
+	}
+	elems := make([]attr.Value, len(ss))
+	for i, s := range ss {
+		elems[i] = types.StringValue(s)
+	}
+	return types.SetValueMust(types.StringType, elems)
+}
+
+// stringSetFromModel extracts a []string from a types.Set of strings.
+// Returns nil if the set is null, unknown, or empty.
+func stringSetFromModel(set types.Set) []string {
+	if set.IsNull() || set.IsUnknown() || len(set.Elements()) == 0 {
+		return nil
+	}
+	result := make([]string, len(set.Elements()))
+	for i, elem := range set.Elements() {
+		s, ok := elem.(types.String)
+		if !ok {
+			continue
+		}
+		result[i] = s.ValueString()
+	}
+	return result
+}
+
 // diffMemberPermissions computes the permissions to add and remove.
 func diffMemberPermissions(current, desired []client.MemberPermission) (add, remove []client.MemberPermission) {
 	currentSet := make(map[string]bool, len(current))

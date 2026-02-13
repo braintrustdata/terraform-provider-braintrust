@@ -25,8 +25,8 @@ Use this data source to look up a Braintrust role by name. Useful for referencin
 - `deleted_at` (String) Date of role deletion, or null if the role is still active.
 - `description` (String) Textual description of the role.
 - `id` (String) Unique identifier for the role (UUID).
-- `member_permissions` (Attributes List) Permissions that belong to this role. (see [below for nested schema](#nestedatt--member_permissions))
-- `member_roles` (List of String) IDs of roles this role inherits from.
+- `member_permissions` (Attributes Set) Permissions that belong to this role. (see [below for nested schema](#nestedatt--member_permissions))
+- `member_roles` (Set of String) IDs of roles this role inherits from.
 - `org_id` (String) Organization the role belongs to. Null for system roles.
 - `user_id` (String) Identifies the user who created the role.
 

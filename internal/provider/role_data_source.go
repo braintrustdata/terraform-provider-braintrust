@@ -61,7 +61,7 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 				Computed:    true,
 				Description: "Identifies the user who created the role.",
 			},
-			"member_permissions": schema.ListNestedAttribute{
+			"member_permissions": schema.SetNestedAttribute{
 				Computed:    true,
 				Description: "Permissions that belong to this role.",
 				NestedObject: schema.NestedAttributeObject{
@@ -77,7 +77,7 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 					},
 				},
 			},
-			"member_roles": schema.ListAttribute{
+			"member_roles": schema.SetAttribute{
 				Computed:    true,
 				Description: "IDs of roles this role inherits from.",
 				ElementType: types.StringType,

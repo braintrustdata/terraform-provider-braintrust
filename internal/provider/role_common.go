@@ -1,8 +1,6 @@
 package provider
 
 import (
-	"sort"
-
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -17,7 +15,7 @@ type roleModel struct {
 	DeletedAt         types.String            `tfsdk:"deleted_at"`
 	UserID            types.String            `tfsdk:"user_id"`
 	MemberPermissions []memberPermissionModel `tfsdk:"member_permissions"`
-	MemberRoles       types.List              `tfsdk:"member_roles"`
+	MemberRoles       types.Set               `tfsdk:"member_roles"`
 }
 
 // memberPermissionModel represents a single (permission, restrict_object_type) tuple.
@@ -36,27 +34,11 @@ func mapRoleToModel(role *client.Role, model *roleModel) {
 	model.DeletedAt = stringPtrToTFValue(role.DeletedAt)
 	model.UserID = stringPtrToTFValue(role.UserID)
 
-	// Map member_permissions, sorted deterministically by (permission, restrict_object_type)
-	// so that the API's return order doesn't cause spurious diffs.
+	// Map member_permissions. Since this is a Set in the schema, Terraform
+	// handles ordering; no need to sort.
 	if len(role.MemberPermissions) > 0 {
-		sorted := make([]client.MemberPermission, len(role.MemberPermissions))
-		copy(sorted, role.MemberPermissions)
-		sort.Slice(sorted, func(i, j int) bool {
-			if sorted[i].Permission != sorted[j].Permission {
-				return sorted[i].Permission < sorted[j].Permission
-			}
-			ri, rj := "", ""
-			if sorted[i].RestrictObjectType != nil {
-				ri = *sorted[i].RestrictObjectType
-			}
-			if sorted[j].RestrictObjectType != nil {
-				rj = *sorted[j].RestrictObjectType
-			}
-			return ri < rj
-		})
-
-		perms := make([]memberPermissionModel, len(sorted))
-		for i, mp := range sorted {
+		perms := make([]memberPermissionModel, len(role.MemberPermissions))
+		for i, mp := range role.MemberPermissions {
 			perms[i] = memberPermissionModel{
 				Permission:         types.StringValue(mp.Permission),
 				RestrictObjectType: stringPtrToTFValue(mp.RestrictObjectType),
@@ -68,7 +50,7 @@ func mapRoleToModel(role *client.Role, model *roleModel) {
 	}
 
 	// Map member_roles.
-	model.MemberRoles = stringSliceToTFList(role.MemberRoles)
+	model.MemberRoles = stringSliceToTFSet(role.MemberRoles)
 }
 
 // memberPermissionsFromModel converts the TF model to client structs.
