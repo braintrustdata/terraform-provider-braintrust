@@ -65,6 +65,7 @@ All projects get 60-day log retention to keep storage costs under control while 
 | Scores | 9 | 3 scores × 3 projects |
 | Tags | 12 | 4 tags × 3 projects |
 | Datasets | 3 | Golden test cases per project |
+| Service accounts | 2 | CI runner + monitoring identities |
 | Service tokens | 2 | CI runner + monitoring |
 | Automations | 9 | 2 alerts + 1 retention per project |
 | AI secrets | 1 | OpenAI |
@@ -76,8 +77,6 @@ export BRAINTRUST_API_KEY="sk-..."
 
 terraform apply \
   -var="openai_api_key=sk-..." \
-  -var="ci_service_account_id=your-uuid" \
-  -var="monitoring_service_account_id=your-uuid" \
   -var="slack_webhook_url=https://hooks.slack.com/services/..."
 ```
 
@@ -90,10 +89,6 @@ terraform output -raw ci_runner_token
 # Get project IDs (use in CI scripts to target the right project)
 terraform output -json project_ids
 ```
-
-## Prerequisites
-
-Service tokens require pre-existing service accounts. Create them in the Braintrust UI under **Organization Settings → Service Accounts**.
 
 ## Example CI Integration (GitHub Actions)
 

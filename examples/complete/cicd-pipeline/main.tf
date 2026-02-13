@@ -142,28 +142,25 @@ resource "braintrust_dataset" "golden" {
 #    Principle of least privilege: each token can only do what it needs.
 # =============================================================================
 
-# You need an existing service account. Create one in the Braintrust UI
-# under Organization Settings → Service Accounts, then paste the ID here.
-variable "ci_service_account_id" {
-  description = "Service account ID for CI runner tokens"
-  type        = string
+# Create service accounts for CI and monitoring.
+resource "braintrust_service_account" "ci_runner" {
+  name = "ci-runner"
 }
 
-variable "monitoring_service_account_id" {
-  description = "Service account ID for monitoring tokens"
-  type        = string
+resource "braintrust_service_account" "monitoring" {
+  name = "monitoring-readonly"
 }
 
 # CI runner token: create experiments and push results. Cannot delete.
 resource "braintrust_service_token" "ci_runner" {
   name               = "ci-runner"
-  service_account_id = var.ci_service_account_id
+  service_account_id = braintrust_service_account.ci_runner.id
 }
 
 # Monitoring token: read-only, used by dashboards and alerting.
 resource "braintrust_service_token" "monitoring" {
   name               = "monitoring-readonly"
-  service_account_id = var.monitoring_service_account_id
+  service_account_id = braintrust_service_account.monitoring.id
 }
 
 # =============================================================================
