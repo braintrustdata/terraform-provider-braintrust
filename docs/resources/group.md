@@ -22,8 +22,8 @@ Manages a Braintrust group. Groups are collections of users that can be assigned
 ### Optional
 
 - `description` (String) Textual description of the group.
-- `member_groups` (List of String) IDs of groups this group inherits from. An inheriting group has all the users of its member groups.
-- `member_users` (List of String) IDs of users in this group.
+- `member_groups` (Set of String) IDs of groups this group inherits from. An inheriting group has all the users of its member groups.
+- `member_users` (Set of String) IDs of users in this group.
 
 ### Read-Only
 

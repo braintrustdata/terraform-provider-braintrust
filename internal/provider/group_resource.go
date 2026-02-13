@@ -8,8 +8,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -53,22 +53,22 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 			},
 			"description": optionalComputedStringAttribute("Textual description of the group."),
-			"member_users": schema.ListAttribute{
+			"member_users": schema.SetAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "IDs of users in this group.",
 				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"member_groups": schema.ListAttribute{
+			"member_groups": schema.SetAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "IDs of groups this group inherits from. An inheriting group has all the users of its member groups.",
 				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -92,8 +92,8 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	createReq := client.CreateGroupRequest{
 		Name:         plan.Name.ValueString(),
 		Description:  tfStringToPtr(plan.Description),
-		MemberUsers:  stringListFromModel(plan.MemberUsers),
-		MemberGroups: stringListFromModel(plan.MemberGroups),
+		MemberUsers:  stringSetFromModel(plan.MemberUsers),
+		MemberGroups: stringSetFromModel(plan.MemberGroups),
 	}
 
 	tflog.Debug(ctx, "Creating group", map[string]any{"name": createReq.Name})
@@ -167,12 +167,12 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	// Compute add/remove diffs for members.
-	currentUsers := stringListFromModel(state.MemberUsers)
-	desiredUsers := stringListFromModel(plan.MemberUsers)
+	currentUsers := stringSetFromModel(state.MemberUsers)
+	desiredUsers := stringSetFromModel(plan.MemberUsers)
 	addUsers, removeUsers := diffStringSlices(currentUsers, desiredUsers)
 
-	currentGroups := stringListFromModel(state.MemberGroups)
-	desiredGroups := stringListFromModel(plan.MemberGroups)
+	currentGroups := stringSetFromModel(state.MemberGroups)
+	desiredGroups := stringSetFromModel(plan.MemberGroups)
 	addGroups, removeGroups := diffStringSlices(currentGroups, desiredGroups)
 
 	name := plan.Name.ValueString()

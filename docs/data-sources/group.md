@@ -25,7 +25,7 @@ Use this data source to look up a Braintrust group by name. Useful for referenci
 - `deleted_at` (String) Date of group deletion, or null if the group is still active.
 - `description` (String) Textual description of the group.
 - `id` (String) Unique identifier for the group (UUID).
-- `member_groups` (List of String) IDs of groups this group inherits from.
-- `member_users` (List of String) IDs of users in this group.
+- `member_groups` (Set of String) IDs of groups this group inherits from.
+- `member_users` (Set of String) IDs of users in this group.
 - `org_id` (String) Organization the group belongs to.
 - `user_id` (String) Identifies the user who created the group.

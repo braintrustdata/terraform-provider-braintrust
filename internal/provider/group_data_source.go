@@ -61,12 +61,12 @@ func (d *groupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				Computed:    true,
 				Description: "Identifies the user who created the group.",
 			},
-			"member_users": schema.ListAttribute{
+			"member_users": schema.SetAttribute{
 				Computed:    true,
 				Description: "IDs of users in this group.",
 				ElementType: types.StringType,
 			},
-			"member_groups": schema.ListAttribute{
+			"member_groups": schema.SetAttribute{
 				Computed:    true,
 				Description: "IDs of groups this group inherits from.",
 				ElementType: types.StringType,

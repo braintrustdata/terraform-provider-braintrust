@@ -14,8 +14,8 @@ type groupModel struct {
 	Created      types.String `tfsdk:"created"`
 	DeletedAt    types.String `tfsdk:"deleted_at"`
 	UserID       types.String `tfsdk:"user_id"`
-	MemberUsers  types.List   `tfsdk:"member_users"`
-	MemberGroups types.List   `tfsdk:"member_groups"`
+	MemberUsers  types.Set    `tfsdk:"member_users"`
+	MemberGroups types.Set    `tfsdk:"member_groups"`
 }
 
 // mapGroupToModel maps a client.Group to the shared Terraform model.
@@ -28,6 +28,6 @@ func mapGroupToModel(group *client.Group, model *groupModel) {
 	model.DeletedAt = stringPtrToTFValue(group.DeletedAt)
 	model.UserID = stringPtrToTFValue(group.UserID)
 
-	model.MemberUsers = stringSliceToTFList(group.MemberUsers)
-	model.MemberGroups = stringSliceToTFList(group.MemberGroups)
+	model.MemberUsers = stringSliceToTFSet(group.MemberUsers)
+	model.MemberGroups = stringSliceToTFSet(group.MemberGroups)
 }
