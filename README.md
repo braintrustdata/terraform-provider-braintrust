@@ -79,6 +79,22 @@ data "braintrust_project" "existing" {
 }
 ```
 
+### Email-First User Membership
+
+For group membership and ACL user grants, write config using emails and resolve to IDs via
+`data "braintrust_user"`:
+
+```hcl
+data "braintrust_user" "alice" {
+  email = "alice@company.com"
+}
+
+resource "braintrust_group" "engineering" {
+  name         = "Engineering"
+  member_users = [data.braintrust_user.alice.id]
+}
+```
+
 ## Adopting Existing Orgs
 
 If you already have a Braintrust organization and want an initial Terraform baseline, use

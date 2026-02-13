@@ -1,10 +1,19 @@
-# Create a group for the ML team
+# Look up users by email so we do not hardcode UUIDs.
+data "braintrust_user" "alice" {
+  email = "alice@company.com"
+}
+
+data "braintrust_user" "bob" {
+  email = "bob@company.com"
+}
+
+# Create a group for the ML team.
 resource "braintrust_group" "ml_team" {
   name        = "ML Team"
   description = "Machine learning engineers"
   member_users = [
-    "user-uuid-1",
-    "user-uuid-2",
+    data.braintrust_user.alice.id,
+    data.braintrust_user.bob.id,
   ]
 }
 
