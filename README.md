@@ -115,6 +115,32 @@ braintrust-terraforming genimport --resource-types all -o braintrust.tf
 After generating, review and trim the output to the resources you want to manage, then run
 `terraform init` and `terraform apply` to import them into state.
 
+## What To Manage In Terraform
+
+Terraform works best for stable control-plane state, not high-churn application content.
+
+### Good Terraform Fits
+
+- Access and identity controls: groups, roles, ACLs, service accounts, service tokens.
+- Environment scaffolding: projects, score definitions, tags, baseline datasets (container objects).
+- Organization policy/configuration: secrets wiring, automations, retention policy.
+
+### Better Managed In Code Pipelines
+
+- High-churn product logic (for example: frequently changing prompts/functions).
+- Data payloads and runtime events (dataset rows, logs, experiment events).
+- Artifacts that ship with application releases and should follow app deployment cadence.
+
+### Decision Rule
+
+Use Terraform when the object should be centrally governed, low-frequency, and shared across teams/environments.
+Use an application CI/CD pipeline when the object is product code, changes frequently, and is owned by a single app team.
+
+### Practical Split (Recommended)
+
+- Terraform owns platform guardrails and shared infrastructure.
+- App repos own fast-moving prompt/function code and runtime content.
+
 ## Development
 
 ### Building
