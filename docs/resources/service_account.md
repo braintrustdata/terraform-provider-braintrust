@@ -4,16 +4,14 @@ page_title: "braintrust_service_account Resource - braintrust"
 subcategory: ""
 description: |-
   Manages a Braintrust service account.
-  Service accounts are organization members intended for non-human, programmatic use.
-  Use `braintrust_service_token` to mint tokens for this service account.
+  Service accounts are organization members intended for non-human, programmatic use. Use braintrust_service_token to mint tokens for this service account.
 ---
 
 # braintrust_service_account (Resource)
 
 Manages a Braintrust service account.
 
-Service accounts are organization members intended for non-human, programmatic use.
-Use `braintrust_service_token` to mint tokens for this service account.
+Service accounts are organization members intended for non-human, programmatic use. Use `braintrust_service_token` to mint tokens for this service account.
 
 
 
