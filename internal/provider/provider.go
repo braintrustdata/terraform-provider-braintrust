@@ -114,6 +114,7 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 	return []func() resource.Resource{
 		NewProjectResource,
 		NewDatasetResource,
+		NewPromptResource,
 		NewGroupResource,
 		NewRoleResource,
 		NewACLResource,
@@ -133,6 +134,7 @@ func (p *braintrustProvider) DataSources(_ context.Context) []func() datasource.
 	return []func() datasource.DataSource{
 		NewProjectDataSource,
 		NewDatasetDataSource,
+		NewPromptDataSource,
 		NewGroupDataSource,
 		NewRoleDataSource,
 		NewUserDataSource,
