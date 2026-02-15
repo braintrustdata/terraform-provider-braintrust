@@ -3,8 +3,7 @@
 page_title: "braintrust_prompt Data Source - braintrust"
 subcategory: ""
 description: |-
-  Use this data source to get information about an existing Braintrust prompt.
-  Look up by id or by name + project_id.
+  Use this data source to get information about an existing Braintrust prompt. Look up by id or by name + project_id.
 ---
 
 # braintrust_prompt (Data Source)

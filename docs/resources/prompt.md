@@ -3,12 +3,12 @@
 page_title: "braintrust_prompt Resource - braintrust"
 subcategory: ""
 description: |-
-  Manages a Braintrust prompt. Prompts belong to a project.
+  Manages a Braintrust prompt. This resource covers prompt object metadata and identity fields.
 ---
 
 # braintrust_prompt (Resource)
 
-Manages a Braintrust prompt. Prompts belong to a project.
+Manages a Braintrust prompt. This resource covers prompt object metadata and identity fields.
 
 
 
