@@ -96,6 +96,13 @@ resource "braintrust_group" "engineering" {
   name         = "Engineering"
   member_users = [data.braintrust_user.alice.id]
 }
+
+resource "braintrust_acl" "alice_project_viewer" {
+  object_type = "project"
+  object_id   = braintrust_project.my_project.id
+  user_id     = data.braintrust_user.alice.id
+  permission  = "read"
+}
 ```
 
 ## Adopting Existing Orgs
