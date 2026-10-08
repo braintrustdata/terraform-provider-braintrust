@@ -117,8 +117,9 @@ func IsNotFoundError(err error) bool {
 }
 
 // doRequest performs an HTTP request with retry logic and returns the result.
-// It retries on network errors and retriable HTTP status codes with exponential
-// backoff plus random jitter to avoid thundering-herd effects.
+// Reads can be retried after network errors and transient HTTP statuses. Writes
+// are retried only when the API explicitly rejects them with 429; after a
+// transport error or 5xx, the server may have committed a non-idempotent write.
 func (c *Client) doRequest(ctx context.Context, method, path string, body any, result any) error {
 	url := fmt.Sprintf("%s%s", c.baseURL, path)
 
@@ -178,6 +179,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
+			if method != http.MethodGet {
+				return fmt.Errorf("%s request outcome is unknown after a transport error; inspect the remote resource before retrying: %w", method, lastErr)
+			}
 			continue
 		}
 
@@ -224,6 +228,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 			lastErr = &APIError{
 				StatusCode: resp.StatusCode,
 				Message:    string(respBody),
+			}
+			if method != http.MethodGet && resp.StatusCode != http.StatusTooManyRequests {
+				return fmt.Errorf("%s request outcome is unknown after HTTP %d; inspect the remote resource before retrying: %w", method, resp.StatusCode, lastErr)
 			}
 			continue
 		}

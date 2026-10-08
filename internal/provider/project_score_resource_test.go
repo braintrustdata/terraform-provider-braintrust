@@ -52,6 +52,42 @@ func TestAccProjectScoreResource_basic(t *testing.T) {
 	})
 }
 
+func TestAccProjectScoreResource_scoreTypeReplaces(t *testing.T) {
+	name := "tf-acc-score-type-" + acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum)
+	var firstID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckProjectScoreDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectScoreResourceConfig(name, "slider"),
+				Check: func(s *terraform.State) error {
+					firstID = s.RootModule().Resources["braintrust_project_score.test"].Primary.ID
+					if firstID == "" {
+						return fmt.Errorf("slider score has no ID")
+					}
+					return nil
+				},
+			},
+			{
+				Config: testAccProjectScoreResourceConfig(name, "categorical"),
+				Check: func(s *terraform.State) error {
+					score := s.RootModule().Resources["braintrust_project_score.test"]
+					if score.Primary.ID == firstID {
+						return fmt.Errorf("score type change kept ID %s; expected replacement", firstID)
+					}
+					if score.Primary.Attributes["score_type"] != "categorical" {
+						return fmt.Errorf("unexpected replacement score type: %s", score.Primary.Attributes["score_type"])
+					}
+					return nil
+				},
+			},
+		},
+	})
+}
+
 func testAccCheckProjectScoreDestroy(s *terraform.State) error {
 	c, err := client.NewClient(os.Getenv(client.EnvAPIURL), os.Getenv(client.EnvAPIKey), "")
 	if err != nil {

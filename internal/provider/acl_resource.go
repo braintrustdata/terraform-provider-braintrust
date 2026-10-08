@@ -165,6 +165,8 @@ func (r *aclResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Re-read to get the full state.
 	acl, err := r.client.GetACL(ctx, created.ID)
 	if err != nil {
+		mapACLToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust ACL After Create",
 			"ACL was created (ID: "+created.ID+") but could not be read: "+err.Error(),

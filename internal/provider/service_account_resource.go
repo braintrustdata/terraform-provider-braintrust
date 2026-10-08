@@ -39,11 +39,12 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Description: "Manages a Braintrust service account.",
 		MarkdownDescription: "Manages a Braintrust service account.\n\n" +
 			"Service accounts are organization members intended for non-human, programmatic use. " +
-			"Use `braintrust_service_token` to mint tokens for this service account.",
+			"Use `braintrust_service_token` to mint tokens for this service account. " +
+			"The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the service account (UUID)."),
 			"email":   computedStringAttribute("The service account email (not routable)."),
-			"created": computedStringAttribute("Date of service account creation."),
+			"created": computedStringAttribute("Date of service account creation, if exposed by the API. Currently null."),
 			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Name of the service account.",
@@ -102,6 +103,9 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 	created := output.AddedUsers[0]
 	plan.ID = types.StringValue(created.ID)
 	plan.Email = stringPtrToTFValue(created.Email)
+	// The membership response does not expose a creation timestamp, and the
+	// public user endpoint excludes service accounts.
+	plan.Created = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -115,31 +119,10 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	users, err := r.client.ListUsersByIDs(ctx, []string{state.ID.ValueString()})
-	if err != nil {
-		if client.IsNotFoundError(err) {
-			tflog.Warn(ctx, "Service account not found, removing from state", map[string]any{
-				"id": state.ID.ValueString(),
-			})
-			resp.State.RemoveResource(ctx)
-			return
-		}
-		resp.Diagnostics.AddError(
-			"Error Reading Braintrust Service Account",
-			"Could not read service account ID "+state.ID.ValueString()+": "+err.Error(),
-		)
-		return
-	}
-
-	if len(users) == 0 {
-		tflog.Warn(ctx, "Service account not found in user listing, removing from state", map[string]any{
-			"id": state.ID.ValueString(),
-		})
-		resp.State.RemoveResource(ctx)
-		return
-	}
-
-	mapUserToServiceAccountModel(&users[0], &state)
+	// GET /v1/user is restricted to human users. An empty result for a
+	// service-account ID is not evidence of deletion. Retain the known state
+	// until the API offers a service-account read contract.
+	resp.Diagnostics.AddWarning("Service Account Refresh Is Limited", "Braintrust does not expose a public service-account read endpoint. Terraform preserves the last known service-account state; deletion or drift outside Terraform cannot currently be detected.")
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 

@@ -16,6 +16,8 @@ import (
 var aclObjectTypes = []string{
 	"organization", "project", "experiment", "dataset", "prompt",
 	"prompt_session", "group", "role", "org_member", "project_log", "org_project",
+	"org_audit_logs", "project_group", "project_group_projects", "ai_secret",
+	"org_ai_secret", "org_account",
 }
 
 // permissionTypes are the valid permission values for ACLs and roles.

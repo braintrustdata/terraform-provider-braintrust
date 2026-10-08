@@ -38,11 +38,11 @@ type CreatePromptRequest struct {
 
 // UpdatePromptRequest is the request body for updating a prompt.
 type UpdatePromptRequest struct {
-	Name        *string  `json:"name,omitempty"`
-	Slug        *string  `json:"slug,omitempty"`
-	Description *string  `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	PromptData  any      `json:"prompt_data,omitempty"`
+	Name        *string   `json:"name,omitempty"`
+	Slug        *string   `json:"slug,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Tags        *[]string `json:"tags,omitempty"`
+	PromptData  any       `json:"prompt_data,omitempty"`
 }
 
 // CreatePrompt creates a new prompt.

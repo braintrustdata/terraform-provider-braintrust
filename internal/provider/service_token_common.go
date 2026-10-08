@@ -16,6 +16,8 @@ type serviceTokenModel struct {
 	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
 	ServiceAccountName  types.String `tfsdk:"service_account_name"`
 	OrgID               types.String `tfsdk:"org_id"`
+	ExpiresInSeconds    types.Int64  `tfsdk:"expires_in_seconds"`
+	ExpiresAt           types.String `tfsdk:"expires_at"`
 }
 
 // mapServiceTokenToModel maps a client.ServiceToken (GET response) to the Terraform model.
@@ -30,6 +32,7 @@ func mapServiceTokenToModel(token *client.ServiceToken, model *serviceTokenModel
 	model.ServiceAccountEmail = stringPtrToTFValue(token.ServiceAccountEmail)
 	model.ServiceAccountName = stringPtrToTFValue(token.ServiceAccountName)
 	model.OrgID = stringPtrToTFValue(token.OrgID)
+	model.ExpiresAt = stringPtrToTFValue(token.ExpiresAt)
 	// model.Key is intentionally NOT set -- see doc comment.
 }
 
@@ -45,4 +48,5 @@ func mapCreateServiceTokenOutputToModel(output *client.CreateServiceTokenOutput,
 	model.ServiceAccountEmail = stringPtrToTFValue(output.ServiceAccountEmail)
 	model.ServiceAccountName = stringPtrToTFValue(output.ServiceAccountName)
 	model.OrgID = stringPtrToTFValue(output.OrgID)
+	model.ExpiresAt = stringPtrToTFValue(output.ExpiresAt)
 }

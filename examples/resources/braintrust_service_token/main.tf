@@ -7,6 +7,7 @@ resource "braintrust_service_account" "ci" {
 resource "braintrust_service_token" "ci" {
   name               = "ci-pipeline"
   service_account_id = braintrust_service_account.ci.id
+  expires_in_seconds = 3600
 }
 
 # The raw token is only available at creation time.

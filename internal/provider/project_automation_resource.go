@@ -174,16 +174,17 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 						Description: "Number of rows to export in each batch.",
 					},
 					"aws_iam_credentials": schema.SingleNestedAttribute{
-						Optional:    true,
-						Description: "AWS IAM role credentials for cross-account S3 access.",
+						Required:    true,
+						Description: "AWS IAM role credentials for cross-account S3 access. The API requires these for S3 exports.",
 						Attributes: map[string]schema.Attribute{
 							"role_arn": schema.StringAttribute{
 								Required:    true,
 								Description: "The ARN of the IAM role to assume.",
 							},
-							"external_id": optionalComputedStringAttribute(
-								"The external ID for the role trust policy. Auto-generated if omitted.",
-							),
+							"external_id": schema.StringAttribute{
+								Required:    true,
+								Description: "The external ID for the role trust policy. The API requires this value at creation.",
+							},
 						},
 					},
 				},
@@ -277,9 +278,12 @@ func (r *projectAutomationResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Read back to ensure state is consistent.
-	automation, err = r.client.GetProjectAutomation(ctx, automation.ID)
+	created := automation
+	automation, err = r.client.GetProjectAutomation(ctx, created.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Project Automation After Create", err.Error())
+		mapProjectAutomationToModel(ctx, created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		resp.Diagnostics.AddError("Error Reading Project Automation After Create", "Automation was created (ID: "+created.ID+") but could not be read: "+err.Error())
 		return
 	}
 

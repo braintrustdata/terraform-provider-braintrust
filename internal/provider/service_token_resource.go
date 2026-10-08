@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -37,6 +38,7 @@ func (r *serviceTokenResource) Schema(_ context.Context, _ resource.SchemaReques
 		Description: "Manages a Braintrust service token.",
 		MarkdownDescription: "Manages a Braintrust service token.\n\n" +
 			"Service tokens are scoped to a service account and are used for programmatic API access.\n\n" +
+			"Creation requires an organization-owner service token. If the caller token expires, set `expires_in_seconds` below its remaining lifetime.\n\n" +
 			"**Important:** The raw token (`key`) is only exposed at creation time and stored in Terraform state. " +
 			"It cannot be retrieved again from the API. Treat the Terraform state as sensitive.\n\n" +
 			"Service tokens are **immutable** — any attribute change requires destroying and recreating the token. " +
@@ -48,6 +50,12 @@ func (r *serviceTokenResource) Schema(_ context.Context, _ resource.SchemaReques
 			"org_id":                computedStringAttribute("Unique identifier for the organization."),
 			"service_account_email": computedStringAttribute("The service account email (not routable)."),
 			"service_account_name":  computedStringAttribute("The service account name."),
+			"expires_at":            computedStringAttribute("Timestamp when the token expires, if configured."),
+			"expires_in_seconds": schema.Int64Attribute{
+				Optional:      true,
+				Description:   "Token lifetime in seconds. Required when minting with an expiring owner service token; it must not exceed the caller token's remaining lifetime.",
+				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()},
+			},
 			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "Name of the service token. Does not have to be unique.",
@@ -94,6 +102,14 @@ func (r *serviceTokenResource) Create(ctx context.Context, req resource.CreateRe
 	createReq := client.CreateServiceTokenRequest{
 		Name:             plan.Name.ValueString(),
 		ServiceAccountID: plan.ServiceAccountID.ValueString(),
+	}
+	if !plan.ExpiresInSeconds.IsNull() && !plan.ExpiresInSeconds.IsUnknown() {
+		seconds := plan.ExpiresInSeconds.ValueInt64()
+		if seconds <= 0 {
+			resp.Diagnostics.AddError("Invalid Service Token Lifetime", "expires_in_seconds must be greater than zero")
+			return
+		}
+		createReq.ExpiresInSeconds = &seconds
 	}
 
 	tflog.Debug(ctx, "Creating service token", map[string]any{

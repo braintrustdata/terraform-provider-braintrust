@@ -8,8 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -52,13 +50,10 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"id":         computedStringAttribute("Unique identifier for the AI secret (UUID)."),
 			"org_id":     computedStringAttribute("Unique identifier for the organization."),
 			"created":    computedStringAttribute("Date of AI secret creation."),
-			"updated_at": computedStringAttribute("Date of last AI secret update."),
+			"updated_at": schema.StringAttribute{Computed: true, Description: "Date of last AI secret update."},
 			"preview_secret": schema.StringAttribute{
 				Computed:    true,
 				Description: "A masked preview of the secret value.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
@@ -119,6 +114,8 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 	// Re-read to get the full state.
 	secret, err := r.client.GetAISecret(ctx, created.ID)
 	if err != nil {
+		mapAISecretToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust AI Secret After Create",
 			"AI secret was created (ID: "+created.ID+") but could not be read: "+err.Error(),

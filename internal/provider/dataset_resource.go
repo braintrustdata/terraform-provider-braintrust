@@ -99,6 +99,8 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 	// Re-read to get the full state -- create responses may omit some fields.
 	dataset, err := r.client.GetDataset(ctx, created.ID)
 	if err != nil {
+		mapDatasetToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Dataset After Create",
 			"Dataset was created (ID: "+created.ID+") but could not be read: "+err.Error(),

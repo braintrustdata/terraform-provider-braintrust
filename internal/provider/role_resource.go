@@ -109,10 +109,16 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	memberPermissions, diags := memberPermissionsFromModel(ctx, plan.MemberPermissions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	createReq := client.CreateRoleRequest{
 		Name:              plan.Name.ValueString(),
 		Description:       tfStringToPtr(plan.Description),
-		MemberPermissions: memberPermissionsFromModel(plan.MemberPermissions),
+		MemberPermissions: memberPermissions,
 		MemberRoles:       stringSetFromModel(plan.MemberRoles),
 	}
 
@@ -130,6 +136,8 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 	// Re-read to get the full state.
 	role, err := r.client.GetRole(ctx, created.ID)
 	if err != nil {
+		mapRoleToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Role After Create",
 			"Role was created (ID: "+created.ID+") but could not be read: "+err.Error(),
@@ -187,8 +195,13 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Compute add/remove diffs for member_permissions and member_roles.
-	currentPerms := memberPermissionsFromModel(state.MemberPermissions)
-	desiredPerms := memberPermissionsFromModel(plan.MemberPermissions)
+	currentPerms, diags := memberPermissionsFromModel(ctx, state.MemberPermissions)
+	resp.Diagnostics.Append(diags...)
+	desiredPerms, diags := memberPermissionsFromModel(ctx, plan.MemberPermissions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	addPerms, removePerms := diffMemberPermissions(currentPerms, desiredPerms)
 
 	currentRoles := stringSetFromModel(state.MemberRoles)

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -92,6 +93,81 @@ func TestAccProjectResource_withDescription(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccProjectResource_preservesUnmanagedSettings(t *testing.T) {
+	name := "tf-acc-settings-" + acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum)
+	resourceName := "braintrust_project.test"
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckProjectDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf("resource \"braintrust_project\" \"test\" {\n  name = %q\n  comparison_key = \"input\"\n}\n", name),
+				Check:  seedProjectBlindReviews(),
+			},
+			{
+				Config: fmt.Sprintf("resource \"braintrust_project\" \"test\" {\n  name = %q\n  description = \"description update\"\n  comparison_key = \"input\"\n}\n", name),
+				Check:  checkProjectBlindReviews(),
+			},
+			{
+				Config: fmt.Sprintf("resource \"braintrust_project\" \"test\" {\n  name = %q\n  description = \"description update\"\n  comparison_key = \"output\"\n}\n", name),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "comparison_key", "output"),
+					checkProjectBlindReviews(),
+				),
+			},
+		},
+	})
+}
+
+func projectFromTestState(s *terraform.State) (*client.Client, string, error) {
+	rs := s.RootModule().Resources["braintrust_project.test"]
+	if rs == nil || rs.Primary == nil {
+		return nil, "", fmt.Errorf("project missing from Terraform state")
+	}
+	c, err := client.NewClient(os.Getenv(client.EnvAPIURL), os.Getenv(client.EnvAPIKey), "")
+	return c, rs.Primary.ID, err
+}
+
+func seedProjectBlindReviews() resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		c, id, err := projectFromTestState(s)
+		if err != nil {
+			return err
+		}
+		project, err := c.GetProject(context.Background(), id)
+		if err != nil {
+			return err
+		}
+		settings := map[string]json.RawMessage{}
+		if project.Settings != nil {
+			for k, v := range project.Settings.Raw {
+				settings[k] = v
+			}
+		}
+		settings["blind_reviews"] = json.RawMessage("true")
+		_, err = c.UpdateProject(context.Background(), id, client.UpdateProjectRequest{Settings: settings})
+		return err
+	}
+}
+
+func checkProjectBlindReviews() resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		c, id, err := projectFromTestState(s)
+		if err != nil {
+			return err
+		}
+		project, err := c.GetProject(context.Background(), id)
+		if err != nil {
+			return err
+		}
+		if project.Settings == nil || string(project.Settings.Raw["blind_reviews"]) != "true" {
+			return fmt.Errorf("project %s lost unmanaged blind_reviews setting", id)
+		}
+		return nil
+	}
 }
 
 // testAccCheckProjectDestroy verifies the project has been destroyed.

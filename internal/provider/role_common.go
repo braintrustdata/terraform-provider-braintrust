@@ -1,21 +1,30 @@
 package provider
 
 import (
+	"context"
+
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+var rolePermissionObjectType = types.ObjectType{AttrTypes: map[string]attr.Type{
+	"permission":           types.StringType,
+	"restrict_object_type": types.StringType,
+}}
+
 // roleModel is the shared data model for both the role resource and data source.
 type roleModel struct {
-	ID                types.String            `tfsdk:"id"`
-	OrgID             types.String            `tfsdk:"org_id"`
-	Name              types.String            `tfsdk:"name"`
-	Description       types.String            `tfsdk:"description"`
-	Created           types.String            `tfsdk:"created"`
-	DeletedAt         types.String            `tfsdk:"deleted_at"`
-	UserID            types.String            `tfsdk:"user_id"`
-	MemberPermissions []memberPermissionModel `tfsdk:"member_permissions"`
-	MemberRoles       types.Set               `tfsdk:"member_roles"`
+	ID                types.String `tfsdk:"id"`
+	OrgID             types.String `tfsdk:"org_id"`
+	Name              types.String `tfsdk:"name"`
+	Description       types.String `tfsdk:"description"`
+	Created           types.String `tfsdk:"created"`
+	DeletedAt         types.String `tfsdk:"deleted_at"`
+	UserID            types.String `tfsdk:"user_id"`
+	MemberPermissions types.Set    `tfsdk:"member_permissions"`
+	MemberRoles       types.Set    `tfsdk:"member_roles"`
 }
 
 // memberPermissionModel represents a single (permission, restrict_object_type) tuple.
@@ -36,27 +45,28 @@ func mapRoleToModel(role *client.Role, model *roleModel) {
 
 	// Map member_permissions. Since this is a Set in the schema, Terraform
 	// handles ordering; no need to sort.
-	if len(role.MemberPermissions) > 0 {
-		perms := make([]memberPermissionModel, len(role.MemberPermissions))
-		for i, mp := range role.MemberPermissions {
-			perms[i] = memberPermissionModel{
-				Permission:         types.StringValue(mp.Permission),
-				RestrictObjectType: stringPtrToTFValue(mp.RestrictObjectType),
-			}
-		}
-		model.MemberPermissions = perms
-	} else {
-		model.MemberPermissions = []memberPermissionModel{}
+	perms := make([]attr.Value, 0, len(role.MemberPermissions))
+	for _, mp := range role.MemberPermissions {
+		perms = append(perms, types.ObjectValueMust(rolePermissionObjectType.AttrTypes, map[string]attr.Value{
+			"permission":           types.StringValue(mp.Permission),
+			"restrict_object_type": stringPtrToTFValue(mp.RestrictObjectType),
+		}))
 	}
+	model.MemberPermissions = types.SetValueMust(rolePermissionObjectType, perms)
 
 	// Map member_roles.
 	model.MemberRoles = stringSliceToTFSet(role.MemberRoles)
 }
 
 // memberPermissionsFromModel converts the TF model to client structs.
-func memberPermissionsFromModel(perms []memberPermissionModel) []client.MemberPermission {
-	if len(perms) == 0 {
-		return nil
+func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]client.MemberPermission, diag.Diagnostics) {
+	if value.IsNull() || value.IsUnknown() {
+		return nil, nil
+	}
+	var perms []memberPermissionModel
+	diags := value.ElementsAs(ctx, &perms, false)
+	if diags.HasError() {
+		return nil, diags
 	}
 	result := make([]client.MemberPermission, len(perms))
 	for i, p := range perms {
@@ -65,5 +75,5 @@ func memberPermissionsFromModel(perms []memberPermissionModel) []client.MemberPe
 			RestrictObjectType: tfStringToPtr(p.RestrictObjectType),
 		}
 	}
-	return result
+	return result, diags
 }

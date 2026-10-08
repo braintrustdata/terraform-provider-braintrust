@@ -52,6 +52,40 @@ func TestAccRoleResource_basic(t *testing.T) {
 	})
 }
 
+func TestAccRoleResource_inheritedRoleWithoutDirectPermissions(t *testing.T) {
+	name := "tf-acc-role-inherit-" + acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum)
+	config := fmt.Sprintf(`
+resource "braintrust_role" "read" {
+  name = %q
+  member_permissions = [{ permission = "read", restrict_object_type = "project" }]
+}
+resource "braintrust_role" "parent" {
+  name = %q
+  member_roles = [braintrust_role.read.id]
+}
+`, name+"-read", name+"-parent")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckRoleDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("braintrust_role.parent", "member_permissions.#", "0"),
+					resource.TestCheckResourceAttr("braintrust_role.parent", "member_roles.#", "1"),
+				),
+			},
+			{
+				ResourceName:      "braintrust_role.parent",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 func testAccCheckRoleDestroy(s *terraform.State) error {
 	c, err := client.NewClient(os.Getenv(client.EnvAPIURL), os.Getenv(client.EnvAPIKey), "")
 	if err != nil {

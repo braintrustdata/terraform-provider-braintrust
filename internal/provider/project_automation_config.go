@@ -75,6 +75,15 @@ type awsIAMCredentialsModel struct {
 // buildConfigJSON converts the Terraform model's config block into the JSON
 // payload expected by the Braintrust API.
 func buildConfigJSON(model *projectAutomationModel) (json.RawMessage, error) {
+	count := 0
+	for _, present := range []bool{model.LogsConfig != nil, model.ExportConfig != nil, model.RetentionConfig != nil, model.EnvironmentUpdateConfig != nil} {
+		if present {
+			count++
+		}
+	}
+	if count != 1 {
+		return nil, fmt.Errorf("exactly one of logs_config, export_config, retention_config, or environment_update_config must be specified")
+	}
 	if model.LogsConfig != nil {
 		return buildLogsConfigJSON(model.LogsConfig)
 	}
@@ -105,6 +114,12 @@ func buildLogsConfigJSON(m *logsConfigModel) (json.RawMessage, error) {
 }
 
 func buildExportConfigJSON(m *exportConfigModel) (json.RawMessage, error) {
+	if m.AWSIAMCredentials == nil || m.AWSIAMCredentials.ExternalID.IsNull() || m.AWSIAMCredentials.ExternalID.IsUnknown() {
+		return nil, fmt.Errorf("export_config requires aws_iam_credentials with role_arn and external_id")
+	}
+	if m.ExportType.ValueString() == "btql_query" && (m.BtqlQuery.IsNull() || m.BtqlQuery.IsUnknown() || m.BtqlQuery.ValueString() == "") {
+		return nil, fmt.Errorf("export_config with export_type btql_query requires btql_query")
+	}
 	cfg := map[string]interface{}{
 		"event_type":       "btql_export",
 		"export_path":      m.ExportPath.ValueString(),
@@ -130,15 +145,10 @@ func buildExportConfigJSON(m *exportConfigModel) (json.RawMessage, error) {
 		cfg["batch_size"] = m.BatchSize.ValueInt64()
 	}
 
-	if m.AWSIAMCredentials != nil {
-		creds := map[string]interface{}{
-			"type":     "aws_iam",
-			"role_arn": m.AWSIAMCredentials.RoleARN.ValueString(),
-		}
-		if !m.AWSIAMCredentials.ExternalID.IsNull() && !m.AWSIAMCredentials.ExternalID.IsUnknown() {
-			creds["external_id"] = m.AWSIAMCredentials.ExternalID.ValueString()
-		}
-		cfg["credentials"] = creds
+	cfg["credentials"] = map[string]interface{}{
+		"type":        "aws_iam",
+		"role_arn":    m.AWSIAMCredentials.RoleARN.ValueString(),
+		"external_id": m.AWSIAMCredentials.ExternalID.ValueString(),
 	}
 
 	return json.Marshal(cfg)
@@ -174,6 +184,9 @@ func buildEnvironmentUpdateConfigJSON(m *environmentUpdateConfigModel) (json.Raw
 }
 
 func buildActionJSON(webhook *webhookActionModel, slack *slackActionModel) (map[string]interface{}, error) {
+	if (webhook == nil) == (slack == nil) {
+		return nil, fmt.Errorf("exactly one of webhook_action or slack_action must be specified")
+	}
 	if webhook != nil {
 		return map[string]interface{}{
 			"type": "webhook",

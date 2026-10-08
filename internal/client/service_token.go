@@ -18,6 +18,7 @@ type ServiceToken struct {
 	ServiceAccountEmail *string `json:"service_account_email,omitempty"`
 	ServiceAccountName  *string `json:"service_account_name,omitempty"`
 	OrgID               *string `json:"org_id,omitempty"`
+	ExpiresAt           *string `json:"expires_at,omitempty"`
 }
 
 // CreateServiceTokenOutput is the POST response, which includes the raw key.
@@ -31,12 +32,14 @@ type CreateServiceTokenOutput struct {
 	ServiceAccountEmail *string `json:"service_account_email,omitempty"`
 	ServiceAccountName  *string `json:"service_account_name,omitempty"`
 	OrgID               *string `json:"org_id,omitempty"`
+	ExpiresAt           *string `json:"expires_at,omitempty"`
 }
 
 // CreateServiceTokenRequest is the request body for creating a service token.
 type CreateServiceTokenRequest struct {
 	Name             string `json:"name"`
 	ServiceAccountID string `json:"service_account_id"`
+	ExpiresInSeconds *int64 `json:"expires_in_seconds,omitempty"`
 }
 
 // CreateServiceToken creates a new service token. Returns the raw key (only exposed once).
