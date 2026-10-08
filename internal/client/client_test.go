@@ -68,7 +68,9 @@ func TestReadRetriesTransientServerError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var result struct{ ID string `json:"id"` }
+	var result struct {
+		ID string `json:"id"`
+	}
 	err = c.doRequest(context.Background(), http.MethodGet, "/v1/project/project-1", nil, &result)
 	if err != nil || requests != 2 || result.ID != "project-1" {
 		t.Fatalf("want successful second read; got requests=%d result=%q error=%v", requests, result.ID, err)
