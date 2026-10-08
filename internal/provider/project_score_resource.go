@@ -52,7 +52,8 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 			"that can be manually labeled through the UI or computed programmatically.\n\n" +
 			"**Note:** This resource manages the score *definition* (name, type, description). " +
 			"Complex score configurations such as categories (for categorical scores) and " +
-			"weights (for weighted scores) are not yet supported and should be managed through the UI.",
+			"weights (for weighted scores) are not yet supported and should be managed through the UI. " +
+			"Changing `score_type` replaces the score and assigns it a new ID.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the project score (UUID)."),
 			"user_id": computedStringAttribute("Identifies the user who created the project score."),
@@ -74,7 +75,13 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 			"description": optionalComputedStringAttribute("Textual description of the project score."),
 			"score_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of the configured score.",
+				Description: "The type of the configured score. Changing it replaces the score because type-specific configuration is not yet modeled.",
+				// PATCH validates the full type-specific score shape. Since this
+				// resource does not yet model categories/config, changing types
+				// in place can fail even when both types are valid at creation.
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				Validators: []validator.String{
 					stringvalidator.OneOf(projectScoreTypes...),
 				},
