@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -105,25 +106,24 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	// If settings were explicitly specified, update the project with them.
-	// Save the original create result so we can persist state even if the
-	// settings update fails (preventing orphaned resources).
-	// Note: check both IsNull and IsUnknown -- during Create, Optional+Computed
-	// attributes that the user did not set will be Unknown (not Null).
+	project, err := r.client.GetProject(ctx, created.ID)
+	if err != nil {
+		mapProjectToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+		resp.Diagnostics.AddError("Error Reading Braintrust Project After Create", "Project was created (ID: "+created.ID+") but could not be read: "+err.Error())
+		return
+	}
+
+	// Project settings are replaced by the API. Keep server-owned settings
+	// when applying either of the two fields managed by this resource.
 	comparisonKeySet := !plan.ComparisonKey.IsNull() && !plan.ComparisonKey.IsUnknown()
 	baselineSet := !plan.BaselineExperimentID.IsNull() && !plan.BaselineExperimentID.IsUnknown()
 	if comparisonKeySet || baselineSet {
-		updateReq := client.UpdateProjectRequest{
-			Settings: &client.ProjectSettings{
-				ComparisonKey:        tfStringToPtr(plan.ComparisonKey),
-				BaselineExperimentID: tfStringToPtr(plan.BaselineExperimentID),
-			},
-		}
+		updateReq := client.UpdateProjectRequest{Settings: mergeProjectSettings(project.Settings, &plan, comparisonKeySet, baselineSet)}
 
 		_, updateErr := r.client.UpdateProject(ctx, created.ID, updateReq)
 		if updateErr != nil {
-			// Save the state from the create call so Terraform can track the resource.
-			mapProjectToModel(created, &plan)
+			mapProjectToModel(project, &plan)
 			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 			resp.Diagnostics.AddError(
 				"Error Setting Braintrust Project Settings",
@@ -131,17 +131,13 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 			)
 			return
 		}
-	}
-
-	// Re-read the project to get the full state -- the create/update
-	// responses may not include all fields (e.g., description).
-	project, err := r.client.GetProject(ctx, created.ID)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Braintrust Project After Create",
-			"Project was created (ID: "+created.ID+") but could not be read: "+err.Error(),
-		)
-		return
+		project, err = r.client.GetProject(ctx, created.ID)
+		if err != nil {
+			mapProjectToModel(created, &plan)
+			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+			resp.Diagnostics.AddError("Error Reading Braintrust Project After Settings Update", "Project was created (ID: "+created.ID+") but could not be read: "+err.Error())
+			return
+		}
 	}
 
 	mapProjectToModel(project, &plan)
@@ -223,32 +219,15 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 		updateReq.Description = &empty
 	}
 
-	// Only send settings if at least one setting field changed. Sending an empty
-	// settings object {"settings": {}} to the PATCH endpoint can clobber other
-	// fields on the server side.
-	var settings client.ProjectSettings
-	settingsChanged := false
-
-	if !plan.ComparisonKey.IsNull() && !plan.ComparisonKey.IsUnknown() {
-		key := plan.ComparisonKey.ValueString()
-		settings.ComparisonKey = &key
-		settingsChanged = true
-	} else if plan.ComparisonKey.IsNull() && !state.ComparisonKey.IsNull() {
-		empty := ""
-		settings.ComparisonKey = &empty
-		settingsChanged = true
-	}
-	if !plan.BaselineExperimentID.IsNull() && !plan.BaselineExperimentID.IsUnknown() {
-		baseID := plan.BaselineExperimentID.ValueString()
-		settings.BaselineExperimentID = &baseID
-		settingsChanged = true
-	} else if plan.BaselineExperimentID.IsNull() && !state.BaselineExperimentID.IsNull() {
-		empty := ""
-		settings.BaselineExperimentID = &empty
-		settingsChanged = true
-	}
-	if settingsChanged {
-		updateReq.Settings = &settings
+	comparisonChanged := !plan.ComparisonKey.IsUnknown() && !plan.ComparisonKey.Equal(state.ComparisonKey)
+	baselineChanged := !plan.BaselineExperimentID.IsUnknown() && !plan.BaselineExperimentID.Equal(state.BaselineExperimentID)
+	if comparisonChanged || baselineChanged {
+		current, err := r.client.GetProject(ctx, state.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading Braintrust Project Settings", "Could not preserve current project settings: "+err.Error())
+			return
+		}
+		updateReq.Settings = mergeProjectSettings(current.Settings, &plan, comparisonChanged, baselineChanged)
 	}
 
 	tflog.Debug(ctx, "Updating project", map[string]any{
@@ -272,6 +251,30 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
+
+func mergeProjectSettings(current *client.ProjectSettings, plan *projectModel, comparisonChanged, baselineChanged bool) map[string]json.RawMessage {
+	settings := make(map[string]json.RawMessage)
+	if current != nil {
+		for name, value := range current.Raw {
+			settings[name] = value
+		}
+	}
+	if comparisonChanged {
+		settings["comparison_key"] = projectSettingValue(plan.ComparisonKey.IsNull(), plan.ComparisonKey.ValueString())
+	}
+	if baselineChanged {
+		settings["baseline_experiment_id"] = projectSettingValue(plan.BaselineExperimentID.IsNull(), plan.BaselineExperimentID.ValueString())
+	}
+	return settings
+}
+
+func projectSettingValue(isNull bool, value string) json.RawMessage {
+	if isNull {
+		return json.RawMessage("null")
+	}
+	encoded, _ := json.Marshal(value)
+	return encoded
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -10,8 +11,24 @@ const projectBasePath = "/v1/project"
 
 // ProjectSettings represents the settings for a Braintrust project.
 type ProjectSettings struct {
-	ComparisonKey        *string `json:"comparison_key,omitempty"`
-	BaselineExperimentID *string `json:"baseline_experiment_id,omitempty"`
+	ComparisonKey        *string                    `json:"comparison_key,omitempty"`
+	BaselineExperimentID *string                    `json:"baseline_experiment_id,omitempty"`
+	Raw                  map[string]json.RawMessage `json:"-"`
+}
+
+func (s *ProjectSettings) UnmarshalJSON(data []byte) error {
+	type knownSettings ProjectSettings
+	var known knownSettings
+	if err := json.Unmarshal(data, &known); err != nil {
+		return err
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*s = ProjectSettings(known)
+	s.Raw = raw
+	return nil
 }
 
 // Project represents a Braintrust project.
@@ -35,9 +52,9 @@ type CreateProjectRequest struct {
 
 // UpdateProjectRequest is the request body for updating a project.
 type UpdateProjectRequest struct {
-	Name        *string          `json:"name,omitempty"`
-	Description *string          `json:"description,omitempty"`
-	Settings    *ProjectSettings `json:"settings,omitempty"`
+	Name        *string                    `json:"name,omitempty"`
+	Description *string                    `json:"description,omitempty"`
+	Settings    map[string]json.RawMessage `json:"settings,omitempty"`
 }
 
 // CreateProject creates a new project.
