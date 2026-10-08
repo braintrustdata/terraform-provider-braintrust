@@ -22,7 +22,6 @@ func TestAccServiceAccountResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", name),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
-					resource.TestCheckResourceAttrSet(resourceName, "created"),
 					resource.TestMatchResourceAttr(resourceName, "email", regexp.MustCompile(".+")),
 				),
 			},

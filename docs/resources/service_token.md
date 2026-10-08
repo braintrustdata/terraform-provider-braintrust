@@ -5,6 +5,7 @@ subcategory: ""
 description: |-
   Manages a Braintrust service token.
   Service tokens are scoped to a service account and are used for programmatic API access.
+  Creation requires an organization-owner service token. If the caller token expires, set expires_in_seconds below its remaining lifetime.
   Important: The raw token (key) is only exposed at creation time and stored in Terraform state. It cannot be retrieved again from the API. Treat the Terraform state as sensitive.
   Service tokens are immutable — any attribute change requires destroying and recreating the token. Import is not supported because the raw key cannot be recovered.
 ---
@@ -14,6 +15,8 @@ description: |-
 Manages a Braintrust service token.
 
 Service tokens are scoped to a service account and are used for programmatic API access.
+
+Creation requires an organization-owner service token. If the caller token expires, set `expires_in_seconds` below its remaining lifetime.
 
 **Important:** The raw token (`key`) is only exposed at creation time and stored in Terraform state. It cannot be retrieved again from the API. Treat the Terraform state as sensitive.
 
@@ -29,9 +32,14 @@ Service tokens are **immutable** — any attribute change requires destroying an
 - `name` (String) Name of the service token. Does not have to be unique.
 - `service_account_id` (String) The service account ID this service token should belong to.
 
+### Optional
+
+- `expires_in_seconds` (Number) Token lifetime in seconds. Required when minting with an expiring owner service token; it must not exceed the caller token's remaining lifetime.
+
 ### Read-Only
 
 - `created` (String) Date of service token creation.
+- `expires_at` (String) Timestamp when the token expires, if configured.
 - `id` (String) Unique identifier for the service token (UUID).
 - `key` (String, Sensitive) The raw service token. Only exposed at creation time and stored in Terraform state.
 - `org_id` (String) Unique identifier for the organization.

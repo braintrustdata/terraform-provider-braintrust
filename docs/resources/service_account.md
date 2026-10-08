@@ -4,14 +4,14 @@ page_title: "braintrust_service_account Resource - braintrust"
 subcategory: ""
 description: |-
   Manages a Braintrust service account.
-  Service accounts are organization members intended for non-human, programmatic use. Use braintrust_service_token to mint tokens for this service account.
+  Service accounts are organization members intended for non-human, programmatic use. Use braintrust_service_token to mint tokens for this service account. The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift.
 ---
 
 # braintrust_service_account (Resource)
 
 Manages a Braintrust service account.
 
-Service accounts are organization members intended for non-human, programmatic use. Use `braintrust_service_token` to mint tokens for this service account.
+Service accounts are organization members intended for non-human, programmatic use. Use `braintrust_service_token` to mint tokens for this service account. The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift.
 
 
 
@@ -24,6 +24,6 @@ Service accounts are organization members intended for non-human, programmatic u
 
 ### Read-Only
 
-- `created` (String) Date of service account creation.
+- `created` (String) Date of service account creation, if exposed by the API. Currently null.
 - `email` (String) The service account email (not routable).
 - `id` (String) Unique identifier for the service account (UUID).
