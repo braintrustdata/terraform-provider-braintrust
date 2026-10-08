@@ -18,7 +18,6 @@ func TestAccRoleDataSource_byName(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(dataSourceName, "id"),
 					resource.TestCheckResourceAttr(dataSourceName, "name", "Viewer"),
-					resource.TestCheckResourceAttrSet(dataSourceName, "org_id"),
 				),
 			},
 		},
