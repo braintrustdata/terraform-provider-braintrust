@@ -73,6 +73,7 @@ Required:
 
 Required:
 
+- `aws_iam_credentials` (Attributes) AWS IAM role credentials for cross-account S3 access. The API requires these for S3 exports. (see [below for nested schema](#nestedatt--export_config--aws_iam_credentials))
 - `export_path` (String) Storage path including protocol, e.g. "s3://bucket/prefix".
 - `export_type` (String) What to export: "log_traces", "log_spans", or "btql_query".
 - `format` (String) Export format: "jsonl" or "parquet".
@@ -80,7 +81,6 @@ Required:
 
 Optional:
 
-- `aws_iam_credentials` (Attributes) AWS IAM role credentials for cross-account S3 access. (see [below for nested schema](#nestedatt--export_config--aws_iam_credentials))
 - `batch_size` (Number) Number of rows to export in each batch.
 - `btql_query` (String) The BTQL query to export. Required when export_type is "btql_query".
 
@@ -89,11 +89,8 @@ Optional:
 
 Required:
 
+- `external_id` (String) The external ID for the role trust policy. The API requires this value at creation.
 - `role_arn` (String) The ARN of the IAM role to assume.
-
-Optional:
-
-- `external_id` (String) The external ID for the role trust policy. Auto-generated if omitted.
 
 
 

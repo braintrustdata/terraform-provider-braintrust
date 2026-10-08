@@ -92,6 +92,36 @@ func TestAccProjectAutomationResource_logsWebhook(t *testing.T) {
 	})
 }
 
+func TestAccProjectAutomationResource_environmentUpdateWebhook(t *testing.T) {
+	resourceName := "braintrust_project_automation.test"
+	projName := "tf-acc-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	autoName := "tf-acc-environment-" + acctest.RandStringFromCharSet(6, acctest.CharSetAlphaNum)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckProjectAutomationDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProjectAutomationEnvironmentConfig(projName, autoName, "staging"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "environment_update_config.environment_filter.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "environment_update_config.webhook_action.url", "https://hooks.example.com/terraform-test"),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccProjectAutomationEnvironmentConfig(projName, autoName, "production"),
+				Check:  resource.TestCheckResourceAttr(resourceName, "environment_update_config.environment_filter.0", "production"),
+			},
+		},
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Config helpers
 // ---------------------------------------------------------------------------
@@ -134,6 +164,25 @@ resource "braintrust_project_automation" "test" {
   }
 }
 `, projName, autoName, webhookURL, interval)
+}
+
+func testAccProjectAutomationEnvironmentConfig(projName, autoName, environment string) string {
+	return fmt.Sprintf(`
+resource "braintrust_project" "test" {
+  name = %[1]q
+}
+
+resource "braintrust_project_automation" "test" {
+  project_id = braintrust_project.test.id
+  name       = %[2]q
+  environment_update_config = {
+    environment_filter = [%[3]q]
+    webhook_action = {
+      url = "https://hooks.example.com/terraform-test"
+    }
+  }
+}
+`, projName, autoName, environment)
 }
 
 // ---------------------------------------------------------------------------
