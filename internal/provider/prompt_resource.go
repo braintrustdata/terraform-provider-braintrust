@@ -42,7 +42,7 @@ func (r *promptResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		MarkdownDescription: "Manages a Braintrust prompt. This resource covers prompt object metadata and identity fields.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the prompt (UUID)."),
-			"xact_id": computedStringAttribute("Transaction id of the prompt version."),
+			"xact_id": schema.StringAttribute{Computed: true, Description: "Transaction id of the prompt version."},
 			"org_id":  computedStringAttribute("Unique identifier for the organization."),
 			"created": computedStringAttribute("Date of prompt creation."),
 			"project_id": schema.StringAttribute{
@@ -210,7 +210,13 @@ func (r *promptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		empty := ""
 		updateReq.Description = &empty
 	}
-	updateReq.Tags = stringListFromModel(plan.Tags)
+	if !plan.Tags.IsNull() && !plan.Tags.IsUnknown() {
+		tags := stringListFromModel(plan.Tags)
+		if tags == nil {
+			tags = []string{}
+		}
+		updateReq.Tags = &tags
+	}
 	promptData, err := tfJSONStringToAny(plan.PromptDataJSON)
 	if err != nil {
 		resp.Diagnostics.AddError(
