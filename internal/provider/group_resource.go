@@ -110,6 +110,8 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	// Re-read to get the full state.
 	group, err := r.client.GetGroup(ctx, created.ID)
 	if err != nil {
+		mapGroupToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Group After Create",
 			"Group was created (ID: "+created.ID+") but could not be read: "+err.Error(),

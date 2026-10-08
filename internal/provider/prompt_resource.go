@@ -140,6 +140,8 @@ func (r *promptResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	prompt, err := r.client.GetPrompt(ctx, created.ID)
 	if err != nil {
+		mapPromptToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Prompt After Create",
 			"Prompt was created (ID: "+created.ID+") but could not be read: "+err.Error(),

@@ -129,6 +129,8 @@ func (r *projectScoreResource) Create(ctx context.Context, req resource.CreateRe
 	// Re-read to get the full state.
 	score, err := r.client.GetProjectScore(ctx, created.ID)
 	if err != nil {
+		mapProjectScoreToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Project Score After Create",
 			"Score was created (ID: "+created.ID+") but could not be read: "+err.Error(),

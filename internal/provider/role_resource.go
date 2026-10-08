@@ -136,6 +136,8 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 	// Re-read to get the full state.
 	role, err := r.client.GetRole(ctx, created.ID)
 	if err != nil {
+		mapRoleToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Role After Create",
 			"Role was created (ID: "+created.ID+") but could not be read: "+err.Error(),

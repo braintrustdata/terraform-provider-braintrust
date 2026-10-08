@@ -103,6 +103,8 @@ func (r *projectTagResource) Create(ctx context.Context, req resource.CreateRequ
 	// Re-read to get the full state.
 	tag, err := r.client.GetProjectTag(ctx, created.ID)
 	if err != nil {
+		mapProjectTagToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Project Tag After Create",
 			"Tag was created (ID: "+created.ID+") but could not be read: "+err.Error(),

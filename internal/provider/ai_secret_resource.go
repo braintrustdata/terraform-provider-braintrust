@@ -114,6 +114,8 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 	// Re-read to get the full state.
 	secret, err := r.client.GetAISecret(ctx, created.ID)
 	if err != nil {
+		mapAISecretToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust AI Secret After Create",
 			"AI secret was created (ID: "+created.ID+") but could not be read: "+err.Error(),

@@ -278,9 +278,12 @@ func (r *projectAutomationResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Read back to ensure state is consistent.
-	automation, err = r.client.GetProjectAutomation(ctx, automation.ID)
+	created := automation
+	automation, err = r.client.GetProjectAutomation(ctx, created.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Project Automation After Create", err.Error())
+		mapProjectAutomationToModel(ctx, created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		resp.Diagnostics.AddError("Error Reading Project Automation After Create", "Automation was created (ID: "+created.ID+") but could not be read: "+err.Error())
 		return
 	}
 

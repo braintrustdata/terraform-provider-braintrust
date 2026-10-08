@@ -134,6 +134,8 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 	// Re-read to get full state.
 	envVar, err := r.client.GetEnvVar(ctx, created.ID)
 	if err != nil {
+		mapEnvVarToModel(created, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Env Var After Create",
 			"Env var was created (ID: "+created.ID+") but could not be read: "+err.Error(),
