@@ -45,6 +45,7 @@ jobs:
         uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
         with:
           version: v1.64
+          args: --timeout=5m
 
   docs:
     name: Documentation Freshness
@@ -56,6 +57,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Install Terraform 1.15.8
+        run: |
+          curl -fsSLO https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip
+          unzip -q terraform_1.15.8_linux_amd64.zip terraform
+          sudo mv terraform /usr/local/bin/terraform
 
       - name: Generate docs
         run: go generate ./...
