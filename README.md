@@ -15,6 +15,8 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_dataset` | Datasets belonging to a project |
 | `braintrust_prompt` | Prompt definitions belonging to a project |
 | `braintrust_group` | User groups for access control |
+| `braintrust_project_group` | Project groups for inherited access control |
+| `braintrust_project_group_membership` | Individual project-to-group membership with safe destroy ordering |
 | `braintrust_role` | Custom roles with fine-grained permissions |
 | `braintrust_acl` | Access control list entries (bind groups to roles/permissions on objects) |
 | `braintrust_env_var` | Environment variables scoped to org, project, or function |
@@ -34,6 +36,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_dataset` | Look up a dataset by ID or by name + project |
 | `braintrust_prompt` | Look up a prompt by ID or by name + project |
 | `braintrust_group` | Look up a group by name |
+| `braintrust_project_group` | Look up a project group by organization ID and name |
 | `braintrust_role` | Look up a role by name (e.g. built-in `Viewer`, `Admin`) |
 | `braintrust_user` | Look up a user by email or ID (useful for group membership) |
 
