@@ -1,39 +1,47 @@
+version: "2"
 linters:
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gosimple
     - gocritic
-    - gofmt
     - misspell
     - nolintlint
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-    disabled-checks:
-      - ifElseChain
-      # hugeParam flags every Terraform Plugin Framework CRUD method because
-      # the interfaces pass request structs by value. We can't change them.
-      - hugeParam
-  misspell:
-    locale: US
-  nolintlint:
-    require-explanation: true
-    require-specific: true
-
-issues:
-  exclude-dirs:
-    - dist
-  exclude-rules:
-    # Allow fmt.Errorf without wrapping in test files
-    - path: _test\.go
-      linters:
-        - errcheck
+  settings:
+    errcheck:
+      check-type-assertions: true
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - performance
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+        path: _test\.go
+    paths:
+      - dist
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - dist
+      - third_party$
+      - builtin$
+      - examples$
