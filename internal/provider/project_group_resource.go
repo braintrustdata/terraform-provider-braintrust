@@ -34,6 +34,10 @@ func (r *projectGroupResource) Metadata(_ context.Context, req resource.Metadata
 func (r *projectGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a Braintrust project group and its member projects. A project may belong to multiple project groups.",
+		MarkdownDescription: "Manages a Braintrust project group. A project may belong to multiple project groups.\n\n" +
+			"For projects also managed by Terraform, leave `member_projects` unset and manage each relationship with `braintrust_project_group_membership`. " +
+			"This ensures Terraform removes membership before destroying the project or group. Inline `member_projects` requires removing membership in a separate apply before destroying a project; do not use both ownership styles for one group.\n\n" +
+			"Adding projects requires `create_acls` on them, and removing projects or deleting a populated group requires `delete_acls`. Import with the project group ID.",
 		Attributes: map[string]schema.Attribute{
 			"id": computedStringAttribute("Project group ID."),
 			"org_id": schema.StringAttribute{
@@ -47,7 +51,7 @@ func (r *projectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 			"user_id":     computedStringAttribute("Creating user ID."),
 			"member_projects": schema.SetAttribute{
 				Optional: true, Computed: true, ElementType: types.StringType,
-				Description:   "Project IDs in this group. Terraform references to managed projects establish create and destroy ordering.",
+				Description:   "Project IDs managed inline. Use separate membership resources for safe simultaneous project deletion.",
 				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
 			},
 		},

@@ -38,6 +38,9 @@ func (r *projectGroupMembershipResource) Schema(_ context.Context, _ resource.Sc
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	resp.Schema = schema.Schema{
 		Description: "Manages one project membership in a Braintrust project group. Use this resource when Terraform also manages the project, so membership is removed before project deletion. Do not also set member_projects on the group resource.",
+		MarkdownDescription: "Manages one project membership in a Braintrust project group. Reference both the group and project so Terraform removes membership before destroying either object. " +
+			"Do not also set `member_projects` on the group resource. The API requires `create_acls` on the project to add it and `delete_acls` to remove it. " +
+			"Import with `project_group_id/project_id`.",
 		Attributes: map[string]schema.Attribute{
 			"id":               computedStringAttribute("Composite ID in project_group_id/project_id form."),
 			"project_group_id": schema.StringAttribute{Required: true, PlanModifiers: replace, Description: "Project group ID."},
