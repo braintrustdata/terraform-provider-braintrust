@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -10,28 +11,34 @@ const projectScoreBasePath = "/v1/project_score"
 
 // ProjectScore represents a Braintrust project score.
 type ProjectScore struct {
-	ID          string  `json:"id"`
-	ProjectID   string  `json:"project_id"`
-	UserID      *string `json:"user_id,omitempty"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	ScoreType   string  `json:"score_type"`
-	Created     *string `json:"created,omitempty"`
+	ID          string          `json:"id"`
+	ProjectID   string          `json:"project_id"`
+	UserID      *string         `json:"user_id,omitempty"`
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	ScoreType   string          `json:"score_type"`
+	Categories  json.RawMessage `json:"categories,omitempty"`
+	Config      json.RawMessage `json:"config,omitempty"`
+	Created     *string         `json:"created,omitempty"`
 }
 
 // CreateProjectScoreRequest is the request body for creating a project score.
 type CreateProjectScoreRequest struct {
-	ProjectID   string  `json:"project_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	ScoreType   string  `json:"score_type"`
+	ProjectID   string          `json:"project_id"`
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	ScoreType   string          `json:"score_type"`
+	Categories  json.RawMessage `json:"categories,omitempty"`
+	Config      json.RawMessage `json:"config,omitempty"`
 }
 
 // UpdateProjectScoreRequest is the request body for updating a project score.
 type UpdateProjectScoreRequest struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	ScoreType   *string `json:"score_type,omitempty"`
+	Name        *string          `json:"name,omitempty"`
+	Description *string          `json:"description,omitempty"`
+	ScoreType   *string          `json:"score_type,omitempty"`
+	Categories  *json.RawMessage `json:"categories,omitempty"`
+	Config      *json.RawMessage `json:"config,omitempty"`
 }
 
 // CreateProjectScore creates a new project score.

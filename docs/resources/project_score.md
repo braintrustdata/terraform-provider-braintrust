@@ -3,15 +3,12 @@
 page_title: "braintrust_project_score Resource - braintrust"
 subcategory: ""
 description: |-
-  Manages a Braintrust project score. Scores are user-configured metrics that can be manually labeled through the UI or computed programmatically.
-  Note: This resource manages the score definition (name, type, description). Complex score configurations such as categories (for categorical scores) and weights (for weighted scores) are not yet supported and should be managed through the UI. Changing score_type replaces the score and assigns it a new ID.
+  Manages a Braintrust project score. Scores are user-configured metrics that can be manually labeled through the UI or computed programmatically. Use categories_json for categorical categories, weighted-score weights, or minimum-score inputs, and config_json for score options. Changing score_type replaces the score and assigns it a new ID.
 ---
 
 # braintrust_project_score (Resource)
 
-Manages a Braintrust project score. Scores are user-configured metrics that can be manually labeled through the UI or computed programmatically.
-
-**Note:** This resource manages the score *definition* (name, type, description). Complex score configurations such as categories (for categorical scores) and weights (for weighted scores) are not yet supported and should be managed through the UI. Changing `score_type` replaces the score and assigns it a new ID.
+Manages a Braintrust project score. Scores are user-configured metrics that can be manually labeled through the UI or computed programmatically. Use `categories_json` for categorical categories, weighted-score weights, or minimum-score inputs, and `config_json` for score options. Changing `score_type` replaces the score and assigns it a new ID.
 
 
 
@@ -22,10 +19,12 @@ Manages a Braintrust project score. Scores are user-configured metrics that can 
 
 - `name` (String) Name of the project score.
 - `project_id` (String) Unique identifier for the project that the score belongs to.
-- `score_type` (String) The type of the configured score. Changing it replaces the score because type-specific configuration is not yet modeled.
+- `score_type` (String) The type of the configured score. Changing it replaces the score and assigns a new ID.
 
 ### Optional
 
+- `categories_json` (String) JSON-encoded score categories, weights, or included score names, depending on score_type. Use the JSON literal null to clear it.
+- `config_json` (String) JSON-encoded score configuration (for example multi_select, visibility, online, condition, and object_types). Use the JSON literal null to clear it.
 - `description` (String) Textual description of the project score.
 
 ### Read-Only

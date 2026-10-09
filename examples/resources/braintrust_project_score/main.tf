@@ -12,4 +12,13 @@ resource "braintrust_project_score" "quality" {
   name        = "quality"
   description = "Response quality assessment"
   score_type  = "categorical"
+
+  categories_json = jsonencode([
+    { name = "Low", value = 0 },
+    { name = "High", value = 1 },
+  ])
+  config_json = jsonencode({
+    multi_select = false
+    object_types = ["project_logs"]
+  })
 }

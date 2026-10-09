@@ -7,13 +7,15 @@ import (
 
 // projectScoreModel is the shared data model for the project score resource.
 type projectScoreModel struct {
-	ID          types.String `tfsdk:"id"`
-	ProjectID   types.String `tfsdk:"project_id"`
-	UserID      types.String `tfsdk:"user_id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	ScoreType   types.String `tfsdk:"score_type"`
-	Created     types.String `tfsdk:"created"`
+	ID             types.String `tfsdk:"id"`
+	ProjectID      types.String `tfsdk:"project_id"`
+	UserID         types.String `tfsdk:"user_id"`
+	Name           types.String `tfsdk:"name"`
+	Description    types.String `tfsdk:"description"`
+	ScoreType      types.String `tfsdk:"score_type"`
+	CategoriesJSON types.String `tfsdk:"categories_json"`
+	ConfigJSON     types.String `tfsdk:"config_json"`
+	Created        types.String `tfsdk:"created"`
 }
 
 // mapProjectScoreToModel maps a client.ProjectScore to the Terraform model.
@@ -24,5 +26,7 @@ func mapProjectScoreToModel(score *client.ProjectScore, model *projectScoreModel
 	model.Name = types.StringValue(score.Name)
 	model.Description = stringPtrToTFValue(score.Description)
 	model.ScoreType = types.StringValue(score.ScoreType)
+	model.CategoriesJSON = promptJSONState(score.Categories, model.CategoriesJSON)
+	model.ConfigJSON = promptJSONState(score.Config, model.ConfigJSON)
 	model.Created = stringPtrToTFValue(score.Created)
 }
