@@ -63,6 +63,32 @@ func (c *Client) GetServiceToken(ctx context.Context, id string) (*ServiceToken,
 	return &token, nil
 }
 
+// ListServiceTokensByName reads every matching page. Token names need not be
+// unique, so callers must also compare service_account_id and IDs.
+func (c *Client) ListServiceTokensByName(ctx context.Context, name string) ([]ServiceToken, error) {
+	params := url.Values{"name": {name}, "limit": {"100"}}
+	var all []ServiceToken
+	var previousCursor string
+	for {
+		var page struct {
+			Objects []ServiceToken `json:"objects"`
+		}
+		if err := c.doRequest(ctx, "GET", serviceTokenBasePath+"?"+params.Encode(), nil, &page); err != nil {
+			return nil, err
+		}
+		all = append(all, page.Objects...)
+		if len(page.Objects) < 100 {
+			return all, nil
+		}
+		cursor := page.Objects[len(page.Objects)-1].ID
+		if cursor == "" || cursor == previousCursor {
+			return nil, fmt.Errorf("service token pagination cursor did not advance")
+		}
+		previousCursor = cursor
+		params.Set("starting_after", cursor)
+	}
+}
+
 // DeleteServiceToken deletes a service token by ID.
 func (c *Client) DeleteServiceToken(ctx context.Context, id string) error {
 	if id == "" {

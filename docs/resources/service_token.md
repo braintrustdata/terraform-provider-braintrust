@@ -7,7 +7,7 @@ description: |-
   Service tokens are scoped to a service account and are used for programmatic API access.
   Creation requires an organization-owner service token. If the caller token expires, set expires_in_seconds below its remaining lifetime.
   Important: The raw token (key) is only exposed at creation time and stored in Terraform state. It cannot be retrieved again from the API. Treat the Terraform state as sensitive.
-  Service tokens are immutable — any attribute change requires destroying and recreating the token. Import is not supported because the raw key cannot be recovered.
+  Service tokens are immutable — any attribute change requires destroying and recreating the token. Import is not supported because the raw key cannot be recovered. Give each Terraform-managed token a unique name within its service account. If a create response is lost, the provider records any newly discovered token ID as tainted state; the next apply revokes it before recreating the token.
 ---
 
 # braintrust_service_token (Resource)
@@ -20,7 +20,7 @@ Creation requires an organization-owner service token. If the caller token expir
 
 **Important:** The raw token (`key`) is only exposed at creation time and stored in Terraform state. It cannot be retrieved again from the API. Treat the Terraform state as sensitive.
 
-Service tokens are **immutable** — any attribute change requires destroying and recreating the token. Import is not supported because the raw key cannot be recovered.
+Service tokens are **immutable** — any attribute change requires destroying and recreating the token. Import is not supported because the raw key cannot be recovered. Give each Terraform-managed token a unique name within its service account. If a create response is lost, the provider records any newly discovered token ID as tainted state; the next apply revokes it before recreating the token.
 
 
 
@@ -29,7 +29,7 @@ Service tokens are **immutable** — any attribute change requires destroying an
 
 ### Required
 
-- `name` (String) Name of the service token. Does not have to be unique.
+- `name` (String) Name of the service token. Terraform requires it to be unique within its service account for safe create recovery.
 - `service_account_id` (String) The service account ID this service token should belong to.
 
 ### Optional

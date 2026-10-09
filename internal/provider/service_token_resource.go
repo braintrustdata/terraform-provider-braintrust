@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -42,7 +43,8 @@ func (r *serviceTokenResource) Schema(_ context.Context, _ resource.SchemaReques
 			"**Important:** The raw token (`key`) is only exposed at creation time and stored in Terraform state. " +
 			"It cannot be retrieved again from the API. Treat the Terraform state as sensitive.\n\n" +
 			"Service tokens are **immutable** — any attribute change requires destroying and recreating the token. " +
-			"Import is not supported because the raw key cannot be recovered.",
+			"Import is not supported because the raw key cannot be recovered. Give each Terraform-managed token a unique name within its service account. " +
+			"If a create response is lost, the provider records any newly discovered token ID as tainted state; the next apply revokes it before recreating the token.",
 		Attributes: map[string]schema.Attribute{
 			"id":                    computedStringAttribute("Unique identifier for the service token (UUID)."),
 			"preview_name":          computedStringAttribute("A preview/masked version of the token name."),
@@ -58,7 +60,7 @@ func (r *serviceTokenResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "Name of the service token. Does not have to be unique.",
+				Description: "Name of the service token. Terraform requires it to be unique within its service account for safe create recovery.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -116,9 +118,43 @@ func (r *serviceTokenResource) Create(ctx context.Context, req resource.CreateRe
 		"name":               createReq.Name,
 		"service_account_id": createReq.ServiceAccountID,
 	})
+	// The API exposes the raw token only in the POST response. If that response
+	// is lost, issuing the POST again would mint a second credential. Reserve a
+	// unique name per account and use the list endpoint to reconcile the result.
+	existing, err := r.client.ListServiceTokensByName(ctx, createReq.Name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Existing Service Tokens", err.Error())
+		return
+	}
+	knownIDs := make(map[string]bool)
+	for _, token := range existing {
+		knownIDs[token.ID] = true
+		if token.Name == createReq.Name && token.ServiceAccountID != nil && *token.ServiceAccountID == createReq.ServiceAccountID {
+			resp.Diagnostics.AddError("Service Token Name Already Used", "A token with this name and service account already exists (ID: "+token.ID+"). Use a unique name or remove that token before creating another. Its raw key cannot be recovered through the API.")
+			return
+		}
+	}
 
 	output, err := r.client.CreateServiceToken(ctx, createReq)
 	if err != nil {
+		if client.IsUncertainWriteError(err) {
+			current, listErr := r.client.ListServiceTokensByName(ctx, createReq.Name)
+			if listErr == nil {
+				var newTokens []client.ServiceToken
+				for _, token := range current {
+					if !knownIDs[token.ID] && token.Name == createReq.Name && token.ServiceAccountID != nil && *token.ServiceAccountID == createReq.ServiceAccountID {
+						newTokens = append(newTokens, token)
+					}
+				}
+				if len(newTokens) == 1 {
+					mapServiceTokenToModel(&newTokens[0], &plan)
+					plan.Key = types.StringNull()
+					resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+					resp.Diagnostics.AddError("Service Token Created But Key Was Lost", "The POST outcome was uncertain, but a new token (ID: "+newTokens[0].ID+") appeared. Its raw key cannot be recovered. Terraform retained the ID in tainted state and will delete it before recreating the token on the next apply. Original error: "+err.Error())
+					return
+				}
+			}
+		}
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Service Token",
 			"Could not create service token, unexpected error: "+err.Error(),
