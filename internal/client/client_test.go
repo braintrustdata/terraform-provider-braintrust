@@ -28,6 +28,9 @@ func TestWriteDoesNotRetryAmbiguousServerError(t *testing.T) {
 	if !strings.Contains(err.Error(), "outcome is unknown") {
 		t.Fatalf("write error must explain uncertainty: %v", err)
 	}
+	if !IsUncertainWriteError(err) {
+		t.Fatalf("write error must be classifiable: %v", err)
+	}
 }
 
 func TestWriteDoesNotRetryDroppedResponse(t *testing.T) {
@@ -49,6 +52,9 @@ func TestWriteDoesNotRetryDroppedResponse(t *testing.T) {
 	err = c.doRequest(context.Background(), http.MethodPost, "/v1/project", map[string]string{"name": "fixture"}, nil)
 	if err == nil || !strings.Contains(err.Error(), "outcome is unknown") || requests != 1 {
 		t.Fatalf("want one ambiguous write; got requests=%d error=%v", requests, err)
+	}
+	if !IsUncertainWriteError(err) {
+		t.Fatalf("write error must be classifiable: %v", err)
 	}
 }
 

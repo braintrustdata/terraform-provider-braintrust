@@ -93,6 +93,24 @@ type NotFoundError struct {
 	Message string
 }
 
+// UncertainWriteError means a write may have committed even though its result
+// could not be observed. Callers must reconcile before issuing another write.
+type UncertainWriteError struct {
+	Method string
+	Cause  error
+}
+
+func (e *UncertainWriteError) Error() string {
+	return fmt.Sprintf("%s request outcome is unknown; inspect the remote resource before retrying: %v", e.Method, e.Cause)
+}
+
+func (e *UncertainWriteError) Unwrap() error { return e.Cause }
+
+func IsUncertainWriteError(err error) bool {
+	var uncertain *UncertainWriteError
+	return errors.As(err, &uncertain)
+}
+
 func (e *NotFoundError) Error() string {
 	return fmt.Sprintf("resource not found: %s", e.Message)
 }
@@ -180,7 +198,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 				return ctx.Err()
 			}
 			if method != http.MethodGet {
-				return fmt.Errorf("%s request outcome is unknown after a transport error; inspect the remote resource before retrying: %w", method, lastErr)
+				return &UncertainWriteError{Method: method, Cause: lastErr}
 			}
 			continue
 		}
@@ -190,6 +208,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 		_ = resp.Body.Close() // intentionally discarding close error
 		if err != nil {
+			if method != http.MethodGet {
+				return &UncertainWriteError{Method: method, Cause: fmt.Errorf("failed to read response body: %w", err)}
+			}
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
 
@@ -203,6 +224,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 			})
 			if result != nil && len(respBody) > 0 {
 				if err := json.Unmarshal(respBody, result); err != nil {
+					if method != http.MethodGet {
+						return &UncertainWriteError{Method: method, Cause: fmt.Errorf("failed to unmarshal response: %w", err)}
+					}
 					return fmt.Errorf("failed to unmarshal response: %w", err)
 				}
 			}
@@ -230,7 +254,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 				Message:    string(respBody),
 			}
 			if method != http.MethodGet && resp.StatusCode != http.StatusTooManyRequests {
-				return fmt.Errorf("%s request outcome is unknown after HTTP %d; inspect the remote resource before retrying: %w", method, resp.StatusCode, lastErr)
+				return &UncertainWriteError{Method: method, Cause: lastErr}
 			}
 			continue
 		}
