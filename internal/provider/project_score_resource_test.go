@@ -2,11 +2,13 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -86,6 +88,80 @@ func TestAccProjectScoreResource_scoreTypeReplaces(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccProjectScoreResource_categoricalDefinition(t *testing.T) {
+	name := "tf-acc-score-config-" + acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum)
+	resourceName := "braintrust_project_score.test"
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckProjectScoreDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCategoricalScoreConfig(name, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "score_type", "categorical"),
+					resource.TestCheckResourceAttrSet(resourceName, "categories_json"),
+					resource.TestCheckResourceAttrSet(resourceName, "config_json"),
+				),
+			},
+			{ResourceName: resourceName, ImportState: true, ImportStateVerify: true},
+			{
+				Config: testAccCategoricalScoreConfig(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "score_type", "categorical"),
+					resource.TestCheckResourceAttrSet(resourceName, "categories_json"),
+					resource.TestCheckResourceAttrSet(resourceName, "config_json"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCategoricalScoreConfig(name string, updated bool) string {
+	if updated {
+		return fmt.Sprintf(`
+resource "braintrust_project" "test" { name = %[1]q }
+resource "braintrust_project_score" "test" {
+  project_id = braintrust_project.test.id
+  name = %[1]q
+  score_type = "categorical"
+  categories_json = jsonencode([
+    { name = "Low", value = 0 },
+    { name = "Medium", value = 0.5 },
+    { name = "High", value = 1 }
+  ])
+  config_json = jsonencode({ multi_select = true, object_types = ["project_logs"] })
+}
+`, name)
+	}
+	return fmt.Sprintf(`
+resource "braintrust_project" "test" { name = %[1]q }
+resource "braintrust_project_score" "test" {
+  project_id = braintrust_project.test.id
+  name = %[1]q
+  score_type = "categorical"
+  categories_json = jsonencode([
+    { name = "Low", value = 0 },
+    { name = "High", value = 1 }
+  ])
+  config_json = jsonencode({ multi_select = false, object_types = ["project_logs"] })
+}
+`, name)
+}
+
+func TestProjectScoreJSONInput(t *testing.T) {
+	if _, err := projectScoreJSONInput(types.StringValue("{bad"), "config_json"); err == nil {
+		t.Fatal("invalid JSON must fail before an API request")
+	}
+	raw, err := projectScoreJSONInput(types.StringValue(`{"multi_select":true}`), "config_json")
+	if err != nil || !json.Valid(raw) {
+		t.Fatalf("valid JSON was rejected: %v", err)
+	}
+	if !scoreJSONEqual(types.StringValue(`{"a":1,"b":2}`), types.StringValue(`{ "b": 2, "a": 1 }`)) {
+		t.Fatal("object key order and whitespace should not change a score definition")
+	}
 }
 
 func testAccCheckProjectScoreDestroy(s *terraform.State) error {

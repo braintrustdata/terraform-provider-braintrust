@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -11,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -49,10 +52,9 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 		Version:     0,
 		Description: "Manages a Braintrust project score.",
 		MarkdownDescription: "Manages a Braintrust project score. Scores are user-configured metrics " +
-			"that can be manually labeled through the UI or computed programmatically.\n\n" +
-			"**Note:** This resource manages the score *definition* (name, type, description). " +
-			"Complex score configurations such as categories (for categorical scores) and " +
-			"weights (for weighted scores) are not yet supported and should be managed through the UI. " +
+			"that can be manually labeled through the UI or computed programmatically. " +
+			"Use `categories_json` for categorical categories, weighted-score weights, or " +
+			"minimum-score inputs, and `config_json` for score options. " +
 			"Changing `score_type` replaces the score and assigns it a new ID.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the project score (UUID)."),
@@ -75,10 +77,9 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 			"description": optionalComputedStringAttribute("Textual description of the project score."),
 			"score_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of the configured score. Changing it replaces the score because type-specific configuration is not yet modeled.",
-				// PATCH validates the full type-specific score shape. Since this
-				// resource does not yet model categories/config, changing types
-				// in place can fail even when both types are valid at creation.
+				Description: "The type of the configured score. Changing it replaces the score and assigns a new ID.",
+				// PATCH validates the full type-specific score shape, and an
+				// in-place type change can invalidate existing category/config data.
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -86,6 +87,8 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringvalidator.OneOf(projectScoreTypes...),
 				},
 			},
+			"categories_json": optionalComputedStringAttribute("JSON-encoded score categories, weights, or included score names, depending on score_type. Use the JSON literal null to clear it."),
+			"config_json":     optionalComputedStringAttribute("JSON-encoded score configuration (for example multi_select, visibility, online, condition, and object_types). Use the JSON literal null to clear it."),
 		},
 	}
 }
@@ -109,6 +112,17 @@ func (r *projectScoreResource) Create(ctx context.Context, req resource.CreateRe
 		Name:        plan.Name.ValueString(),
 		Description: tfStringToPtr(plan.Description),
 		ScoreType:   plan.ScoreType.ValueString(),
+	}
+	var err error
+	createReq.Categories, err = projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Score Categories", err.Error())
+		return
+	}
+	createReq.Config, err = projectScoreJSONInput(plan.ConfigJSON, "config_json")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Score Config", err.Error())
+		return
 	}
 
 	tflog.Debug(ctx, "Creating project score", map[string]any{
@@ -188,10 +202,24 @@ func (r *projectScoreResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	name := plan.Name.ValueString()
-	scoreType := plan.ScoreType.ValueString()
 	updateReq := client.UpdateProjectScoreRequest{
-		Name:      &name,
-		ScoreType: &scoreType,
+		Name: &name,
+	}
+	categories, err := projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Score Categories", err.Error())
+		return
+	}
+	if categories != nil && !scoreJSONEqual(plan.CategoriesJSON, state.CategoriesJSON) {
+		updateReq.Categories = &categories
+	}
+	config, err := projectScoreJSONInput(plan.ConfigJSON, "config_json")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Score Config", err.Error())
+		return
+	}
+	if config != nil && !scoreJSONEqual(plan.ConfigJSON, state.ConfigJSON) {
+		updateReq.Config = &config
 	}
 
 	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
@@ -239,4 +267,22 @@ func (r *projectScoreResource) Delete(ctx context.Context, req resource.DeleteRe
 
 func (r *projectScoreResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func projectScoreJSONInput(value types.String, field string) (json.RawMessage, error) {
+	if value.IsNull() || value.IsUnknown() {
+		return nil, nil
+	}
+	raw := json.RawMessage(value.ValueString())
+	if !json.Valid(raw) {
+		return nil, fmt.Errorf("%s must be valid JSON", field)
+	}
+	return raw, nil
+}
+
+func scoreJSONEqual(a, b types.String) bool {
+	if a.IsNull() || a.IsUnknown() || b.IsNull() || b.IsUnknown() {
+		return a.Equal(b)
+	}
+	return jsonRawToTFString(json.RawMessage(a.ValueString())).Equal(jsonRawToTFString(json.RawMessage(b.ValueString())))
 }
