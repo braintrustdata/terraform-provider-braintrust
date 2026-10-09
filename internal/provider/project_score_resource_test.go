@@ -155,6 +155,9 @@ func TestProjectScoreJSONInput(t *testing.T) {
 	if _, err := projectScoreJSONInput(types.StringValue("{bad"), "config_json"); err == nil {
 		t.Fatal("invalid JSON must fail before an API request")
 	}
+	if _, err := projectScoreJSONInput(types.StringValue("  null "), "config_json"); err == nil {
+		t.Fatal("Braintrust ignores a null score config patch; reject it before an API request")
+	}
 	raw, err := projectScoreJSONInput(types.StringValue(`{"multi_select":true}`), "config_json")
 	if err != nil || !json.Valid(raw) {
 		t.Fatalf("valid JSON was rejected: %v", err)
