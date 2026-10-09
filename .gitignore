@@ -18,6 +18,8 @@ go.work.sum
 
 # Dependency directories
 vendor/
+__pycache__/
+*.pyc
 
 # IDE
 .idea/

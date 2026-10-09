@@ -94,6 +94,23 @@ data "braintrust_project" "existing" {
 
 The [agent-assisted starter](examples/agent-assisted/) includes a copyable `AGENTS.md` for your own Terraform repo and a small project-group configuration. It points an agent to the installed provider schema, shows safe dependency references, and asks for a reviewed plan before applying changes.
 
+### Saved Views and Dashboards
+
+Use `braintrust_view` for saved views and monitor dashboards. A dashboard has
+`view_type = "monitor"`; its chart layout and definitions live in
+`view_data_json.custom_charts`. See the [view example](examples/resources/braintrust_view/main.tf).
+Charts share the view's lifecycle because the Braintrust API has no separate chart
+resource. Import a view with `object_type/object_id/view_id`, for example
+`project/PROJECT_UUID/VIEW_UUID`.
+
+The [API drift workflow](.github/workflows/api-drift.yml) checks the public
+[Braintrust OpenAPI sync](https://github.com/braintrustdata/braintrust-openapi)
+on weekdays and maintains one review issue for API changes. It also accepts a
+`braintrust-openapi-updated` repository dispatch from the internal sync pipeline.
+After reviewing an issue and updating the provider and exporter as needed, refresh
+`api-contract-baseline.json` with
+`python3 scripts/check_api_drift.py --spec spec.json --refresh-baseline`.
+
 ### Email-First User Membership
 
 For group membership and ACL user grants, write config using emails and resolve to IDs via
