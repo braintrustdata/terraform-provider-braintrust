@@ -57,6 +57,8 @@ terraform {
 
 The provider is not yet published in the Terraform Registry. For now, build it locally and use a [Terraform development override](examples/agent-assisted/README.md) to validate and plan. After publication, `terraform init` will install it normally.
 
+Maintainers: see [RELEASING.md](RELEASING.md) for the Registry publication steps.
+
 ## Authentication
 
 The provider requires a Braintrust API key. You can create one in the Braintrust [organization settings](https://www.braintrustdata.com/app/settings?subroute=api-keys).
