@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 )
@@ -10,26 +11,33 @@ const datasetBasePath = "/v1/dataset"
 
 // Dataset represents a Braintrust dataset.
 type Dataset struct {
-	ID          string  `json:"id"`
-	ProjectID   string  `json:"project_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Created     *string `json:"created,omitempty"`
-	DeletedAt   *string `json:"deleted_at,omitempty"`
-	UserID      *string `json:"user_id,omitempty"`
+	ID          string          `json:"id"`
+	ProjectID   string          `json:"project_id"`
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	Tags        []string        `json:"tags,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	URLSlug     *string         `json:"url_slug,omitempty"`
+	Created     *string         `json:"created,omitempty"`
+	DeletedAt   *string         `json:"deleted_at,omitempty"`
+	UserID      *string         `json:"user_id,omitempty"`
 }
 
 // CreateDatasetRequest is the request body for creating a dataset.
 type CreateDatasetRequest struct {
-	ProjectID   string  `json:"project_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
+	ProjectID   string          `json:"project_id"`
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	Tags        []string        `json:"tags,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
 // UpdateDatasetRequest is the request body for updating a dataset.
 type UpdateDatasetRequest struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Name        *string          `json:"name,omitempty"`
+	Description *string          `json:"description,omitempty"`
+	Tags        *[]string        `json:"tags,omitempty"`
+	Metadata    *json.RawMessage `json:"metadata,omitempty"`
 }
 
 // CreateDataset creates a new dataset.

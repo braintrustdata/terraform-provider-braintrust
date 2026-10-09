@@ -23,10 +23,13 @@ Manages a Braintrust [dataset](https://www.braintrustdata.com/docs/guides/datase
 ### Optional
 
 - `description` (String) Textual description of the dataset.
+- `metadata_json` (String) JSON-encoded dataset metadata object. Use the JSON literal null to clear it.
+- `tags` (List of String) Dataset tags. Use an empty list to clear all tags.
 
 ### Read-Only
 
 - `created` (String) Date of dataset creation.
 - `deleted_at` (String) Date of dataset deletion, or null if the dataset is still active.
 - `id` (String) Unique identifier for the dataset (UUID).
+- `url_slug` (String) URL slug assigned to the dataset by Braintrust.
 - `user_id` (String) Identifies the user who created the dataset.
