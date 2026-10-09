@@ -139,6 +139,12 @@ func IsNotFoundError(err error) bool {
 // are retried only when the API explicitly rejects them with 429; after a
 // transport error or 5xx, the server may have committed a non-idempotent write.
 func (c *Client) doRequest(ctx context.Context, method, path string, body any, result any) error {
+	return c.doRequestWithHeaders(ctx, method, path, body, result, nil)
+}
+
+// doRequestWithHeaders exposes response headers for endpoints where a successful
+// status still carries lifecycle information (for example, found-existing).
+func (c *Client) doRequestWithHeaders(ctx context.Context, method, path string, body any, result any, responseHeaders *http.Header) error {
 	url := fmt.Sprintf("%s%s", c.baseURL, path)
 
 	tflog.Debug(ctx, "Braintrust API request", map[string]any{
@@ -216,6 +222,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 
 		// Success
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if responseHeaders != nil {
+				*responseHeaders = resp.Header.Clone()
+			}
 			tflog.Debug(ctx, "Braintrust API request succeeded", map[string]any{
 				"method":      method,
 				"path":        path,
