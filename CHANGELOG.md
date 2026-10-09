@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `braintrust_view` for saved views and monitor dashboards, with chart definitions in `view_data_json.custom_charts`.
+- A scheduled API contract check against the public `braintrust-openapi` sync that maintains one review issue for drift.
+
 ## [0.1.0] - 2026-10-09
 
 ### Added

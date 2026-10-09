@@ -127,6 +127,7 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 		NewServiceTokenResource,
 		NewAISecretResource,
 		NewProjectAutomationResource,
+		NewViewResource,
 	}
 }
 
