@@ -17,10 +17,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Require a tag on current main
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Verify release source
+        run: |
+          go build -mod=readonly ./...
+          go vet -mod=readonly ./...
+          go test -mod=readonly -count=1 ./...
+
+      - name: Verify generated documentation
+        run: |
+          curl -fsSL https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip -o /tmp/terraform_1.15.8_linux_amd64.zip
+          unzip -q /tmp/terraform_1.15.8_linux_amd64.zip terraform -d /tmp
+          sudo mv /tmp/terraform /usr/local/bin/terraform
+          go generate ./...
+          git diff --exit-code -- docs/
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0

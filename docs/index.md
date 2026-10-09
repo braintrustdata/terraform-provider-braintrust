@@ -11,9 +11,11 @@ The Braintrust provider allows you to manage [Braintrust](https://www.braintrust
 
 ## Authentication
 
-The provider requires a Braintrust API key for authentication. You can create an API key in the Braintrust [organization settings page](https://www.braintrustdata.com/app/settings?subroute=api-keys).
+The provider accepts a Braintrust user API key or service token for authentication. You can create a user API key in the Braintrust [organization settings page](https://www.braintrustdata.com/app/settings?subroute=api-keys).
 
 The API key can be provided in the provider configuration block or via the `BRAINTRUST_API_KEY` environment variable.
+
+User API keys must be created in Braintrust settings; the public API does not permit creating them through this provider. Creating `braintrust_service_token` requires an organization-owner service token. Configure a provider alias with that credential when managing service tokens alongside resources authenticated by a user API key.
 
 ## Example Usage
 
@@ -43,7 +45,6 @@ Terraform state may contain sensitive values in plaintext. Keep these considerat
 
 The following resource attributes are stored in the Terraform state file:
 
-- `braintrust_api_key` — the `key` attribute contains the raw API key
 - `braintrust_service_token` — the `key` attribute contains the raw service token
 - `braintrust_ai_secret` — the `secret` attribute contains the AI provider credential
 
@@ -55,7 +56,7 @@ If multiple team members run `terraform apply` against the same state simultaneo
 
 ### Non-Recoverable Secrets
 
-`braintrust_api_key` and `braintrust_service_token` expose their raw secret only at creation time. These resources **cannot be imported** — if state is lost, delete the old credential and create a new one.
+`braintrust_service_token` exposes its raw secret only at creation time. It **cannot be imported** — if state is lost, delete the old credential and create a new one.
 
 ### Upsert Behavior on Env Vars and AI Secrets
 

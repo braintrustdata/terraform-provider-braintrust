@@ -5,7 +5,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.24 (to build the provider plugin)
+- [Go](https://go.dev/doc/install) >= 1.26.9 (to build the provider plugin)
 
 ## Resources
 
@@ -21,7 +21,6 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_acl` | Access control list entries (bind groups to roles/permissions on objects) |
 | `braintrust_env_var` | Environment variables scoped to org, project, or function |
 | `braintrust_ai_secret` | AI provider credentials (OpenAI, Anthropic, etc.) at org level |
-| `braintrust_api_key` | API keys for user-level authentication |
 | `braintrust_service_account` | Service accounts for non-human automation identities |
 | `braintrust_service_token` | Service tokens for programmatic access via service accounts |
 | `braintrust_project_score` | Score definitions for labeling experiments |
@@ -61,7 +60,9 @@ Maintainers: see [RELEASING.md](RELEASING.md) for the Registry publication steps
 
 ## Authentication
 
-The provider requires a Braintrust API key. You can create one in the Braintrust [organization settings](https://www.braintrustdata.com/app/settings?subroute=api-keys).
+The provider accepts a Braintrust user API key or service token. You can create a user API key in the Braintrust [organization settings](https://www.braintrustdata.com/app/settings?subroute=api-keys).
+
+The public Braintrust API does not currently permit creating user API keys, so the provider does not manage them. Create the key in organization settings before using Terraform. Service tokens can be managed with `braintrust_service_token` when authenticated with an organization-owner service token.
 
 Set it via the `BRAINTRUST_API_KEY` environment variable (recommended) or in the provider block.
 
