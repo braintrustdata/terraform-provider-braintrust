@@ -206,21 +206,25 @@ func (r *projectScoreResource) Update(ctx context.Context, req resource.UpdateRe
 	updateReq := client.UpdateProjectScoreRequest{
 		Name: &name,
 	}
-	categories, err := projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
-	if err != nil {
-		resp.Diagnostics.AddError("Invalid Score Categories", err.Error())
-		return
+	if !scoreJSONEqual(plan.CategoriesJSON, state.CategoriesJSON) {
+		categories, err := projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid Score Categories", err.Error())
+			return
+		}
+		if categories != nil {
+			updateReq.Categories = &categories
+		}
 	}
-	if categories != nil && !scoreJSONEqual(plan.CategoriesJSON, state.CategoriesJSON) {
-		updateReq.Categories = &categories
-	}
-	config, err := projectScoreJSONInput(plan.ConfigJSON, "config_json")
-	if err != nil {
-		resp.Diagnostics.AddError("Invalid Score Config", err.Error())
-		return
-	}
-	if config != nil && !scoreJSONEqual(plan.ConfigJSON, state.ConfigJSON) {
-		updateReq.Config = &config
+	if !scoreJSONEqual(plan.ConfigJSON, state.ConfigJSON) {
+		config, err := projectScoreJSONInput(plan.ConfigJSON, "config_json")
+		if err != nil {
+			resp.Diagnostics.AddError("Invalid Score Config", err.Error())
+			return
+		}
+		if config != nil {
+			updateReq.Config = &config
+		}
 	}
 
 	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
