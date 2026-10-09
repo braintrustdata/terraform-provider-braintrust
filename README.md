@@ -98,7 +98,11 @@ The [agent-assisted starter](examples/agent-assisted/) includes a copyable `AGEN
 
 Use `braintrust_view` for saved views and monitor dashboards. A dashboard has
 `view_type = "monitor"`; its chart layout and definitions live in
-`view_data_json.custom_charts`. See the [view example](examples/resources/braintrust_view/main.tf).
+`view_data_json.custom_charts`. The [view example](examples/resources/braintrust_view/main.tf)
+includes a SQL big-number chart and a grouped time series; its [SQL chart guide](examples/resources/braintrust_view/README.md)
+shows the estimated-cost query from the chart editor. See the official
+[Braintrust SQL charts documentation](https://www.braintrust.dev/docs/observe/dashboards/sql-charts#sql-charts)
+for chart query behavior and options.
 Charts share the view's lifecycle because the Braintrust API has no separate chart
 resource. Import a view with `object_type/object_id/view_id`, for example
 `project/PROJECT_UUID/VIEW_UUID`.
