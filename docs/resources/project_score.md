@@ -23,8 +23,8 @@ Manages a Braintrust project score. Scores are user-configured metrics that can 
 
 ### Optional
 
-- `categories_json` (String) JSON-encoded score categories, weights, or included score names, depending on score_type. Use the JSON literal null to clear it.
-- `config_json` (String) JSON-encoded score configuration (for example multi_select, visibility, online, condition, and object_types). Use the JSON literal null to clear it.
+- `categories_json` (String) JSON-encoded score categories, weights, or included score names, depending on score_type. A JSON null is sent to the API, which may reject it for score types requiring categories.
+- `config_json` (String) JSON-encoded score configuration (for example multi_select, visibility, online, condition, and object_types). Braintrust does not clear this field on PATCH; replace the score to remove an existing configuration.
 - `description` (String) Textual description of the project score.
 
 ### Read-Only

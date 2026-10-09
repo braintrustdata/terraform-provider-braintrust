@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -87,8 +88,8 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringvalidator.OneOf(projectScoreTypes...),
 				},
 			},
-			"categories_json": optionalComputedStringAttribute("JSON-encoded score categories, weights, or included score names, depending on score_type. Use the JSON literal null to clear it."),
-			"config_json":     optionalComputedStringAttribute("JSON-encoded score configuration (for example multi_select, visibility, online, condition, and object_types). Use the JSON literal null to clear it."),
+			"categories_json": optionalComputedStringAttribute("JSON-encoded score categories, weights, or included score names, depending on score_type. A JSON null is sent to the API, which may reject it for score types requiring categories."),
+			"config_json":     optionalComputedStringAttribute("JSON-encoded score configuration (for example multi_select, visibility, online, condition, and object_types). Braintrust does not clear this field on PATCH; replace the score to remove an existing configuration."),
 		},
 	}
 }
@@ -276,6 +277,9 @@ func projectScoreJSONInput(value types.String, field string) (json.RawMessage, e
 	raw := json.RawMessage(value.ValueString())
 	if !json.Valid(raw) {
 		return nil, fmt.Errorf("%s must be valid JSON", field)
+	}
+	if field == "config_json" && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil, fmt.Errorf("%s cannot be JSON null: Braintrust does not clear score configuration on PATCH; replace the score to remove an existing configuration", field)
 	}
 	return raw, nil
 }
