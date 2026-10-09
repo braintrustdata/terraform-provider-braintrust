@@ -42,7 +42,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 
 ## Installation
 
-Add the provider to your `required_providers` block and run `terraform init`:
+Add the provider to your `required_providers` block:
 
 ```hcl
 terraform {
@@ -54,6 +54,8 @@ terraform {
   }
 }
 ```
+
+The provider is not yet published in the Terraform Registry. For now, build it locally and use a [Terraform development override](examples/agent-assisted/README.md) to validate and plan. After publication, `terraform init` will install it normally.
 
 ## Authentication
 
@@ -84,6 +86,10 @@ data "braintrust_project" "existing" {
   name = "my-ml-project"
 }
 ```
+
+### Working With a Coding Agent
+
+The [agent-assisted starter](examples/agent-assisted/) includes a copyable `AGENTS.md` for your own Terraform repo and a small project-group configuration. It points an agent to the installed provider schema, shows safe dependency references, and asks for a reviewed plan before applying changes.
 
 ### Email-First User Membership
 
