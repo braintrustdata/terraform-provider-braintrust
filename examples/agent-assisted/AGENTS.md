@@ -1,0 +1,14 @@
+# Braintrust Terraform guidance for coding agents
+
+This file is meant to be copied into the Terraform directory of a project that uses the Braintrust provider. It guides agents writing configuration for that project; it is not guidance for developing the provider itself.
+
+- Use `braintrustdata/braintrust` as the provider source. Read the installed provider schema with `terraform providers schema -json` and consult the [resource documentation](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/docs) before using an attribute or resource. Do not infer an API field from its name.
+- Ask which Braintrust organization and Terraform state should own new resources. The provider authenticates with `BRAINTRUST_API_KEY`; do not put credentials in `.tf` files or commit `.env`, `.tfstate`, plan files, or secret-bearing outputs. Protect remote state because service tokens and AI secrets can be stored there.
+- Prefer references such as `braintrust_project.app.id` over copied IDs. Use `data "braintrust_user"` to resolve existing members by email. Read an existing object via a data source or import it before trying to manage it.
+- For a project managed by Terraform, connect it to a project group with `braintrust_project_group_membership`. Leave `member_projects` unset on that project group. This makes Terraform remove membership before destroying the project or group. A project can have more than one membership.
+- Keep ACL targets and principals explicit. An ACL takes exactly one of `user_id` or `group_id`, and exactly one of `permission` or `role_id`. Granting project-group access requires an ACL on the project group; membership alone does not grant access.
+- An existing service token's secret cannot be read back. Do not attempt to import it. The public API also does not support provider creation of user API keys or service-account read/import. Check the resource docs before promising lifecycle coverage.
+- For existing organizations, generate a selected subset with [braintrust-terraforming](https://github.com/braintrustdata/braintrust-terraforming), review it, and use import blocks before applying. Do not assume a whole-org export is a no-op migration. Secret values must be supplied separately.
+- Run `terraform fmt -check`, `terraform validate`, and `terraform plan`. Explain creates, replacements, destroys, and permission changes to the user before applying. Do not apply or destroy unless the user has authorized changes to that organization.
+
+Start with `main.tf` in this directory for a project, project group, membership, and permission group. Adapt names and `org_id` to the target organization. Until the provider is published in the Terraform Registry, follow the local development override instructions in this starter's README.
