@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -57,7 +58,10 @@ func (r *datasetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
-			"description": optionalComputedStringAttribute("Textual description of the dataset."),
+			"description":   optionalComputedStringAttribute("Textual description of the dataset."),
+			"tags":          schema.ListAttribute{Optional: true, Computed: true, ElementType: types.StringType, Description: "Dataset tags. Use an empty list to clear all tags."},
+			"metadata_json": optionalComputedStringAttribute("JSON-encoded dataset metadata object. Use the JSON literal null to clear it."),
+			"url_slug":      computedStringAttribute("URL slug assigned to the dataset by Braintrust."),
 		},
 	}
 }
@@ -80,6 +84,13 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 		ProjectID:   plan.ProjectID.ValueString(),
 		Name:        plan.Name.ValueString(),
 		Description: tfStringToPtr(plan.Description),
+		Tags:        stringListFromModel(plan.Tags),
+	}
+	var err error
+	createReq.Metadata, err = datasetMetadataInput(plan.MetadataJSON)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Dataset Metadata", err.Error())
+		return
 	}
 
 	tflog.Debug(ctx, "Creating dataset", map[string]any{
@@ -160,6 +171,21 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	name := plan.Name.ValueString()
 	updateReq := client.UpdateDatasetRequest{
 		Name: &name,
+	}
+	if !plan.Tags.IsNull() && !plan.Tags.IsUnknown() && !plan.Tags.Equal(state.Tags) {
+		tags := stringListFromModel(plan.Tags)
+		if tags == nil {
+			tags = []string{}
+		}
+		updateReq.Tags = &tags
+	}
+	metadata, err := datasetMetadataInput(plan.MetadataJSON)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid Dataset Metadata", err.Error())
+		return
+	}
+	if metadata != nil && !plan.MetadataJSON.Equal(state.MetadataJSON) {
+		updateReq.Metadata = &metadata
 	}
 
 	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {

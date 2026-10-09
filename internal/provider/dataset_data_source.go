@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -57,6 +58,9 @@ func (d *datasetDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				Computed:    true,
 				Description: "Textual description of the dataset.",
 			},
+			"tags":          schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Dataset tags."},
+			"metadata_json": schema.StringAttribute{Computed: true, Description: "JSON-encoded dataset metadata object."},
+			"url_slug":      schema.StringAttribute{Computed: true, Description: "URL slug assigned to the dataset by Braintrust."},
 			"created": schema.StringAttribute{
 				Computed:    true,
 				Description: "Date of dataset creation.",
