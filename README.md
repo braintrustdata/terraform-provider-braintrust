@@ -210,9 +210,11 @@ with a credential that can access **only** the dedicated test organization, and
 set the repository variable `BRAINTRUST_TEST_ORG_ID`. Apply the
 `run-acc-tests` label to a trusted same-repository pull request to run the
 live suite. CI verifies the credential's organization scope before creating
-resources and serializes sandbox runs. Tests requiring a specific user or a
-pre-existing service account skip unless their corresponding test environment
-variables are configured.
+resources and serializes sandbox runs. The optional `BRAINTRUST_TEST_USER_ID`
+and `BRAINTRUST_TEST_USER_EMAIL` secrets enable user lookup and membership
+tests. The test requiring a pre-existing service account skips unless
+`BRAINTRUST_SERVICE_ACCOUNT_ID` is configured; a separate test creates and
+destroys its own service account and token.
 
 ### Generating Documentation
 
