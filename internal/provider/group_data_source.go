@@ -105,28 +105,28 @@ func (d *groupDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	var matches []client.Group
-	for _, group := range groups {
+	var match *client.Group
+	for i := range groups {
+		group := &groups[i]
 		if group.Name == name && (orgID == "" || group.OrgID == orgID) {
-			matches = append(matches, group)
+			if match != nil {
+				resp.Diagnostics.AddError(
+					"Ambiguous Group",
+					"Multiple groups have the name "+name+". Set org_id to select one organization.",
+				)
+				return
+			}
+			match = group
 		}
 	}
-	if len(matches) == 0 {
+	if match == nil {
 		resp.Diagnostics.AddError(
 			"Group Not Found",
 			"No group found with name: "+name,
 		)
 		return
 	}
-	if len(matches) > 1 {
-		resp.Diagnostics.AddError(
-			"Ambiguous Group",
-			"Multiple groups have the name "+name+". Set org_id to select one organization.",
-		)
-		return
-	}
-
 	var state groupModel
-	mapGroupToModel(&matches[0], &state)
+	mapGroupToModel(match, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
