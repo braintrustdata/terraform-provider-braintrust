@@ -19,6 +19,7 @@ Use this data source to get information about an existing Braintrust [project](h
 
 - `id` (String) The unique identifier (UUID) of the project. Provide either `id` or `name`.
 - `name` (String) The name of the project. Provide either `name` or `id`.
+- `org_id` (String) Organization ID to match when looking up by name. Set this if the credential can access multiple organizations.
 
 ### Read-Only
 
@@ -27,5 +28,4 @@ Use this data source to get information about an existing Braintrust [project](h
 - `created` (String) Date of project creation.
 - `deleted_at` (String) Date of project deletion, or null if the project is still active.
 - `description` (String) Textual description of the project.
-- `org_id` (String) Unique identifier for the organization that the project belongs to.
 - `user_id` (String) Identifies the user who created the project.

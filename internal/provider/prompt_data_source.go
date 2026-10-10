@@ -137,14 +137,24 @@ func (d *promptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			)
 			return
 		}
-		if len(prompts) == 0 {
+		var matches []client.Prompt
+		for _, candidate := range prompts {
+			if candidate.Name == name && candidate.ProjectID == projectID {
+				matches = append(matches, candidate)
+			}
+		}
+		if len(matches) == 0 {
 			resp.Diagnostics.AddError(
 				"Prompt Not Found",
-				"No prompt found with name: "+name,
+				"No prompt found with name "+name+" in project "+projectID+".",
 			)
 			return
 		}
-		prompt = &prompts[0]
+		if len(matches) > 1 {
+			resp.Diagnostics.AddError("Ambiguous Prompt", "Multiple prompts have the name "+name+" in project "+projectID+". Look up the prompt by ID.")
+			return
+		}
+		prompt = &matches[0]
 	} else {
 		id := config.ID.ValueString()
 		tflog.Debug(ctx, "Reading prompt data source", map[string]any{"id": id})
@@ -155,6 +165,10 @@ func (d *promptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 				"Error Reading Braintrust Prompt",
 				"Could not read prompt ID "+id+": "+err.Error(),
 			)
+			return
+		}
+		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && prompt.ProjectID != config.ProjectID.ValueString() {
+			resp.Diagnostics.AddError("Prompt Project Mismatch", "Prompt ID "+id+" does not belong to project_id "+config.ProjectID.ValueString()+".")
 			return
 		}
 	}

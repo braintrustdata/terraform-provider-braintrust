@@ -126,15 +126,29 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	if len(users) == 0 {
+	var matches []client.User
+	for _, candidate := range users {
+		if !config.Email.IsNull() && !config.Email.IsUnknown() && (candidate.Email == nil || *candidate.Email != config.Email.ValueString()) {
+			continue
+		}
+		if !config.ID.IsNull() && !config.ID.IsUnknown() && candidate.ID != config.ID.ValueString() {
+			continue
+		}
+		matches = append(matches, candidate)
+	}
+	if len(matches) == 0 {
 		resp.Diagnostics.AddError(
 			"User Not Found",
 			"No user found matching: "+lookupKey,
 		)
 		return
 	}
+	if len(matches) > 1 {
+		resp.Diagnostics.AddError("Ambiguous User", "Multiple users matched "+lookupKey+". Look up a user by ID.")
+		return
+	}
 
-	user := &users[0]
+	user := &matches[0]
 	var state userDataSourceModel
 	state.ID = types.StringValue(user.ID)
 	state.Email = stringPtrToTFValue(user.Email)
