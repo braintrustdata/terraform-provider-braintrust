@@ -28,6 +28,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_project_automation` | Automation rules (alerts, exports, retention, env notifications) |
 | `braintrust_org_automation` | Organization-wide retention policies for logs, experiments, or datasets (plan permitting) |
 | `braintrust_view` | Saved views and monitor dashboards with SQL-backed charts |
+| `braintrust_mcp_server` | Project-scoped MCP server connections |
 
 ## Data Sources
 
