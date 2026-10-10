@@ -3,12 +3,12 @@
 page_title: "braintrust_group Data Source - braintrust"
 subcategory: ""
 description: |-
-  Use this data source to look up a Braintrust group by name. Useful for referencing built-in system groups (Owners, Engineers, Viewers).
+  Look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (Owners, Engineers, Viewers, All AI Provider Access).
 ---
 
 # braintrust_group (Data Source)
 
-Use this data source to look up a Braintrust group by name. Useful for referencing built-in system groups (`Owners`, `Engineers`, `Viewers`).
+Look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (`Owners`, `Engineers`, `Viewers`, `All AI Provider Access`).
 
 
 
@@ -19,6 +19,10 @@ Use this data source to look up a Braintrust group by name. Useful for referenci
 
 - `name` (String) Name of the group to look up.
 
+### Optional
+
+- `org_id` (String) Organization the group belongs to. Set this when the credential can access multiple organizations.
+
 ### Read-Only
 
 - `created` (String) Date of group creation.
@@ -27,5 +31,4 @@ Use this data source to look up a Braintrust group by name. Useful for referenci
 - `id` (String) Unique identifier for the group (UUID).
 - `member_groups` (Set of String) IDs of groups this group inherits from.
 - `member_users` (Set of String) IDs of users in this group.
-- `org_id` (String) Organization the group belongs to.
 - `user_id` (String) Identifies the user who created the group.

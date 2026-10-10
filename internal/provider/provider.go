@@ -116,6 +116,7 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 		NewDatasetResource,
 		NewPromptResource,
 		NewGroupResource,
+		NewGroupMembershipResource,
 		NewProjectGroupResource,
 		NewProjectGroupMembershipResource,
 		NewRoleResource,

@@ -30,8 +30,8 @@ func (d *groupDataSource) Metadata(_ context.Context, req datasource.MetadataReq
 
 func (d *groupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "Use this data source to look up a Braintrust group by name. Useful for referencing built-in system groups (Owners, Engineers, Viewers).",
-		MarkdownDescription: "Use this data source to look up a Braintrust group by name. Useful for referencing built-in system groups (`Owners`, `Engineers`, `Viewers`).",
+		Description:         "Look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (Owners, Engineers, Viewers, All AI Provider Access).",
+		MarkdownDescription: "Look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (`Owners`, `Engineers`, `Viewers`, `All AI Provider Access`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,
@@ -42,8 +42,9 @@ func (d *groupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				Description: "Name of the group to look up.",
 			},
 			"org_id": schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: "Organization the group belongs to.",
+				Description: "Organization the group belongs to. Set this when the credential can access multiple organizations.",
 			},
 			"description": schema.StringAttribute{
 				Computed:    true,
@@ -90,11 +91,12 @@ func (d *groupDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	}
 
 	name := config.Name.ValueString()
+	orgID := config.OrgID.ValueString()
 	tflog.Debug(ctx, "Looking up group by name", map[string]any{
-		"name": name,
+		"name": name, "org_id": orgID,
 	})
 
-	groups, err := d.client.ListGroups(ctx, name)
+	groups, err := d.client.ListGroups(ctx, name, orgID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Group",
@@ -103,15 +105,28 @@ func (d *groupDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	if len(groups) == 0 {
+	var match *client.Group
+	for i := range groups {
+		group := &groups[i]
+		if group.Name == name && (orgID == "" || group.OrgID == orgID) {
+			if match != nil {
+				resp.Diagnostics.AddError(
+					"Ambiguous Group",
+					"Multiple groups have the name "+name+". Set org_id to select one organization.",
+				)
+				return
+			}
+			match = group
+		}
+	}
+	if match == nil {
 		resp.Diagnostics.AddError(
 			"Group Not Found",
 			"No group found with name: "+name,
 		)
 		return
 	}
-
 	var state groupModel
-	mapGroupToModel(&groups[0], &state)
+	mapGroupToModel(match, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

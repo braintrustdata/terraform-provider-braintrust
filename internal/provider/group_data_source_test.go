@@ -38,7 +38,8 @@ resource "braintrust_group" "test" {
 }
 
 data "braintrust_group" "test" {
-  name = braintrust_group.test.name
+  name   = braintrust_group.test.name
+  org_id = braintrust_group.test.org_id
 }
 `, name)
 }
