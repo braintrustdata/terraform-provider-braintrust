@@ -35,7 +35,7 @@ type UpdateProjectGroupRequest struct {
 
 func (c *Client) CreateProjectGroup(ctx context.Context, req CreateProjectGroupRequest) (*ProjectGroup, error) {
 	var group ProjectGroup
-	if err := c.doRequest(ctx, "POST", projectGroupBasePath, req, &group); err != nil {
+	if err := c.createNew(ctx, projectGroupBasePath, req, &group, "project group"); err != nil {
 		return nil, err
 	}
 	return &group, nil
@@ -53,17 +53,26 @@ func (c *Client) GetProjectGroup(ctx context.Context, id string) (*ProjectGroup,
 }
 
 func (c *Client) ListProjectGroups(ctx context.Context, orgID, name string) ([]ProjectGroup, error) {
-	params := url.Values{"org_id": {orgID}}
+	params := url.Values{}
 	if name != "" {
-		params.Set("name", name)
+		params.Set("project_group_name", name)
 	}
-	var result struct {
-		Objects []ProjectGroup `json:"objects"`
-	}
-	if err := c.doRequest(ctx, "GET", projectGroupBasePath+"?"+params.Encode(), nil, &result); err != nil {
+	// The API filters by org_name, not org_id. Filter locally after fetching
+	// all pages so a group in a later page is not silently missed.
+	groups, err := listAllByID(ctx, c, projectGroupBasePath, params, func(group ProjectGroup) string { return group.ID })
+	if err != nil {
 		return nil, err
 	}
-	return result.Objects, nil
+	if orgID == "" {
+		return groups, nil
+	}
+	filtered := make([]ProjectGroup, 0, len(groups))
+	for _, group := range groups {
+		if group.OrgID == orgID {
+			filtered = append(filtered, group)
+		}
+	}
+	return filtered, nil
 }
 
 func (c *Client) UpdateProjectGroup(ctx context.Context, id string, req UpdateProjectGroupRequest) (*ProjectGroup, error) {

@@ -44,7 +44,7 @@ type UpdateProjectScoreRequest struct {
 // CreateProjectScore creates a new project score.
 func (c *Client) CreateProjectScore(ctx context.Context, req CreateProjectScoreRequest) (*ProjectScore, error) {
 	var score ProjectScore
-	if err := c.doRequest(ctx, "POST", projectScoreBasePath, req, &score); err != nil {
+	if err := c.createNew(ctx, projectScoreBasePath, req, &score, "project score"); err != nil {
 		return nil, err
 	}
 	return &score, nil

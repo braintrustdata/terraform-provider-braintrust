@@ -38,7 +38,7 @@ type UpdateProjectAutomationRequest struct {
 // CreateProjectAutomation creates a new project automation.
 func (c *Client) CreateProjectAutomation(ctx context.Context, req CreateProjectAutomationRequest) (*ProjectAutomation, error) {
 	var automation ProjectAutomation
-	if err := c.doRequest(ctx, "POST", projectAutomationBasePath, req, &automation); err != nil {
+	if err := c.createNew(ctx, projectAutomationBasePath, req, &automation, "project automation"); err != nil {
 		return nil, err
 	}
 	return &automation, nil

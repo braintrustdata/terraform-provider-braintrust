@@ -54,7 +54,7 @@ type ListRolesResponse struct {
 // CreateRole creates a new role.
 func (c *Client) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role, error) {
 	var role Role
-	if err := c.doRequest(ctx, "POST", roleBasePath, req, &role); err != nil {
+	if err := c.createNew(ctx, roleBasePath, req, &role, "role"); err != nil {
 		return nil, err
 	}
 	return &role, nil
@@ -74,15 +74,11 @@ func (c *Client) GetRole(ctx context.Context, id string) (*Role, error) {
 
 // ListRoles lists roles, optionally filtered by name.
 func (c *Client) ListRoles(ctx context.Context, name string) ([]Role, error) {
-	path := roleBasePath
+	params := url.Values{}
 	if name != "" {
-		path += "?role_name=" + url.QueryEscape(name)
+		params.Set("role_name", name)
 	}
-	var resp ListRolesResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
-		return nil, err
-	}
-	return resp.Objects, nil
+	return listAllByID(ctx, c, roleBasePath, params, func(role Role) string { return role.ID })
 }
 
 // UpdateRole updates a role by ID.

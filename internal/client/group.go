@@ -48,7 +48,7 @@ type ListGroupsResponse struct {
 // CreateGroup creates a new group.
 func (c *Client) CreateGroup(ctx context.Context, req CreateGroupRequest) (*Group, error) {
 	var group Group
-	if err := c.doRequest(ctx, "POST", groupBasePath, req, &group); err != nil {
+	if err := c.createNew(ctx, groupBasePath, req, &group, "group"); err != nil {
 		return nil, err
 	}
 	return &group, nil
@@ -68,22 +68,26 @@ func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 
 // ListGroups lists groups, optionally filtered by name and organization.
 func (c *Client) ListGroups(ctx context.Context, name, orgID string) ([]Group, error) {
-	path := groupBasePath
 	params := url.Values{}
 	if name != "" {
 		params.Set("group_name", name)
 	}
-	if orgID != "" {
-		params.Set("org_id", orgID)
-	}
-	if len(params) > 0 {
-		path += "?" + params.Encode()
-	}
-	var resp ListGroupsResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
+	// GET /v1/group accepts org_name, not org_id. Filter by the returned
+	// org_id after reading all pages so an ID-scoped lookup is reliable.
+	groups, err := listAllByID(ctx, c, groupBasePath, params, func(group Group) string { return group.ID })
+	if err != nil {
 		return nil, err
 	}
-	return resp.Objects, nil
+	if orgID == "" {
+		return groups, nil
+	}
+	filtered := make([]Group, 0, len(groups))
+	for _, group := range groups {
+		if group.OrgID == orgID {
+			filtered = append(filtered, group)
+		}
+	}
+	return filtered, nil
 }
 
 // UpdateGroup updates a group by ID.
