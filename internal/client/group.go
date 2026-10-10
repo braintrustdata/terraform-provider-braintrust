@@ -66,11 +66,18 @@ func (c *Client) GetGroup(ctx context.Context, id string) (*Group, error) {
 	return &group, nil
 }
 
-// ListGroups lists groups, optionally filtered by name.
-func (c *Client) ListGroups(ctx context.Context, name string) ([]Group, error) {
+// ListGroups lists groups, optionally filtered by name and organization.
+func (c *Client) ListGroups(ctx context.Context, name, orgID string) ([]Group, error) {
 	path := groupBasePath
+	params := url.Values{}
 	if name != "" {
-		path += "?group_name=" + url.QueryEscape(name)
+		params.Set("group_name", name)
+	}
+	if orgID != "" {
+		params.Set("org_id", orgID)
+	}
+	if len(params) > 0 {
+		path += "?" + params.Encode()
 	}
 	var resp ListGroupsResponse
 	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
