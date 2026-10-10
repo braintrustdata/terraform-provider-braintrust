@@ -27,6 +27,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Install Terraform 1.15.8
+        run: |
+          curl -fsSLO https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip
+          unzip -q terraform_1.15.8_linux_amd64.zip terraform
+          sudo mv terraform /usr/local/bin/terraform
+
       - name: Unit Tests
         run: go test -mod=readonly -count=1 ./...
 
