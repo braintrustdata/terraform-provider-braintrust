@@ -26,6 +26,8 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_project_score` | Score definitions for labeling experiments |
 | `braintrust_project_tag` | Tags for filtering experiments and logs |
 | `braintrust_project_automation` | Automation rules (alerts, exports, retention, env notifications) |
+| `braintrust_org_automation` | Organization-wide retention policies for logs, experiments, or datasets (plan permitting) |
+| `braintrust_view` | Saved views and monitor dashboards with SQL-backed charts |
 
 ## Data Sources
 
