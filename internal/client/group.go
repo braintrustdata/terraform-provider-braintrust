@@ -82,9 +82,9 @@ func (c *Client) ListGroups(ctx context.Context, name, orgID string) ([]Group, e
 		return groups, nil
 	}
 	filtered := make([]Group, 0, len(groups))
-	for _, group := range groups {
-		if group.OrgID == orgID {
-			filtered = append(filtered, group)
+	for i := range groups {
+		if groups[i].OrgID == orgID {
+			filtered = append(filtered, groups[i])
 		}
 	}
 	return filtered, nil

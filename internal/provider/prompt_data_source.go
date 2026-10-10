@@ -137,24 +137,23 @@ func (d *promptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 			)
 			return
 		}
-		var matches []client.Prompt
-		for _, candidate := range prompts {
+		for i := range prompts {
+			candidate := &prompts[i]
 			if candidate.Name == name && candidate.ProjectID == projectID {
-				matches = append(matches, candidate)
+				if prompt != nil {
+					resp.Diagnostics.AddError("Ambiguous Prompt", "Multiple prompts have the name "+name+" in project "+projectID+". Look up the prompt by ID.")
+					return
+				}
+				prompt = candidate
 			}
 		}
-		if len(matches) == 0 {
+		if prompt == nil {
 			resp.Diagnostics.AddError(
 				"Prompt Not Found",
 				"No prompt found with name "+name+" in project "+projectID+".",
 			)
 			return
 		}
-		if len(matches) > 1 {
-			resp.Diagnostics.AddError("Ambiguous Prompt", "Multiple prompts have the name "+name+" in project "+projectID+". Look up the prompt by ID.")
-			return
-		}
-		prompt = &matches[0]
 	} else {
 		id := config.ID.ValueString()
 		tflog.Debug(ctx, "Reading prompt data source", map[string]any{"id": id})
