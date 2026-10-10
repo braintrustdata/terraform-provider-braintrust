@@ -37,7 +37,7 @@ type CreateACLRequest struct {
 // ACL already exists, the existing one is returned.
 func (c *Client) CreateACL(ctx context.Context, req CreateACLRequest) (*ACL, error) {
 	var acl ACL
-	if err := c.doRequest(ctx, "POST", aclBasePath, req, &acl); err != nil {
+	if err := c.createNew(ctx, aclBasePath, req, &acl, "ACL"); err != nil {
 		return nil, err
 	}
 	return &acl, nil

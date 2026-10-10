@@ -11,7 +11,18 @@ jobs:
   acceptance:
     name: Acceptance Tests
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'run-acc-tests')
+    # Never expose the sandbox credential to code from forked pull requests.
+    if: contains(github.event.pull_request.labels.*.name, 'run-acc-tests') && github.event.pull_request.head.repo.full_name == github.repository
+    concurrency:
+      group: braintrust-acceptance-sandbox
+      cancel-in-progress: false
+    env:
+      TF_ACC: "1"
+      BRAINTRUST_API_KEY: ${{ secrets.BRAINTRUST_ACCEPTANCE_API_KEY }}
+      BRAINTRUST_TEST_ORG_ID: ${{ vars.BRAINTRUST_TEST_ORG_ID }}
+      BRAINTRUST_ORG_ID: ${{ vars.BRAINTRUST_TEST_ORG_ID }}
+      BRAINTRUST_TEST_USER_ID: ${{ secrets.BRAINTRUST_TEST_USER_ID }}
+      BRAINTRUST_TEST_USER_EMAIL: ${{ secrets.BRAINTRUST_TEST_USER_EMAIL }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -20,8 +31,24 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Verify dedicated sandbox credential
+        run: |
+          test -n "$BRAINTRUST_API_KEY"
+          test -n "$BRAINTRUST_TEST_ORG_ID"
+          if ! curl -fsS --max-time 30 \
+            -H "Authorization: Bearer $BRAINTRUST_API_KEY" \
+            'https://api.braintrust.dev/v1/organization?limit=100' |
+            jq -e --arg id "$BRAINTRUST_TEST_ORG_ID" \
+              '(.objects | length) == 1 and .objects[0].id == $id' >/dev/null; then
+            echo '::error::Acceptance credential must access only the configured sandbox organization.'
+            exit 1
+          fi
+
+      - name: Install Terraform 1.15.8
+        run: |
+          curl -fsSLO https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip
+          unzip -q terraform_1.15.8_linux_amd64.zip terraform
+          sudo mv terraform /usr/local/bin/terraform
+
       - name: Run acceptance tests
-        run: go test -v -mod=readonly -count=1 -p 5 -parallel 10 -timeout 600s ./internal/provider/
-        env:
-          TF_ACC: "1"
-          BRAINTRUST_API_KEY: ${{ secrets.BRAINTRUST_API_KEY }}
+        run: go test -v -mod=readonly -count=1 -p 4 -parallel 4 -timeout 1200s ./internal/provider/

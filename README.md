@@ -26,6 +26,8 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 | `braintrust_project_score` | Score definitions for labeling experiments |
 | `braintrust_project_tag` | Tags for filtering experiments and logs |
 | `braintrust_project_automation` | Automation rules (alerts, exports, retention, env notifications) |
+| `braintrust_org_automation` | Organization-wide retention policies for logs, experiments, or datasets (plan permitting) |
+| `braintrust_view` | Saved views and monitor dashboards with SQL-backed charts |
 
 ## Data Sources
 
@@ -197,9 +199,22 @@ Acceptance tests run against a live Braintrust API. You'll need a valid API key:
 
 ```sh
 export BRAINTRUST_API_KEY="sk-..."
+export BRAINTRUST_TEST_ORG_ID="YOUR_DEDICATED_TEST_ORG_ID"
+export BRAINTRUST_ORG_ID="$BRAINTRUST_TEST_ORG_ID"
 export TF_ACC=1
-go test -v ./internal/provider/ -timeout 600s
+go test -v ./internal/provider/ -timeout 1200s
 ```
+
+For GitHub Actions, configure the repository secret `BRAINTRUST_ACCEPTANCE_API_KEY`
+with a credential that can access **only** the dedicated test organization, and
+set the repository variable `BRAINTRUST_TEST_ORG_ID`. Apply the
+`run-acc-tests` label to a trusted same-repository pull request to run the
+live suite. CI verifies the credential's organization scope before creating
+resources and serializes sandbox runs. The optional `BRAINTRUST_TEST_USER_ID`
+and `BRAINTRUST_TEST_USER_EMAIL` secrets enable user lookup and membership
+tests. The test requiring a pre-existing service account skips unless
+`BRAINTRUST_SERVICE_ACCOUNT_ID` is configured; a separate test creates and
+destroys its own service account and token.
 
 ### Generating Documentation
 

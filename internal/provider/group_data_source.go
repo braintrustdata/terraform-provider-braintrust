@@ -108,7 +108,7 @@ func (d *groupDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	var match *client.Group
 	for i := range groups {
 		group := &groups[i]
-		if group.Name == name && (orgID == "" || group.OrgID == orgID) {
+		if group.Name == name && group.DeletedAt == nil && (orgID == "" || group.OrgID == orgID) {
 			if match != nil {
 				resp.Diagnostics.AddError(
 					"Ambiguous Group",

@@ -53,8 +53,9 @@ func (d *projectDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				Description: "The name of the project. Provide either `name` or `id`.",
 			},
 			"org_id": schema.StringAttribute{
+				Optional:    true,
 				Computed:    true,
-				Description: "Unique identifier for the organization that the project belongs to.",
+				Description: "Organization ID to match when looking up by name. Set this if the credential can access multiple organizations.",
 			},
 			"description": schema.StringAttribute{
 				Computed:    true,
@@ -117,14 +118,24 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
-		if len(projects) == 0 {
+		var matches []client.Project
+		for _, candidate := range projects {
+			if candidate.Name == name && (config.OrgID.IsNull() || config.OrgID.IsUnknown() || candidate.OrgID == config.OrgID.ValueString()) && candidate.DeletedAt == nil {
+				matches = append(matches, candidate)
+			}
+		}
+		if len(matches) == 0 {
 			resp.Diagnostics.AddError(
 				"Project Not Found",
-				"No project found with name: "+name,
+				"No active project found with name: "+name+" in the selected organization.",
 			)
 			return
 		}
-		project = &projects[0]
+		if len(matches) > 1 {
+			resp.Diagnostics.AddError("Ambiguous Project", "Multiple active projects have the name "+name+". Set org_id to select one organization.")
+			return
+		}
+		project = &matches[0]
 	} else {
 		// Look up by ID.
 		id := config.ID.ValueString()
@@ -136,6 +147,10 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				"Error Reading Braintrust Project",
 				"Could not read project ID "+id+": "+err.Error(),
 			)
+			return
+		}
+		if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && project.OrgID != config.OrgID.ValueString() {
+			resp.Diagnostics.AddError("Project Organization Mismatch", "Project ID "+id+" does not belong to org_id "+config.OrgID.ValueString()+".")
 			return
 		}
 	}

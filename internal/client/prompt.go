@@ -48,7 +48,7 @@ type UpdatePromptRequest struct {
 // CreatePrompt creates a new prompt.
 func (c *Client) CreatePrompt(ctx context.Context, req CreatePromptRequest) (*Prompt, error) {
 	var prompt Prompt
-	if err := c.doRequest(ctx, "POST", promptBasePath, req, &prompt); err != nil {
+	if err := c.createNew(ctx, promptBasePath, req, &prompt, "prompt"); err != nil {
 		return nil, err
 	}
 	return &prompt, nil
@@ -73,7 +73,6 @@ type ListPromptsResponse struct {
 
 // ListPrompts lists prompts, optionally filtered by name and/or project ID.
 func (c *Client) ListPrompts(ctx context.Context, name string, projectID string) ([]Prompt, error) {
-	path := promptBasePath
 	params := url.Values{}
 	if name != "" {
 		params.Set("prompt_name", name)
@@ -81,14 +80,7 @@ func (c *Client) ListPrompts(ctx context.Context, name string, projectID string)
 	if projectID != "" {
 		params.Set("project_id", projectID)
 	}
-	if len(params) > 0 {
-		path += "?" + params.Encode()
-	}
-	var resp ListPromptsResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
-		return nil, err
-	}
-	return resp.Objects, nil
+	return listAllByID(ctx, c, promptBasePath, params, func(prompt Prompt) string { return prompt.ID })
 }
 
 // UpdatePrompt updates a prompt by ID.

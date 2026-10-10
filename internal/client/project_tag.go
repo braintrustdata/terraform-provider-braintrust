@@ -37,7 +37,7 @@ type UpdateProjectTagRequest struct {
 // CreateProjectTag creates a new project tag.
 func (c *Client) CreateProjectTag(ctx context.Context, req CreateProjectTagRequest) (*ProjectTag, error) {
 	var tag ProjectTag
-	if err := c.doRequest(ctx, "POST", projectTagBasePath, req, &tag); err != nil {
+	if err := c.createNew(ctx, projectTagBasePath, req, &tag, "project tag"); err != nil {
 		return nil, err
 	}
 	return &tag, nil

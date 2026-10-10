@@ -49,7 +49,7 @@ type ReplaceEnvVarRequest struct {
 // CreateEnvVar creates a new env var. Idempotent: returns existing if same name exists.
 func (c *Client) CreateEnvVar(ctx context.Context, req CreateEnvVarRequest) (*EnvVar, error) {
 	var envVar EnvVar
-	if err := c.doRequest(ctx, "POST", envVarBasePath, req, &envVar); err != nil {
+	if err := c.createNew(ctx, envVarBasePath, req, &envVar, "environment variable"); err != nil {
 		return nil, err
 	}
 	return &envVar, nil

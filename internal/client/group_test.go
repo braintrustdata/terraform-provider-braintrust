@@ -2,18 +2,34 @@ package client
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestListGroupsFiltersNameAndOrganization(t *testing.T) {
+	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/group" || r.URL.Query().Get("group_name") != "Engineers" || r.URL.Query().Get("org_id") != "org-1" {
+		requests++
+		query := r.URL.Query()
+		if r.URL.Path != "/v1/group" || query.Get("group_name") != "Engineers" || query.Get("org_id") != "" || query.Get("limit") != "100" {
 			t.Errorf("unexpected request: %s", r.URL.String())
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"objects":[{"id":"group-1","org_id":"org-1","name":"Engineers"}]}`))
+		if query.Get("starting_after") == "" {
+			groups := make([]Group, 100)
+			for i := range groups {
+				groups[i] = Group{ID: fmt.Sprintf("other-%03d", i), OrgID: "other-org", Name: "Engineers"}
+			}
+			_ = json.NewEncoder(w).Encode(ListGroupsResponse{Objects: groups})
+			return
+		}
+		if query.Get("starting_after") != "other-099" {
+			t.Errorf("unexpected cursor: %s", r.URL.String())
+		}
+		_ = json.NewEncoder(w).Encode(ListGroupsResponse{Objects: []Group{{ID: "group-1", OrgID: "org-1", Name: "Engineers"}}})
 	}))
 	defer server.Close()
 
@@ -27,5 +43,8 @@ func TestListGroupsFiltersNameAndOrganization(t *testing.T) {
 	}
 	if len(groups) != 1 || groups[0].ID != "group-1" {
 		t.Fatalf("unexpected groups: %#v", groups)
+	}
+	if requests != 2 {
+		t.Fatalf("expected two pages, got %d requests", requests)
 	}
 }

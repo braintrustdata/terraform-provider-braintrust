@@ -142,6 +142,20 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 	return c.doRequestWithHeaders(ctx, method, path, body, result, nil)
 }
 
+// createNew rejects Braintrust's idempotent POST response for an existing
+// object. Adopting that object as newly created Terraform state would make a
+// later destroy delete infrastructure this configuration did not create.
+func (c *Client) createNew(ctx context.Context, path string, body any, result any, resourceType string) error {
+	var headers http.Header
+	if err := c.doRequestWithHeaders(ctx, http.MethodPost, path, body, result, &headers); err != nil {
+		return err
+	}
+	if headers.Get("x-bt-found-existing") != "" {
+		return fmt.Errorf("%s already exists; import the existing resource instead of creating it", resourceType)
+	}
+	return nil
+}
+
 // doRequestWithHeaders exposes response headers for endpoints where a successful
 // status still carries lifecycle information (for example, found-existing).
 func (c *Client) doRequestWithHeaders(ctx context.Context, method, path string, body any, result any, responseHeaders *http.Header) error {

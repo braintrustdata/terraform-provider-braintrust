@@ -120,14 +120,23 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
-		if len(datasets) == 0 {
+		for i := range datasets {
+			candidate := &datasets[i]
+			if candidate.Name == name && candidate.ProjectID == projectID && candidate.DeletedAt == nil {
+				if dataset != nil {
+					resp.Diagnostics.AddError("Ambiguous Dataset", "Multiple active datasets have the name "+name+" in project "+projectID+". Look up the dataset by ID.")
+					return
+				}
+				dataset = candidate
+			}
+		}
+		if dataset == nil {
 			resp.Diagnostics.AddError(
 				"Dataset Not Found",
-				"No dataset found with name: "+name,
+				"No active dataset found with name "+name+" in project "+projectID+".",
 			)
 			return
 		}
-		dataset = &datasets[0]
 	} else {
 		// Look up by ID.
 		id := config.ID.ValueString()
@@ -139,6 +148,10 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 				"Error Reading Braintrust Dataset",
 				"Could not read dataset ID "+id+": "+err.Error(),
 			)
+			return
+		}
+		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && dataset.ProjectID != config.ProjectID.ValueString() {
+			resp.Diagnostics.AddError("Dataset Project Mismatch", "Dataset ID "+id+" does not belong to project_id "+config.ProjectID.ValueString()+".")
 			return
 		}
 	}

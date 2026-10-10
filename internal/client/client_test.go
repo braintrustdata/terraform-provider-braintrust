@@ -82,3 +82,27 @@ func TestReadRetriesTransientServerError(t *testing.T) {
 		t.Fatalf("want successful second read; got requests=%d result=%q error=%v", requests, result.ID, err)
 	}
 }
+
+func TestCreateDoesNotAdoptExistingRemoteObject(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("x-bt-found-existing", "true")
+		_, _ = w.Write([]byte(`{"id":"existing-id","name":"existing"}`))
+	}))
+	defer server.Close()
+	c, err := NewClient(server.URL, "fixture", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.CreateProject(context.Background(), CreateProjectRequest{Name: "existing"}); err == nil || !strings.Contains(err.Error(), "import") {
+		t.Fatalf("creating an existing project must require import; got %v", err)
+	}
+	if _, err := c.CreateProjectAutomation(context.Background(), CreateProjectAutomationRequest{ProjectID: "project", Name: "existing"}); err == nil || !strings.Contains(err.Error(), "import") {
+		t.Fatalf("creating an existing automation must require import; got %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("expected one request per create, got %d", requests)
+	}
+}

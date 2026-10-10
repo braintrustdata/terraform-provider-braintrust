@@ -71,7 +71,7 @@ func (c *Client) GetView(ctx context.Context, id, objectType, objectID string) (
 }
 
 func (c *Client) ListViews(ctx context.Context, objectType, objectID, name string) ([]View, error) {
-	params := url.Values{"limit": {"100"}}
+	params := url.Values{}
 	if objectType != "" {
 		params.Set("object_type", objectType)
 	}
@@ -81,26 +81,7 @@ func (c *Client) ListViews(ctx context.Context, objectType, objectID, name strin
 	if name != "" {
 		params.Set("view_name", name)
 	}
-	var all []View
-	var previousCursor string
-	for {
-		var result struct {
-			Objects []View `json:"objects"`
-		}
-		if err := c.doRequest(ctx, "GET", viewBasePath+"?"+params.Encode(), nil, &result); err != nil {
-			return nil, err
-		}
-		all = append(all, result.Objects...)
-		if len(result.Objects) < 100 {
-			return all, nil
-		}
-		cursor := result.Objects[len(result.Objects)-1].ID
-		if cursor == "" || cursor == previousCursor {
-			return nil, fmt.Errorf("view pagination cursor did not advance")
-		}
-		previousCursor = cursor
-		params.Set("starting_after", cursor)
-	}
+	return listAllByID(ctx, c, viewBasePath, params, func(view View) string { return view.ID })
 }
 
 func (c *Client) UpdateView(ctx context.Context, id string, req UpdateViewRequest) (*View, error) {

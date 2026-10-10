@@ -60,7 +60,7 @@ type UpdateProjectRequest struct {
 // CreateProject creates a new project.
 func (c *Client) CreateProject(ctx context.Context, req CreateProjectRequest) (*Project, error) {
 	var project Project
-	if err := c.doRequest(ctx, "POST", projectBasePath, req, &project); err != nil {
+	if err := c.createNew(ctx, projectBasePath, req, &project, "project"); err != nil {
 		return nil, err
 	}
 	return &project, nil
@@ -85,15 +85,11 @@ type ListProjectsResponse struct {
 
 // ListProjects lists projects, optionally filtered by name.
 func (c *Client) ListProjects(ctx context.Context, name string) ([]Project, error) {
-	path := projectBasePath
+	params := url.Values{}
 	if name != "" {
-		path += "?project_name=" + url.QueryEscape(name)
+		params.Set("project_name", name)
 	}
-	var resp ListProjectsResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
-		return nil, err
-	}
-	return resp.Objects, nil
+	return listAllByID(ctx, c, projectBasePath, params, func(project Project) string { return project.ID })
 }
 
 // UpdateProject updates a project by ID.

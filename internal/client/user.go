@@ -24,29 +24,18 @@ type ListUsersResponse struct {
 
 // ListUsersByEmail lists users filtered by email address.
 func (c *Client) ListUsersByEmail(ctx context.Context, email string) ([]User, error) {
-	path := userBasePath
+	params := url.Values{}
 	if email != "" {
-		path += "?email=" + url.QueryEscape(email)
+		params.Set("email", email)
 	}
-	var resp ListUsersResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
-		return nil, err
-	}
-	return resp.Objects, nil
+	return listAllByID(ctx, c, userBasePath, params, func(user User) string { return user.ID })
 }
 
 // ListUsersByIDs lists users filtered by IDs.
 func (c *Client) ListUsersByIDs(ctx context.Context, ids []string) ([]User, error) {
-	path := userBasePath + "?"
-	for i, id := range ids {
-		if i > 0 {
-			path += "&"
-		}
-		path += "ids=" + url.QueryEscape(id)
+	params := url.Values{}
+	for _, id := range ids {
+		params.Add("ids", id)
 	}
-	var resp ListUsersResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
-		return nil, err
-	}
-	return resp.Objects, nil
+	return listAllByID(ctx, c, userBasePath, params, func(user User) string { return user.ID })
 }

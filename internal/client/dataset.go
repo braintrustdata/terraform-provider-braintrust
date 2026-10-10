@@ -43,7 +43,7 @@ type UpdateDatasetRequest struct {
 // CreateDataset creates a new dataset.
 func (c *Client) CreateDataset(ctx context.Context, req CreateDatasetRequest) (*Dataset, error) {
 	var dataset Dataset
-	if err := c.doRequest(ctx, "POST", datasetBasePath, req, &dataset); err != nil {
+	if err := c.createNew(ctx, datasetBasePath, req, &dataset, "dataset"); err != nil {
 		return nil, err
 	}
 	return &dataset, nil
@@ -68,7 +68,6 @@ type ListDatasetsResponse struct {
 
 // ListDatasets lists datasets, optionally filtered by name and/or project ID.
 func (c *Client) ListDatasets(ctx context.Context, name string, projectID string) ([]Dataset, error) {
-	path := datasetBasePath
 	params := url.Values{}
 	if name != "" {
 		params.Set("dataset_name", name)
@@ -76,14 +75,7 @@ func (c *Client) ListDatasets(ctx context.Context, name string, projectID string
 	if projectID != "" {
 		params.Set("project_id", projectID)
 	}
-	if len(params) > 0 {
-		path += "?" + params.Encode()
-	}
-	var resp ListDatasetsResponse
-	if err := c.doRequest(ctx, "GET", path, nil, &resp); err != nil {
-		return nil, err
-	}
-	return resp.Objects, nil
+	return listAllByID(ctx, c, datasetBasePath, params, func(dataset Dataset) string { return dataset.ID })
 }
 
 // UpdateDataset updates a dataset by ID.
