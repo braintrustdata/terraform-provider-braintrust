@@ -199,9 +199,20 @@ Acceptance tests run against a live Braintrust API. You'll need a valid API key:
 
 ```sh
 export BRAINTRUST_API_KEY="sk-..."
+export BRAINTRUST_TEST_ORG_ID="YOUR_DEDICATED_TEST_ORG_ID"
+export BRAINTRUST_ORG_ID="$BRAINTRUST_TEST_ORG_ID"
 export TF_ACC=1
-go test -v ./internal/provider/ -timeout 600s
+go test -v ./internal/provider/ -timeout 1200s
 ```
+
+For GitHub Actions, configure the repository secret `BRAINTRUST_ACCEPTANCE_API_KEY`
+with a credential that can access **only** the dedicated test organization, and
+set the repository variable `BRAINTRUST_TEST_ORG_ID`. Apply the
+`run-acc-tests` label to a trusted same-repository pull request to run the
+live suite. CI verifies the credential's organization scope before creating
+resources and serializes sandbox runs. Tests requiring a specific user or a
+pre-existing service account skip unless their corresponding test environment
+variables are configured.
 
 ### Generating Documentation
 
