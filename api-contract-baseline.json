@@ -3843,6 +3843,810 @@
         ]
       }
     },
+    "/v1/function": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AppLimitParam"
+            }
+          },
+          {
+            "in": "query",
+            "name": "starting_after",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/StartingAfter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ending_before",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EndingBefore"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Ids"
+            }
+          },
+          {
+            "allowReserved": true,
+            "in": "query",
+            "name": "function_name",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/FunctionName"
+            }
+          },
+          {
+            "allowReserved": true,
+            "in": "query",
+            "name": "project_name",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectName"
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectIdQuery"
+            }
+          },
+          {
+            "allowReserved": true,
+            "in": "query",
+            "name": "slug",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Slug"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PromptVersion"
+            }
+          },
+          {
+            "allowReserved": true,
+            "in": "query",
+            "name": "environment",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PromptEnvironment"
+            }
+          },
+          {
+            "allowReserved": true,
+            "in": "query",
+            "name": "org_name",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OrgName"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "objects": {
+                      "items": {
+                        "$ref": "#/components/schemas/Function"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "objects"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFunction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Function"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFunction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Function"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/function/{function_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunctionIdParam"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Function"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunctionIdParam"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PromptVersion"
+            }
+          },
+          {
+            "allowReserved": true,
+            "in": "query",
+            "name": "environment",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PromptEnvironment"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Function"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunctionIdParam"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchFunction"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Function"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      }
+    },
+    "/v1/function/{function_id}/invoke": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FunctionIdParam"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvokeApi"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ]
+      }
+    },
     "/v1/group": {
       "get": {
         "parameters": [
@@ -11778,6 +12582,76 @@
       ],
       "type": "string"
     },
+    "BatchedFacetData": {
+      "properties": {
+        "facets": {
+          "items": {
+            "properties": {
+              "embedding_model": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "no_match_pattern": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "preprocessor": {
+          "$ref": "#/components/schemas/FacetPreprocessorId"
+        },
+        "topic_maps": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "function_name": {
+                  "type": "string"
+                },
+                "topic_map_data": {
+                  "$ref": "#/components/schemas/TopicMapData"
+                },
+                "topic_map_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "function_name",
+                "topic_map_data"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "type": {
+          "enum": [
+            "batched_facet"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "facets"
+      ],
+      "title": "batched_facet",
+      "type": "object"
+    },
     "ChatCompletionContentPart": {
       "anyOf": [
         {
@@ -12358,6 +13232,216 @@
       ],
       "type": "object"
     },
+    "CodeBundle": {
+      "properties": {
+        "bundle_id": {
+          "nullable": true,
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "properties": {
+                "eval_name": {
+                  "type": "string"
+                },
+                "position": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "type": {
+                          "enum": [
+                            "task"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "index": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "type": {
+                          "enum": [
+                            "scorer"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "index"
+                      ],
+                      "title": "scorer",
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "index": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "type": {
+                          "enum": [
+                            "classifier"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "index"
+                      ],
+                      "title": "classifier",
+                      "type": "object"
+                    }
+                  ]
+                },
+                "type": {
+                  "enum": [
+                    "experiment"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "eval_name",
+                "position"
+              ],
+              "title": "experiment",
+              "type": "object"
+            },
+            {
+              "properties": {
+                "index": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": {
+                  "enum": [
+                    "function"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "index"
+              ],
+              "title": "function",
+              "type": "object"
+            },
+            {
+              "properties": {
+                "entrypoints": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "eval_name": {
+                  "type": "string"
+                },
+                "evaluator_definition": {
+                  "nullable": true
+                },
+                "parameters": {
+                  "additionalProperties": {
+                    "nullable": true
+                  },
+                  "type": "object"
+                },
+                "sandbox_spec": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "provider": {
+                          "enum": [
+                            "modal"
+                          ],
+                          "type": "string"
+                        },
+                        "snapshot_ref": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "snapshot_ref"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "provider": {
+                          "enum": [
+                            "lambda"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "type": {
+                  "enum": [
+                    "sandbox"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "sandbox_spec",
+                "eval_name"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "preview": {
+          "nullable": true,
+          "type": "string"
+        },
+        "runtime_context": {
+          "properties": {
+            "runtime": {
+              "enum": [
+                "node",
+                "python",
+                "browser",
+                "quickjs"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "runtime",
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "runtime_context",
+        "location"
+      ],
+      "type": "object"
+    },
     "CreateAISecret": {
       "properties": {
         "metadata": {
@@ -12409,6 +13493,71 @@
       "required": [
         "project_id",
         "name"
+      ],
+      "type": "object"
+    },
+    "CreateFunction": {
+      "properties": {
+        "function_data": {
+          "$ref": "#/components/schemas/FunctionData"
+        },
+        "function_schema": {
+          "nullable": true,
+          "properties": {
+            "parameters": {
+              "nullable": true
+            },
+            "returns": {
+              "nullable": true
+            }
+          },
+          "type": "object"
+        },
+        "function_type": {
+          "$ref": "#/components/schemas/FunctionTypeEnumNullish"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "origin": {
+          "nullable": true,
+          "properties": {
+            "internal": {
+              "nullable": true,
+              "type": "boolean"
+            },
+            "object_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "object_type": {
+              "$ref": "#/components/schemas/AclObjectType"
+            }
+          },
+          "required": [
+            "object_type",
+            "object_id"
+          ],
+          "type": "object"
+        },
+        "project_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "prompt_data": {
+          "$ref": "#/components/schemas/PromptDataNullish"
+        },
+        "slug": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_id",
+        "name",
+        "slug",
+        "function_data"
       ],
       "type": "object"
     },
@@ -13547,6 +14696,108 @@
       ],
       "type": "string"
     },
+    "FacetData": {
+      "properties": {
+        "embedding_model": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "no_match_pattern": {
+          "type": "string"
+        },
+        "preprocessor": {
+          "$ref": "#/components/schemas/FacetPreprocessorId"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "facet"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "prompt"
+      ],
+      "title": "facet",
+      "type": "object"
+    },
+    "FacetPreprocessorId": {
+      "anyOf": [
+        {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "function"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "title": "function",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "function_type": {
+              "$ref": "#/components/schemas/FunctionTypeEnum"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "global"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "global",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "code": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "inline"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "code"
+          ],
+          "title": "preprocessor_inline",
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "FeedbackDatasetEventRequest": {
       "properties": {
         "feedback": {
@@ -13659,6 +14910,605 @@
       "nullable": true,
       "type": "string"
     },
+    "Function": {
+      "properties": {
+        "_xact_id": {
+          "type": "string"
+        },
+        "created": {
+          "format": "date-time",
+          "nullable": true,
+          "type": "string"
+        },
+        "function_data": {
+          "$ref": "#/components/schemas/FunctionData"
+        },
+        "function_schema": {
+          "nullable": true,
+          "properties": {
+            "parameters": {
+              "nullable": true
+            },
+            "returns": {
+              "nullable": true
+            }
+          },
+          "type": "object"
+        },
+        "function_type": {
+          "$ref": "#/components/schemas/FunctionTypeEnumNullish"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "log_id": {
+          "enum": [
+            "p"
+          ],
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "nullable": true
+          },
+          "nullable": true,
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "org_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "origin": {
+          "nullable": true,
+          "properties": {
+            "internal": {
+              "nullable": true,
+              "type": "boolean"
+            },
+            "object_id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "object_type": {
+              "$ref": "#/components/schemas/AclObjectType"
+            }
+          },
+          "required": [
+            "object_type",
+            "object_id"
+          ],
+          "type": "object"
+        },
+        "project_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "prompt_data": {
+          "$ref": "#/components/schemas/PromptDataNullish"
+        },
+        "slug": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "_xact_id",
+        "project_id",
+        "log_id",
+        "org_id",
+        "name",
+        "slug",
+        "function_data"
+      ],
+      "type": "object"
+    },
+    "FunctionData": {
+      "anyOf": [
+        {
+          "properties": {
+            "type": {
+              "enum": [
+                "prompt"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "prompt",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "type": {
+                          "enum": [
+                            "bundle"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CodeBundle"
+                    }
+                  ],
+                  "title": "bundle"
+                },
+                {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "code_hash": {
+                      "type": "string"
+                    },
+                    "runtime_context": {
+                      "properties": {
+                        "runtime": {
+                          "enum": [
+                            "node",
+                            "python",
+                            "browser",
+                            "quickjs"
+                          ],
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "runtime",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "type": {
+                      "enum": [
+                        "inline"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "runtime_context",
+                    "code"
+                  ],
+                  "title": "inline",
+                  "type": "object"
+                }
+              ]
+            },
+            "type": {
+              "enum": [
+                "code"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "title": "code",
+          "type": "object"
+        },
+        {
+          "$ref": "#/components/schemas/GraphData"
+        },
+        {
+          "properties": {
+            "endpoint": {
+              "type": "string"
+            },
+            "eval_name": {
+              "type": "string"
+            },
+            "parameters": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "type": "object"
+            },
+            "parameters_version": {
+              "nullable": true,
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "remote_eval"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "endpoint",
+            "eval_name",
+            "parameters"
+          ],
+          "title": "remote_eval",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "config": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "nullable": true,
+              "type": "object"
+            },
+            "function_type": {
+              "$ref": "#/components/schemas/FunctionTypeEnum"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "global"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "global",
+          "type": "object"
+        },
+        {
+          "$ref": "#/components/schemas/FacetData"
+        },
+        {
+          "$ref": "#/components/schemas/BatchedFacetData"
+        },
+        {
+          "properties": {
+            "__schema": {
+              "properties": {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "properties": {
+                  "additionalProperties": {
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "type": "object"
+                  },
+                  "type": "object"
+                },
+                "required": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "enum": [
+                    "object"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "data": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "parameters"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data",
+            "__schema"
+          ],
+          "title": "parameters",
+          "type": "object"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/TopicMapData"
+            },
+            {
+              "title": "topic_map"
+            }
+          ]
+        }
+      ]
+    },
+    "FunctionDataNullish": {
+      "anyOf": [
+        {
+          "properties": {
+            "type": {
+              "enum": [
+                "prompt"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "title": "prompt",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "anyOf": [
+                {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "type": {
+                          "enum": [
+                            "bundle"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CodeBundle"
+                    }
+                  ],
+                  "title": "bundle"
+                },
+                {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "code_hash": {
+                      "type": "string"
+                    },
+                    "runtime_context": {
+                      "properties": {
+                        "runtime": {
+                          "enum": [
+                            "node",
+                            "python",
+                            "browser",
+                            "quickjs"
+                          ],
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "runtime",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "type": {
+                      "enum": [
+                        "inline"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "runtime_context",
+                    "code"
+                  ],
+                  "title": "inline",
+                  "type": "object"
+                }
+              ]
+            },
+            "type": {
+              "enum": [
+                "code"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "title": "code",
+          "type": "object"
+        },
+        {
+          "$ref": "#/components/schemas/GraphData"
+        },
+        {
+          "properties": {
+            "endpoint": {
+              "type": "string"
+            },
+            "eval_name": {
+              "type": "string"
+            },
+            "parameters": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "type": "object"
+            },
+            "parameters_version": {
+              "nullable": true,
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "remote_eval"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "endpoint",
+            "eval_name",
+            "parameters"
+          ],
+          "title": "remote_eval",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "config": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "nullable": true,
+              "type": "object"
+            },
+            "function_type": {
+              "$ref": "#/components/schemas/FunctionTypeEnum"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "global"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "global",
+          "type": "object"
+        },
+        {
+          "$ref": "#/components/schemas/FacetData"
+        },
+        {
+          "$ref": "#/components/schemas/BatchedFacetData"
+        },
+        {
+          "properties": {
+            "__schema": {
+              "properties": {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "properties": {
+                  "additionalProperties": {
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "type": "object"
+                  },
+                  "type": "object"
+                },
+                "required": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "enum": [
+                    "object"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "properties"
+              ],
+              "type": "object"
+            },
+            "data": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "parameters"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data",
+            "__schema"
+          ],
+          "title": "parameters",
+          "type": "object"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/TopicMapData"
+            },
+            {
+              "title": "topic_map"
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "FunctionIdParam": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "FunctionIdRef": {
+      "additionalProperties": {
+        "nullable": true
+      },
+      "properties": {},
+      "type": "object"
+    },
+    "FunctionName": {
+      "type": "string"
+    },
     "FunctionTypeEnum": {
       "default": "scorer",
       "enum": [
@@ -13694,6 +15544,348 @@
       ],
       "nullable": true,
       "type": "string"
+    },
+    "GraphData": {
+      "properties": {
+        "edges": {
+          "additionalProperties": {
+            "$ref": "#/components/schemas/GraphEdge"
+          },
+          "type": "object"
+        },
+        "nodes": {
+          "additionalProperties": {
+            "$ref": "#/components/schemas/GraphNode"
+          },
+          "type": "object"
+        },
+        "type": {
+          "enum": [
+            "graph"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "nodes",
+        "edges"
+      ],
+      "title": "graph",
+      "type": "object"
+    },
+    "GraphEdge": {
+      "properties": {
+        "purpose": {
+          "enum": [
+            "control",
+            "data",
+            "messages"
+          ],
+          "type": "string"
+        },
+        "source": {
+          "properties": {
+            "node": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "node",
+            "variable"
+          ],
+          "type": "object"
+        },
+        "target": {
+          "properties": {
+            "node": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "variable": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "node",
+            "variable"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "purpose"
+      ],
+      "type": "object"
+    },
+    "GraphNode": {
+      "anyOf": [
+        {
+          "properties": {
+            "function": {
+              "$ref": "#/components/schemas/FunctionIdRef"
+            },
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "function"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "function"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "input"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "output"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "literal"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "nullable": true
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "expr": {
+              "type": "string"
+            },
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "btql"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "expr"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "condition": {
+              "nullable": true,
+              "type": "string"
+            },
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "gate"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "enum": [
+                "aggregator"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "position": {
+              "nullable": true,
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            },
+            "prompt": {
+              "$ref": "#/components/schemas/PromptBlockData"
+            },
+            "type": {
+              "enum": [
+                "prompt_template"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "prompt"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "Group": {
       "properties": {
@@ -13950,6 +16142,124 @@
         "row_ids"
       ],
       "type": "object"
+    },
+    "InvokeApi": {
+      "properties": {
+        "endpoint_name": {
+          "nullable": true,
+          "type": "string"
+        },
+        "expected": {
+          "nullable": true
+        },
+        "input": {
+          "nullable": true
+        },
+        "mcp_auth": {
+          "additionalProperties": {
+            "properties": {
+              "oauth_token": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "messages": {
+          "items": {
+            "$ref": "#/components/schemas/ChatCompletionMessageParam"
+          },
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "nullable": true
+          },
+          "nullable": true,
+          "type": "object"
+        },
+        "mode": {
+          "$ref": "#/components/schemas/StreamingMode"
+        },
+        "overrides": {
+          "additionalProperties": {
+            "nullable": true
+          },
+          "nullable": true,
+          "type": "object"
+        },
+        "parent": {
+          "$ref": "#/components/schemas/InvokeParent"
+        },
+        "stream": {
+          "nullable": true,
+          "type": "boolean"
+        },
+        "strict": {
+          "nullable": true,
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "InvokeParent": {
+      "anyOf": [
+        {
+          "properties": {
+            "object_id": {
+              "type": "string"
+            },
+            "object_type": {
+              "enum": [
+                "project_logs",
+                "experiment",
+                "playground_logs"
+              ],
+              "type": "string"
+            },
+            "propagated_event": {
+              "additionalProperties": {
+                "nullable": true
+              },
+              "nullable": true,
+              "type": "object"
+            },
+            "row_ids": {
+              "nullable": true,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "root_span_id": {
+                  "type": "string"
+                },
+                "span_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "span_id",
+                "root_span_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "object_type",
+            "object_id"
+          ],
+          "title": "span_parent_struct",
+          "type": "object"
+        },
+        {
+          "type": "string"
+        }
+      ]
     },
     "MaxRootSpanId": {
       "type": "string"
@@ -14546,6 +16856,21 @@
         "name": {
           "nullable": true,
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PatchFunction": {
+      "properties": {
+        "function_data": {
+          "$ref": "#/components/schemas/FunctionDataNullish"
+        },
+        "name": {
+          "nullable": true,
+          "type": "string"
+        },
+        "prompt_data": {
+          "$ref": "#/components/schemas/PromptDataNullish"
         }
       },
       "type": "object"
@@ -16621,6 +18946,54 @@
       ],
       "type": "object"
     },
+    "PromptBlockData": {
+      "anyOf": [
+        {
+          "properties": {
+            "messages": {
+              "items": {
+                "$ref": "#/components/schemas/ChatCompletionMessageParam"
+              },
+              "type": "array"
+            },
+            "tools": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "chat"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "messages"
+          ],
+          "title": "chat",
+          "type": "object"
+        },
+        {
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "completion"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "title": "completion",
+          "type": "object"
+        }
+      ]
+    },
     "PromptBlockDataNullish": {
       "anyOf": [
         {
@@ -17205,6 +19578,17 @@
       "format": "uuid",
       "type": "string"
     },
+    "StreamingMode": {
+      "enum": [
+        "auto",
+        "parallel",
+        "json",
+        "text",
+        null
+      ],
+      "nullable": true,
+      "type": "string"
+    },
     "SummarizeData": {
       "nullable": true,
       "type": "boolean"
@@ -17517,6 +19901,117 @@
       ],
       "type": "object"
     },
+    "TopicMapData": {
+      "properties": {
+        "automation_btql_filter": {
+          "type": "string"
+        },
+        "btql_filter": {
+          "type": "string"
+        },
+        "bundle_key": {
+          "type": "string"
+        },
+        "disable_reconciliation": {
+          "type": "boolean"
+        },
+        "distance_threshold": {
+          "type": "number"
+        },
+        "embedding_model": {
+          "type": "string"
+        },
+        "generation_settings": {
+          "$ref": "#/components/schemas/TopicMapGenerationSettings"
+        },
+        "reconcile_mode": {
+          "enum": [
+            "evolve",
+            "names_only"
+          ],
+          "type": "string"
+        },
+        "report_key": {
+          "type": "string"
+        },
+        "source_facet": {
+          "type": "string"
+        },
+        "source_facet_function": {
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/SavedFunctionId"
+            },
+            {
+              "anyOf": [
+                {
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "enum": [
+                        "function"
+                      ],
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "id"
+                  ],
+                  "title": "function",
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "function_type": {
+                      "$ref": "#/components/schemas/FunctionTypeEnum"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "enum": [
+                        "global"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "name"
+                  ],
+                  "title": "global",
+                  "type": "object"
+                }
+              ]
+            }
+          ]
+        },
+        "topic_names": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "type": {
+          "enum": [
+            "topic_map"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "source_facet",
+        "embedding_model"
+      ],
+      "type": "object"
+    },
     "TopicMapFunctionAutomation": {
       "properties": {
         "btql_filter": {
@@ -17581,6 +20076,59 @@
       },
       "required": [
         "function"
+      ],
+      "type": "object"
+    },
+    "TopicMapGenerationSettings": {
+      "properties": {
+        "algorithm": {
+          "enum": [
+            "hdbscan",
+            "kmeans",
+            "community"
+          ],
+          "type": "string"
+        },
+        "dimension_reduction": {
+          "enum": [
+            "umap",
+            "pca",
+            "none"
+          ],
+          "type": "string"
+        },
+        "hierarchy_threshold": {
+          "exclusiveMinimum": true,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "min_cluster_size": {
+          "exclusiveMinimum": true,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "min_samples": {
+          "exclusiveMinimum": true,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "n_clusters": {
+          "exclusiveMinimum": true,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "naming_model": {
+          "type": "string"
+        },
+        "sample_size": {
+          "exclusiveMinimum": true,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "algorithm",
+        "dimension_reduction"
       ],
       "type": "object"
     },
