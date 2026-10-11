@@ -80,8 +80,9 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 		MarkdownDescription: "Manages a Braintrust project automation rule. Automations allow you to " +
 			"set up alerts (webhook or Slack), scheduled data exports, data retention policies, " +
 			"and environment-update notifications for a project.\n\n" +
-			"Exactly one of `logs_config`, `export_config`, `retention_config`, or " +
-			"`environment_update_config` must be specified.",
+			"Exactly one of `logs_config`, `export_config`, `retention_config`, " +
+			"`environment_update_config`, or `config_json` must be specified. " +
+			"Use `config_json` for API automation variants not modeled by the structured attributes.",
 		Attributes: map[string]schema.Attribute{
 			"id": computedStringAttribute("Unique identifier for the project automation."),
 			"project_id": schema.StringAttribute{
@@ -101,6 +102,18 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 			"user_id": computedStringAttribute("The user who created this automation."),
 			"created": computedStringAttribute("Date of creation."),
+			"config_json": schema.StringAttribute{
+				Optional:    true,
+				Description: "Raw project automation config JSON. Use for API event types without a structured config attribute, such as topic. Mutually exclusive with all structured config attributes.",
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("logs_config"),
+						path.MatchRoot("export_config"),
+						path.MatchRoot("retention_config"),
+						path.MatchRoot("environment_update_config"),
+					),
+				},
+			},
 
 			// ---------------------------------------------------------------
 			// Config variant 1: logs — alert on log events matching a filter.
@@ -114,6 +127,7 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 						path.MatchRoot("export_config"),
 						path.MatchRoot("retention_config"),
 						path.MatchRoot("environment_update_config"),
+						path.MatchRoot("config_json"),
 					),
 				},
 				Attributes: map[string]schema.Attribute{

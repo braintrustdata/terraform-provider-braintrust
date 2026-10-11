@@ -122,6 +122,40 @@ func TestAccProjectAutomationResource_environmentUpdateWebhook(t *testing.T) {
 	})
 }
 
+func TestAccProjectAutomationResource_rawConfig(t *testing.T) {
+	orgID := os.Getenv("BRAINTRUST_TEST_ORG_ID")
+	if orgID == "" {
+		t.Skip("BRAINTRUST_TEST_ORG_ID is required")
+	}
+	projName := "tf-acc-raw-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	autoName := "tf-acc-raw-retention-" + acctest.RandStringFromCharSet(6, acctest.CharSetAlphaNum)
+	config := func(days int) string {
+		return fmt.Sprintf(`
+resource "braintrust_project" "test" {
+  name = %q
+}
+resource "braintrust_project_automation" "test" {
+  project_id = braintrust_project.test.id
+  name = %q
+  config_json = jsonencode({
+    event_type = "retention"
+    object_type = "project_logs"
+    retention_days = %d
+  })
+}
+`, projName, autoName, days)
+	}
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t); requireSingleAccessibleOrg(t, orgID) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckProjectAutomationDestroy,
+		Steps: []resource.TestStep{
+			{Config: config(90), Check: resource.TestCheckResourceAttrSet("braintrust_project_automation.test", "id")},
+			{Config: config(30), Check: resource.TestCheckResourceAttrSet("braintrust_project_automation.test", "config_json")},
+		},
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Config helpers
 // ---------------------------------------------------------------------------

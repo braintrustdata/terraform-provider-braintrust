@@ -2,6 +2,7 @@ package provider
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -65,5 +66,54 @@ func TestBuildAutomationConfigRejectsAmbiguousVariants(t *testing.T) {
 	}
 	if _, err := buildActionJSON(&webhookActionModel{URL: types.StringValue("https://example.invalid")}, &slackActionModel{}); err == nil || !strings.Contains(err.Error(), "exactly one") {
 		t.Fatalf("expected multiple action error, got %v", err)
+	}
+}
+
+func TestRawAutomationConfigRoundTrip(t *testing.T) {
+	configured := types.StringValue(`{ "event_type": "topic", "sampling_rate": 0.5, "facet_functions": [], "topic_map_functions": [] }`)
+	model := &projectAutomationModel{ConfigJSON: configured}
+	payload, err := buildConfigJSON(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := parseConfigToModel(payload, model); err != nil {
+		t.Fatal(err)
+	}
+	if model.ConfigJSON != configured || model.LogsConfig != nil || model.ExportConfig != nil || model.RetentionConfig != nil || model.EnvironmentUpdateConfig != nil {
+		t.Fatalf("raw config was not preserved: %#v", model)
+	}
+
+	imported := &projectAutomationModel{ConfigJSON: types.StringNull()}
+	if err := parseConfigToModel(payload, imported); err != nil {
+		t.Fatal(err)
+	}
+	if imported.ConfigJSON.IsNull() || imported.ConfigJSON.IsUnknown() {
+		t.Fatal("unknown automation config was lost on import")
+	}
+	var got, want any
+	if err := json.Unmarshal([]byte(imported.ConfigJSON.ValueString()), &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(payload, &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("imported config = %v, want %v", got, want)
+	}
+}
+
+func TestRawAutomationConfigValidation(t *testing.T) {
+	for _, raw := range []string{`[]`, `{}`, `{"event_type":42}`, `{"event_type":""}`, `not-json`} {
+		model := &projectAutomationModel{ConfigJSON: types.StringValue(raw)}
+		if _, err := buildConfigJSON(model); err == nil {
+			t.Fatalf("accepted invalid config_json %q", raw)
+		}
+	}
+	model := &projectAutomationModel{
+		ConfigJSON:      types.StringValue(`{"event_type":"topic"}`),
+		RetentionConfig: &retentionConfigModel{ObjectType: types.StringValue("project_logs"), RetentionDays: types.Int64Value(90)},
+	}
+	if _, err := buildConfigJSON(model); err == nil {
+		t.Fatal("accepted both raw and structured automation config")
 	}
 }

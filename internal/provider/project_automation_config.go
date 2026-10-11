@@ -19,6 +19,7 @@ type projectAutomationModel struct {
 	Description             types.String                  `tfsdk:"description"`
 	UserID                  types.String                  `tfsdk:"user_id"`
 	Created                 types.String                  `tfsdk:"created"`
+	ConfigJSON              types.String                  `tfsdk:"config_json"`
 	LogsConfig              *logsConfigModel              `tfsdk:"logs_config"`
 	ExportConfig            *exportConfigModel            `tfsdk:"export_config"`
 	RetentionConfig         *retentionConfigModel         `tfsdk:"retention_config"`
@@ -76,13 +77,24 @@ type awsIAMCredentialsModel struct {
 // payload expected by the Braintrust API.
 func buildConfigJSON(model *projectAutomationModel) (json.RawMessage, error) {
 	count := 0
-	for _, present := range []bool{model.LogsConfig != nil, model.ExportConfig != nil, model.RetentionConfig != nil, model.EnvironmentUpdateConfig != nil} {
+	for _, present := range []bool{model.LogsConfig != nil, model.ExportConfig != nil, model.RetentionConfig != nil, model.EnvironmentUpdateConfig != nil, !model.ConfigJSON.IsNull() && !model.ConfigJSON.IsUnknown()} {
 		if present {
 			count++
 		}
 	}
 	if count != 1 {
-		return nil, fmt.Errorf("exactly one of logs_config, export_config, retention_config, or environment_update_config must be specified")
+		return nil, fmt.Errorf("exactly one of logs_config, export_config, retention_config, environment_update_config, or config_json must be specified")
+	}
+	if !model.ConfigJSON.IsNull() && !model.ConfigJSON.IsUnknown() {
+		var config map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(model.ConfigJSON.ValueString()), &config); err != nil {
+			return nil, fmt.Errorf("config_json must be a JSON object: %w", err)
+		}
+		var eventType string
+		if err := json.Unmarshal(config["event_type"], &eventType); err != nil || eventType == "" {
+			return nil, fmt.Errorf("config_json must contain a non-empty string event_type")
+		}
+		return json.Marshal(config)
 	}
 	if model.LogsConfig != nil {
 		return buildLogsConfigJSON(model.LogsConfig)
@@ -227,6 +239,18 @@ func parseConfigToModel(raw json.RawMessage, model *projectAutomationModel) erro
 	model.ExportConfig = nil
 	model.RetentionConfig = nil
 	model.EnvironmentUpdateConfig = nil
+	// Keep the raw config form chosen by the user, even for a known event type.
+	// Unknown event types use this form on import so their full payload survives.
+	if (!model.ConfigJSON.IsNull() && !model.ConfigJSON.IsUnknown()) ||
+		(disc.EventType != "logs" && disc.EventType != "btql_export" && disc.EventType != "retention" && disc.EventType != "environment_update") {
+		var config map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &config); err != nil || config == nil || disc.EventType == "" {
+			return fmt.Errorf("automation config must be a JSON object with event_type")
+		}
+		model.ConfigJSON = promptJSONState(raw, model.ConfigJSON)
+		return nil
+	}
+	model.ConfigJSON = types.StringNull()
 
 	switch disc.EventType {
 	case "logs":

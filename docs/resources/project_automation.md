@@ -4,14 +4,14 @@ page_title: "braintrust_project_automation Resource - braintrust"
 subcategory: ""
 description: |-
   Manages a Braintrust project automation rule. Automations allow you to set up alerts (webhook or Slack), scheduled data exports, data retention policies, and environment-update notifications for a project.
-  Exactly one of logs_config, export_config, retention_config, or environment_update_config must be specified.
+  Exactly one of logs_config, export_config, retention_config, environment_update_config, or config_json must be specified. Use config_json for API automation variants not modeled by the structured attributes.
 ---
 
 # braintrust_project_automation (Resource)
 
 Manages a Braintrust project automation rule. Automations allow you to set up alerts (webhook or Slack), scheduled data exports, data retention policies, and environment-update notifications for a project.
 
-Exactly one of `logs_config`, `export_config`, `retention_config`, or `environment_update_config` must be specified.
+Exactly one of `logs_config`, `export_config`, `retention_config`, `environment_update_config`, or `config_json` must be specified. Use `config_json` for API automation variants not modeled by the structured attributes.
 
 
 
@@ -25,6 +25,7 @@ Exactly one of `logs_config`, `export_config`, `retention_config`, or `environme
 
 ### Optional
 
+- `config_json` (String) Raw project automation config JSON. Use for API event types without a structured config attribute, such as topic. Mutually exclusive with all structured config attributes.
 - `description` (String) Textual description of the project automation.
 - `environment_update_config` (Attributes) Notify when an environment is updated. Exactly one of webhook_action or slack_action must be specified. (see [below for nested schema](#nestedatt--environment_update_config))
 - `export_config` (Attributes) Schedule periodic data exports to cloud storage (e.g. S3). (see [below for nested schema](#nestedatt--export_config))
