@@ -85,7 +85,7 @@ func viewJSONState(remote json.RawMessage, existing types.String) types.String {
 	if len(remote) == 0 || bytes.Equal(bytes.TrimSpace(remote), []byte("null")) {
 		return types.StringNull()
 	}
-	return promptJSONState(remote, existing)
+	return jsonState(remote, existing)
 }
 
 func mapViewToModel(view *client.View, model *viewModel) {

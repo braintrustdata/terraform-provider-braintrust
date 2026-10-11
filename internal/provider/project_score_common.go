@@ -26,7 +26,7 @@ func mapProjectScoreToModel(score *client.ProjectScore, model *projectScoreModel
 	model.Name = types.StringValue(score.Name)
 	model.Description = stringPtrToTFValue(score.Description)
 	model.ScoreType = types.StringValue(score.ScoreType)
-	model.CategoriesJSON = promptJSONState(score.Categories, model.CategoriesJSON)
-	model.ConfigJSON = promptJSONState(score.Config, model.ConfigJSON)
+	model.CategoriesJSON = jsonState(score.Categories, model.CategoriesJSON)
+	model.ConfigJSON = jsonState(score.Config, model.ConfigJSON)
 	model.Created = stringPtrToTFValue(score.Created)
 }

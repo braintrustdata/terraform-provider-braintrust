@@ -31,11 +31,11 @@ func TestDataSourceLookupRejectsAmbiguityAndSupportsScope(t *testing.T) {
 				t.Errorf("unexpected dataset query: %s", r.URL.String())
 			}
 			_, _ = w.Write([]byte(`{"objects":[{"id":"deleted-dataset","name":"Shared","project_id":"project-a","deleted_at":"2026-01-01"},{"id":"dataset-a","name":"Shared","project_id":"project-a"}]}`))
-		case "/v1/prompt":
-			if r.URL.Query().Get("prompt_name") != "Shared" || r.URL.Query().Get("project_id") != "project-a" {
-				t.Errorf("unexpected prompt query: %s", r.URL.String())
+		case "/v1/function":
+			if r.URL.Query().Get("function_name") != "Shared" || r.URL.Query().Get("project_id") != "project-a" {
+				t.Errorf("unexpected function query: %s", r.URL.String())
 			}
-			_, _ = w.Write([]byte(`{"objects":[{"id":"prompt-a","name":"Shared","project_id":"project-a"},{"id":"prompt-b","name":"Shared","project_id":"project-a"}]}`))
+			_, _ = w.Write([]byte(`{"objects":[{"id":"function-a","name":"Shared","project_id":"project-a"},{"id":"function-b","name":"Shared","project_id":"project-a"}]}`))
 		default:
 			t.Errorf("unexpected request: %s", r.URL.String())
 			w.WriteHeader(http.StatusNotFound)
@@ -56,7 +56,7 @@ func TestDataSourceLookupRejectsAmbiguityAndSupportsScope(t *testing.T) {
 		{"ambiguous project", `data "braintrust_project" "test" { name = "Shared" }`, "Ambiguous Project", nil},
 		{"scoped project", "data \"braintrust_project\" \"test\" {\n  name = \"Shared\"\n  org_id = \"org-a\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_project.test", "id", "project-a")},
 		{"active dataset", "data \"braintrust_dataset\" \"test\" {\n  name = \"Shared\"\n  project_id = \"project-a\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_dataset.test", "id", "dataset-a")},
-		{"ambiguous prompt", "data \"braintrust_prompt\" \"test\" {\n  name = \"Shared\"\n  project_id = \"project-a\"\n}", "Ambiguous Prompt", nil},
+		{"ambiguous function", "data \"braintrust_function\" \"test\" {\n  name = \"Shared\"\n  project_id = \"project-a\"\n}", "Ambiguous Function", nil},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -13,7 +13,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 |---|---|
 | `braintrust_project` | Projects for organizing experiments, datasets, and logs |
 | `braintrust_dataset` | Datasets belonging to a project |
-| `braintrust_prompt` | Prompt definitions belonging to a project |
+| `braintrust_function` | Prompts, scorers, preprocessors, tools, and other project functions |
 | `braintrust_group` | User groups for access control |
 | `braintrust_project_group` | Project groups for inherited access control |
 | `braintrust_project_group_membership` | Individual project-to-group membership with safe destroy ordering |
@@ -36,7 +36,7 @@ A [Terraform](https://www.terraform.io/) provider for managing [Braintrust](http
 |---|---|
 | `braintrust_project` | Look up a project by ID or name |
 | `braintrust_dataset` | Look up a dataset by ID or by name + project |
-| `braintrust_prompt` | Look up a prompt by ID or by name + project |
+| `braintrust_function` | Look up a function by ID or by name + project |
 | `braintrust_group` | Look up a group by name |
 | `braintrust_project_group` | Look up a project group by organization ID and name |
 | `braintrust_role` | Look up a role by name (e.g. built-in `Viewer`, `Admin`) |
@@ -96,6 +96,21 @@ data "braintrust_project" "existing" {
 ### Working With a Coding Agent
 
 The [agent-assisted starter](examples/agent-assisted/) includes a copyable `AGENTS.md` for your own Terraform repo and a small project-group configuration. It points an agent to the installed provider schema, shows safe dependency references, and asks for a reviewed plan before applying changes.
+
+### Functions
+
+Use `braintrust_function` for prompts, scorers, preprocessors, tools, and other
+functions exposed by `/v1/function`. The [function example](examples/resources/braintrust_function/main.tf)
+shows a prompt and two inline-code functions. Set `function_data_json` to the
+API's tagged implementation object; prompt-backed functions also use
+`prompt_data_json`. For example, a prompt uses `{ type = "prompt" }`, while
+inline code uses `{ type = "code", data = { type = "inline", ... } }`.
+
+Terraform manages the saved function definition and its versions. It does not
+build or upload a code bundle; use the Braintrust SDK's push workflow when your
+function requires bundling local dependencies. Manage each function ID in one
+Terraform resource, and use `braintrust_function` data sources for references
+to existing functions.
 
 ### Saved Views and Dashboards
 
