@@ -29,7 +29,7 @@ func mapDatasetToModel(dataset *client.Dataset, model *datasetModel) {
 	model.Name = types.StringValue(dataset.Name)
 	model.Description = stringPtrToTFValue(dataset.Description)
 	model.Tags = stringSliceToTFList(dataset.Tags)
-	model.MetadataJSON = promptJSONState(dataset.Metadata, model.MetadataJSON)
+	model.MetadataJSON = jsonState(dataset.Metadata, model.MetadataJSON)
 	model.URLSlug = stringPtrToTFValue(dataset.URLSlug)
 	model.Created = stringPtrToTFValue(dataset.Created)
 	model.DeletedAt = stringPtrToTFValue(dataset.DeletedAt)

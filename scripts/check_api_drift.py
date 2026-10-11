@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "api-contract-baseline.json"
 TRACKED = (
-    "project", "dataset", "prompt", "group", "project_group", "role",
+    "project", "dataset", "prompt", "function", "group", "project_group", "role",
     "acl", "env_var", "project_tag", "project_score", "service_account",
     "service_token", "ai_secret", "project_automation", "view", "organization",
 )

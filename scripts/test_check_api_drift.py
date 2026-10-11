@@ -44,6 +44,20 @@ class ContractTest(unittest.TestCase):
         spec["components"]["schemas"]["CreateView"]["description"] = "new docs"
         self.assertEqual(differences(before, contract(spec)), [])
 
+    def test_function_endpoint_is_tracked(self):
+        spec = self.spec()
+        spec["paths"]["/v1/function"] = {
+            "post": {"requestBody": {"content": {"application/json": {
+                "schema": {"$ref": "#/components/schemas/CreateFunction"}
+            }}}}
+        }
+        spec["components"]["schemas"]["CreateFunction"] = {
+            "type": "object", "properties": {"function_data": {"type": "object"}}
+        }
+        tracked = contract(spec)
+        self.assertIn("/v1/function", tracked["paths"])
+        self.assertIn("CreateFunction", tracked["schemas"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -21,8 +21,8 @@ func TestNameLookupsReadLaterPages(t *testing.T) {
 			}
 			return len(items), items[len(items)-1].ID, nil
 		}},
-		{"prompt", "/v1/prompt", "prompt_name", func(ctx context.Context, c *Client) (int, string, error) {
-			items, err := c.ListPrompts(ctx, "Shared", "project-a")
+		{"function", "/v1/function", "function_name", func(ctx context.Context, c *Client) (int, string, error) {
+			items, err := c.ListFunctions(ctx, "Shared", "project-a")
 			if err != nil {
 				return 0, "", err
 			}

@@ -247,7 +247,7 @@ func parseConfigToModel(raw json.RawMessage, model *projectAutomationModel) erro
 		if err := json.Unmarshal(raw, &config); err != nil || config == nil || disc.EventType == "" {
 			return fmt.Errorf("automation config must be a JSON object with event_type")
 		}
-		model.ConfigJSON = promptJSONState(raw, model.ConfigJSON)
+		model.ConfigJSON = jsonState(raw, model.ConfigJSON)
 		return nil
 	}
 	model.ConfigJSON = types.StringNull()
