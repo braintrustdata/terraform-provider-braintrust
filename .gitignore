@@ -1,5 +1,6 @@
 # Binaries
 terraform-provider-braintrust
+/braintrust-terraforming
 *.exe
 *.exe~
 *.dll
@@ -54,3 +55,6 @@ provider_code_spec.json
 
 # GoReleaser
 dist/
+
+# Offline exporter/provider check evidence
+tests/evidence/

@@ -6,6 +6,9 @@ default: install
 build:
 	go build -ldflags "-w -s" -o $(BINARY) .
 
+build-terraforming:
+	go build -ldflags "-w -s" -o braintrust-terraforming ./cmd/braintrust-terraforming
+
 install: build
 	mkdir -p $(HOME)/.terraform.d/plugins
 	mv ./$(BINARY) $(HOME)/.terraform.d/plugins/$(BINARY)
@@ -83,4 +86,4 @@ install-hooks:
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
 
-.PHONY: default build install generate scaffold-resource scaffold-datasource doc test test-acceptance check-docs deps fmt lint lint-fix install-hooks
+.PHONY: default build build-terraforming install generate scaffold-resource scaffold-datasource doc test test-acceptance check-docs deps fmt lint lint-fix install-hooks
