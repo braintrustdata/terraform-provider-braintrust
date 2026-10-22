@@ -4,14 +4,12 @@
 package schema
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
-)
 
-//go:embed spec.json
-var embeddedSpec []byte
+	"github.com/braintrustdata/terraform-provider-braintrust/internal/openapispec"
+)
 
 // FieldType represents the JSON schema type of a field.
 type FieldType string
@@ -47,7 +45,7 @@ type SchemaRegistry map[string]*ResourceSchema
 
 // LoadRegistry parses the embedded OpenAPI spec and builds the registry.
 func LoadRegistry() (SchemaRegistry, error) {
-	return loadRegistryFromBytes(embeddedSpec)
+	return loadRegistryFromBytes(openapispec.JSON)
 }
 
 // LoadRegistryFromBytes parses a custom spec (e.g., freshly downloaded).

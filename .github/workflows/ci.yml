@@ -39,6 +39,11 @@ jobs:
       - name: API drift checker tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
+      - name: Check generated fixture contracts
+        run: |
+          go build -mod=readonly -o bin/braintrust-terraforming ./cmd/braintrust-terraforming
+          python3 tests/offline_checks.py --exporter bin/braintrust-terraforming --skip-terraform --output test-results/offline
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

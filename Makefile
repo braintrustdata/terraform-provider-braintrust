@@ -18,7 +18,7 @@ generate:
 	tfplugingen-openapi generate \
 		--config ./generator_config.yml \
 		--output ./provider_code_spec.json \
-		./openapi_spec.json
+		./internal/openapispec/openapi_spec.json
 	tfplugingen-framework generate resources \
 		--input ./provider_code_spec.json \
 		--output ./internal
