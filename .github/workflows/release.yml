@@ -55,3 +55,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+
+      # goreleaser only supports one checksum config, which is reserved for the
+      # provider's SHA256SUMS (read by the Terraform Registry).
+      - name: Upload CLI checksums
+        working-directory: dist
+        run: |
+          checksums="braintrust-terraforming_${GITHUB_REF_NAME#v}_checksums.txt"
+          sha256sum braintrust-terraforming_*.tar.gz braintrust-terraforming_*.zip > "$checksums"
+          gh release upload "$GITHUB_REF_NAME" "$checksums"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

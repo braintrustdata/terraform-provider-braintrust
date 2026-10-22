@@ -1,6 +1,7 @@
 version: 2
 builds:
-  - env:
+  - id: provider
+    env:
       - CGO_ENABLED=0
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -21,11 +22,44 @@ builds:
       - goos: darwin
         goarch: "386"
     binary: "{{ .ProjectName }}_v{{ .Version }}"
+  - id: braintrust-terraforming
+    main: ./cmd/braintrust-terraforming
+    binary: braintrust-terraforming
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w -X main.version={{.Version}}"
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
 archives:
-  - formats:
+  - id: provider
+    ids:
+      - provider
+    formats:
       - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: braintrust-terraforming
+    ids:
+      - braintrust-terraforming
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "braintrust-terraforming_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 checksum:
+  # SHA256SUMS is consumed by the Terraform Registry, so keep it provider-only.
+  ids:
+    - provider
   extra_files:
     - glob: terraform-registry-manifest.json
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"

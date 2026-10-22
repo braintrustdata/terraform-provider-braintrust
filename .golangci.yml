@@ -30,6 +30,12 @@ linters:
       - linters:
           - errcheck
         path: _test\.go
+      # Imported braintrust-terraforming code predates this lint config; see TODO.md.
+      - linters:
+          - errcheck
+          - gocritic
+          - staticcheck
+        path: ^internal/terraforming/
     paths:
       - dist
       - third_party$

@@ -6,6 +6,9 @@ default: install
 build:
 	go build -ldflags "-w -s" -o $(BINARY) .
 
+build-terraforming:
+	go build -ldflags "-w -s" -o braintrust-terraforming ./cmd/braintrust-terraforming
+
 install: build
 	mkdir -p $(HOME)/.terraform.d/plugins
 	mv ./$(BINARY) $(HOME)/.terraform.d/plugins/$(BINARY)
@@ -15,7 +18,7 @@ generate:
 	tfplugingen-openapi generate \
 		--config ./generator_config.yml \
 		--output ./provider_code_spec.json \
-		./openapi_spec.json
+		./internal/openapispec/openapi_spec.json
 	tfplugingen-framework generate resources \
 		--input ./provider_code_spec.json \
 		--output ./internal
@@ -83,4 +86,4 @@ install-hooks:
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
 
-.PHONY: default build install generate scaffold-resource scaffold-datasource doc test test-acceptance check-docs deps fmt lint lint-fix install-hooks
+.PHONY: default build build-terraforming install generate scaffold-resource scaffold-datasource doc test test-acceptance check-docs deps fmt lint lint-fix install-hooks
