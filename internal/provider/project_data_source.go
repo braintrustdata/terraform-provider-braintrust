@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -102,7 +103,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	var project *client.Project
+	var project *openapi.Project
 	var err error
 
 	if !config.Name.IsNull() && !config.Name.IsUnknown() {
@@ -110,7 +111,21 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		name := config.Name.ValueString()
 		tflog.Debug(ctx, "Looking up project by name", map[string]any{"name": name})
 
-		projects, listErr := d.client.ListProjects(ctx, name)
+		projects, listErr := client.ListAll("/v1/project", func(limit int, startingAfter *string) ([]openapi.Project, error) {
+			page, err := d.client.API.GetProjectWithResponse(ctx, &openapi.GetProjectParams{
+				Limit:         &limit,
+				StartingAfter: startingAfter,
+				ProjectName:   &name,
+			})
+			if err != nil {
+				return nil, err
+			}
+			body, err := client.JSON(page.JSON200)
+			if err != nil {
+				return nil, err
+			}
+			return body.Objects, nil
+		}, func(p openapi.Project) string { return p.Id.String() })
 		if listErr != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Braintrust Project",
@@ -118,9 +133,9 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
-		var matches []client.Project
+		var matches []openapi.Project
 		for _, candidate := range projects {
-			if candidate.Name == name && (config.OrgID.IsNull() || config.OrgID.IsUnknown() || candidate.OrgID == config.OrgID.ValueString()) && candidate.DeletedAt == nil {
+			if candidate.Name == name && (config.OrgID.IsNull() || config.OrgID.IsUnknown() || candidate.OrgId.String() == config.OrgID.ValueString()) && !nullableIsSet(candidate.DeletedAt) {
 				matches = append(matches, candidate)
 			}
 		}
@@ -141,7 +156,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		id := config.ID.ValueString()
 		tflog.Debug(ctx, "Reading project data source", map[string]any{"id": id})
 
-		project, err = d.client.GetProject(ctx, id)
+		project, _, err = getProject(ctx, d.client, id)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Braintrust Project",
@@ -149,7 +164,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
-		if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && project.OrgID != config.OrgID.ValueString() {
+		if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && project.OrgId.String() != config.OrgID.ValueString() {
 			resp.Diagnostics.AddError("Project Organization Mismatch", "Project ID "+id+" does not belong to org_id "+config.OrgID.ValueString()+".")
 			return
 		}

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -61,40 +62,47 @@ func (d *functionDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if resp.Diagnostics.HasError() || !requireClient(d.client, &resp.Diagnostics) {
 		return
 	}
-	var function *client.Function
+	var function *function
 	if !config.Name.IsNull() && !config.Name.IsUnknown() {
 		if config.ProjectID.IsNull() || config.ProjectID.IsUnknown() {
 			resp.Diagnostics.AddError("Missing Project ID", "project_id is required when looking up a function by name.")
 			return
 		}
 		name, projectID := config.Name.ValueString(), config.ProjectID.ValueString()
-		functions, err := d.client.ListFunctions(ctx, name, projectID)
+		functions, err := listFunctions(ctx, d.client, name, projectID)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Listing Braintrust Functions", err.Error())
 			return
 		}
+		var match *openapi.Function
 		for i := range functions {
 			candidate := &functions[i]
-			if candidate.Name == name && candidate.ProjectID == projectID {
-				if function != nil {
+			if candidate.Name == name && candidate.ProjectId.String() == projectID {
+				if match != nil {
 					resp.Diagnostics.AddError("Ambiguous Function", "Multiple functions have this name in the project. Look up by ID.")
 					return
 				}
-				function = candidate
+				match = candidate
 			}
 		}
-		if function == nil {
+		if match == nil {
 			resp.Diagnostics.AddError("Function Not Found", "No function with this name exists in the project.")
 			return
 		}
-	} else {
-		var err error
-		function, err = d.client.GetFunction(ctx, config.ID.ValueString())
+		// Re-read by ID so the JSON attributes are kept as raw JSON.
+		function, err = getFunction(ctx, d.client, match.Id.String())
 		if err != nil {
 			resp.Diagnostics.AddError("Error Reading Braintrust Function", err.Error())
 			return
 		}
-		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && function.ProjectID != config.ProjectID.ValueString() {
+	} else {
+		var err error
+		function, err = getFunction(ctx, d.client, config.ID.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading Braintrust Function", err.Error())
+			return
+		}
+		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && function.Value.ProjectId.String() != config.ProjectID.ValueString() {
 			resp.Diagnostics.AddError("Function Project Mismatch", "The function ID does not belong to project_id.")
 			return
 		}

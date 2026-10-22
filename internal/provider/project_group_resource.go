@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -68,23 +71,43 @@ func (r *projectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	add := stringSetFromModel(plan.MemberProjects)
+	add, err := parseUUIDs(stringSetFromModel(plan.MemberProjects), "member_projects")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("member_projects"), "Invalid Member Projects", err.Error())
+		return
+	}
 	// POST returns an existing group for a duplicate name. Refuse to adopt and
 	// mutate an object owned outside this Terraform state.
-	existing, err := r.client.ListProjectGroups(ctx, plan.OrgID.ValueString(), plan.Name.ValueString())
+	existing, err := listProjectGroups(ctx, r.client, plan.OrgID.ValueString(), plan.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Project Group Name", err.Error())
 		return
 	}
 	for _, group := range existing {
-		if group.OrgID == plan.OrgID.ValueString() && group.Name == plan.Name.ValueString() && group.DeletedAt == nil {
+		if group.OrgId.String() == plan.OrgID.ValueString() && group.Name == plan.Name.ValueString() && !nullableIsSet(group.DeletedAt) {
 			resp.Diagnostics.AddError("Project Group Already Exists", "Import the existing project group instead of creating another with the same organization and name.")
 			return
 		}
 	}
-	created, err := r.client.CreateProjectGroup(ctx, client.CreateProjectGroupRequest{
-		OrgID: plan.OrgID.ValueString(), Name: plan.Name.ValueString(), Description: tfStringToPtr(plan.Description),
-	})
+	// The public spec only documents org_name, but the API accepts org_id,
+	// which is what this resource is keyed on.
+	orgID, err := json.Marshal(plan.OrgID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Project Group", err.Error())
+		return
+	}
+	body, err := client.JSONBody(openapi.CreateProjectGroup{
+		Name: plan.Name.ValueString(), Description: tfStringToNullable(plan.Description),
+	}, map[string]json.RawMessage{"org_id": orgID})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Project Group", err.Error())
+		return
+	}
+	createResp, err := client.Write(r.client.API.PostProjectGroupWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *openapi.ProjectGroup
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project group")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Project Group", err.Error())
 		return
@@ -98,15 +121,15 @@ func (r *projectGroupResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	group := created
 	if len(add) > 0 {
-		group, err = r.applyChanges(ctx, created.ID, client.UpdateProjectGroupRequest{AddMemberProjects: add})
+		group, err = r.applyChanges(ctx, created.Id.String(), projectGroupChange{add: add})
 		if err != nil {
-			resp.Diagnostics.AddError("Error Adding Project Group Members", fmt.Sprintf("Project group %s was created: %v", created.ID, err))
+			resp.Diagnostics.AddError("Error Adding Project Group Members", fmt.Sprintf("Project group %s was created: %v", created.Id, err))
 			return
 		}
 	}
-	group, err = r.client.GetProjectGroup(ctx, group.ID)
+	group, err = getProjectGroup(ctx, r.client, group.Id.String())
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Project Group After Create", fmt.Sprintf("Project group %s was created: %v", created.ID, err))
+		resp.Diagnostics.AddError("Error Reading Project Group After Create", fmt.Sprintf("Project group %s was created: %v", created.Id, err))
 		return
 	}
 	mapProjectGroupToModel(group, &plan)
@@ -119,7 +142,7 @@ func (r *projectGroupResource) Read(ctx context.Context, req resource.ReadReques
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	group, err := r.client.GetProjectGroup(ctx, state.ID.ValueString())
+	group, err := getProjectGroup(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -139,16 +162,16 @@ func (r *projectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	add, remove := diffStringSlices(stringSetFromModel(state.MemberProjects), stringSetFromModel(plan.MemberProjects))
-	name := plan.Name.ValueString()
-	update := client.UpdateProjectGroupRequest{Name: &name, AddMemberProjects: add, RemoveMemberProjects: remove}
+	add, remove, err := diffUUIDs(stringSetFromModel(state.MemberProjects), stringSetFromModel(plan.MemberProjects), "member_projects")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("member_projects"), "Invalid Member Projects", err.Error())
+		return
+	}
+	update := projectGroupChange{name: nullable.NewNullableWithValue(plan.Name.ValueString()), add: add, remove: remove}
 	if plan.Description.IsNull() && !state.Description.IsNull() {
-		null := json.RawMessage("null")
-		update.Description = &null
+		update.description = nullable.NewNullNullable[string]()
 	} else if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		value, _ := json.Marshal(plan.Description.ValueString())
-		raw := json.RawMessage(value)
-		update.Description = &raw
+		update.description = nullable.NewNullableWithValue(plan.Description.ValueString())
 	}
 	group, err := r.applyChanges(ctx, state.ID.ValueString(), update)
 	if err != nil {
@@ -162,28 +185,33 @@ func (r *projectGroupResource) Update(ctx context.Context, req resource.UpdateRe
 // The API accepts at most 1,000 distinct membership changes per PATCH.
 // Apply metadata on the first batch; a later failure is recovered by Read,
 // which observes the successfully applied batches before the next plan.
-func (r *projectGroupResource) applyChanges(ctx context.Context, id string, change client.UpdateProjectGroupRequest) (*client.ProjectGroup, error) {
+type projectGroupChange struct {
+	name, description nullable.Nullable[string]
+	add, remove       []uuid.UUID
+}
+
+func (r *projectGroupResource) applyChanges(ctx context.Context, id string, change projectGroupChange) (*openapi.ProjectGroup, error) {
 	const batchSize = 1000
-	var last *client.ProjectGroup
-	for first := true; first || len(change.AddMemberProjects) > 0 || len(change.RemoveMemberProjects) > 0; first = false {
-		batch := client.UpdateProjectGroupRequest{}
+	var last *openapi.ProjectGroup
+	for first := true; first || len(change.add) > 0 || len(change.remove) > 0; first = false {
+		batch := openapi.PatchProjectGroup{}
 		if first {
-			batch.Name, batch.Description = change.Name, change.Description
+			batch.Name, batch.Description = change.name, change.description
 		}
 		remaining := batchSize
-		if len(change.RemoveMemberProjects) > 0 {
-			n := min(remaining, len(change.RemoveMemberProjects))
-			batch.RemoveMemberProjects = change.RemoveMemberProjects[:n]
-			change.RemoveMemberProjects = change.RemoveMemberProjects[n:]
+		if len(change.remove) > 0 {
+			n := min(remaining, len(change.remove))
+			batch.RemoveMemberProjects = nullableSlice(change.remove[:n])
+			change.remove = change.remove[n:]
 			remaining -= n
 		}
-		if remaining > 0 && len(change.AddMemberProjects) > 0 {
-			n := min(remaining, len(change.AddMemberProjects))
-			batch.AddMemberProjects = change.AddMemberProjects[:n]
-			change.AddMemberProjects = change.AddMemberProjects[n:]
+		if remaining > 0 && len(change.add) > 0 {
+			n := min(remaining, len(change.add))
+			batch.AddMemberProjects = nullableSlice(change.add[:n])
+			change.add = change.add[n:]
 		}
 		var err error
-		last, err = r.client.UpdateProjectGroup(ctx, id, batch)
+		last, err = patchProjectGroup(ctx, r.client, id, batch)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +225,7 @@ func (r *projectGroupResource) Delete(ctx context.Context, req resource.DeleteRe
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	if err := r.client.DeleteProjectGroup(ctx, state.ID.ValueString()); err != nil && !client.IsNotFoundError(err) {
+	if _, err := client.Write(r.client.API.DeleteProjectGroupIdWithResponse(ctx, state.ID.ValueString())); err != nil && !client.IsNotFoundError(err) {
 		resp.Diagnostics.AddError("Error Deleting Project Group", err.Error())
 	}
 }

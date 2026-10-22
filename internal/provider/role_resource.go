@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -115,16 +117,25 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	createReq := client.CreateRoleRequest{
+	memberRoles, err := parseUUIDs(stringSetFromModel(plan.MemberRoles), "member_roles")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("member_roles"), "Invalid Member Roles", err.Error())
+		return
+	}
+	createReq := openapi.CreateRole{
 		Name:              plan.Name.ValueString(),
-		Description:       tfStringToPtr(plan.Description),
-		MemberPermissions: memberPermissions,
-		MemberRoles:       stringSetFromModel(plan.MemberRoles),
+		Description:       tfStringToNullable(plan.Description),
+		MemberPermissions: nullableSlice(memberPermissions),
+		MemberRoles:       nullableSlice(memberRoles),
 	}
 
 	tflog.Debug(ctx, "Creating role", map[string]any{"name": createReq.Name})
 
-	created, err := r.client.CreateRole(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostRoleWithResponse(ctx, createReq))
+	var created *openapi.Role
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "role")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Role",
@@ -134,13 +145,13 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	// Re-read to get the full state.
-	role, err := r.client.GetRole(ctx, created.ID)
+	role, err := getRole(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapRoleToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Role After Create",
-			"Role was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"Role was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -159,7 +170,7 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	role, err := r.client.GetRole(ctx, state.ID.ValueString())
+	role, err := getRole(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Role not found, removing from state", map[string]any{
@@ -206,29 +217,28 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	currentRoles := stringSetFromModel(state.MemberRoles)
 	desiredRoles := stringSetFromModel(plan.MemberRoles)
-	addRoles, removeRoles := diffStringSlices(currentRoles, desiredRoles)
-
-	name := plan.Name.ValueString()
-	updateReq := client.UpdateRoleRequest{
-		Name:                    &name,
-		AddMemberPermissions:    addPerms,
-		RemoveMemberPermissions: removePerms,
-		AddMemberRoles:          addRoles,
-		RemoveMemberRoles:       removeRoles,
+	addRoles, removeRoles, err := diffUUIDs(currentRoles, desiredRoles, "member_roles")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("member_roles"), "Invalid Member Roles", err.Error())
+		return
 	}
 
-	// Handle description clearing.
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		desc := plan.Description.ValueString()
-		updateReq.Description = &desc
-	} else if plan.Description.IsNull() && !state.Description.IsNull() {
-		empty := ""
-		updateReq.Description = &empty
+	updateReq := openapi.PatchRole{
+		Name:                    nullable.NewNullableWithValue(plan.Name.ValueString()),
+		Description:             patchString(plan.Description, state.Description),
+		AddMemberPermissions:    nullableSlice(addPerms),
+		RemoveMemberPermissions: nullableSlice(removePerms),
+		AddMemberRoles:          nullableSlice(addRoles),
+		RemoveMemberRoles:       nullableSlice(removeRoles),
 	}
 
 	tflog.Debug(ctx, "Updating role", map[string]any{"id": state.ID.ValueString()})
 
-	role, err := r.client.UpdateRole(ctx, state.ID.ValueString(), &updateReq)
+	updateResp, err := client.Write(r.client.API.PatchRoleIdWithResponse(ctx, state.ID.ValueString(), updateReq))
+	var role *openapi.Role
+	if err == nil {
+		role, err = client.JSON(updateResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Role",
@@ -251,7 +261,7 @@ func (r *roleResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err := r.client.DeleteRole(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteRoleIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

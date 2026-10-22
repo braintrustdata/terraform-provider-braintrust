@@ -57,7 +57,7 @@ func testAccCheckGroupDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_group" {
 			continue
 		}
-		_, err := c.GetGroup(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetGroupIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust group %s still exists after destroy", rs.Primary.ID)
 		}

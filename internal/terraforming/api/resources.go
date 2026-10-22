@@ -4,410 +4,326 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
+	"io"
+
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
+	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/google/uuid"
 )
 
-// =============================================================================
-// Resource types — matching the Braintrust API response shapes.
-// We only include fields relevant to Terraform generation (not write-only).
-// =============================================================================
+// Exported objects whose JSON-encoded attributes are emitted verbatim keep
+// those fields as raw JSON instead of round-tripping them through SDK models.
+type (
+	Dataset           = client.Raw[openapi.Dataset]
+	Function          = client.Raw[openapi.Function]
+	ProjectScore      = client.Raw[openapi.ProjectScore]
+	View              = client.Raw[openapi.View]
+	OrgAutomation     = client.Raw[openapi.OrgAutomation]
+	ProjectAutomation = client.Raw[openapi.ProjectAutomation]
+)
 
-type Project struct {
-	ID          string  `json:"id"`
-	OrgID       string  `json:"org_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Created     *string `json:"created,omitempty"`
-	DeletedAt   *string `json:"deleted_at,omitempty"`
-	UserID      *string `json:"user_id,omitempty"`
-}
-
-type Organization struct {
-	ID string `json:"id"`
-}
-
-type Dataset struct {
-	ID          string          `json:"id"`
-	ProjectID   string          `json:"project_id"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description,omitempty"`
-	Tags        []string        `json:"tags,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	Created     *string         `json:"created,omitempty"`
-	DeletedAt   *string         `json:"deleted_at,omitempty"`
-	UserID      *string         `json:"user_id,omitempty"`
-}
-
-type Function struct {
-	ID             string          `json:"id"`
-	ProjectID      string          `json:"project_id"`
-	Name           string          `json:"name"`
-	Slug           string          `json:"slug"`
-	Description    *string         `json:"description,omitempty"`
-	Tags           []string        `json:"tags,omitempty"`
-	FunctionType   *string         `json:"function_type,omitempty"`
-	FunctionData   json.RawMessage `json:"function_data"`
-	PromptData     json.RawMessage `json:"prompt_data,omitempty"`
-	FunctionSchema json.RawMessage `json:"function_schema,omitempty"`
-}
-
-type MemberPermission struct {
-	Permission         string  `json:"permission"`
-	RestrictObjectType *string `json:"restrict_object_type,omitempty"`
-}
-
-type Role struct {
-	ID                string             `json:"id"`
-	OrgID             *string            `json:"org_id,omitempty"`
-	Name              string             `json:"name"`
-	Description       *string            `json:"description,omitempty"`
-	Created           *string            `json:"created,omitempty"`
-	DeletedAt         *string            `json:"deleted_at,omitempty"`
-	UserID            *string            `json:"user_id,omitempty"`
-	MemberPermissions []MemberPermission `json:"member_permissions,omitempty"`
-	MemberRoles       []string           `json:"member_roles,omitempty"`
-}
-
-type Group struct {
-	ID           string   `json:"id"`
-	OrgID        string   `json:"org_id"`
-	Name         string   `json:"name"`
-	Description  *string  `json:"description,omitempty"`
-	Created      *string  `json:"created,omitempty"`
-	DeletedAt    *string  `json:"deleted_at,omitempty"`
-	UserID       *string  `json:"user_id,omitempty"`
-	MemberUsers  []string `json:"member_users,omitempty"`
-	MemberGroups []string `json:"member_groups,omitempty"`
-}
-
-type ProjectGroup struct {
-	ID             string   `json:"id"`
-	OrgID          string   `json:"org_id"`
-	Name           string   `json:"name"`
-	Description    *string  `json:"description"`
-	MemberProjects []string `json:"member_projects"`
-}
-
-type ACL struct {
-	ID                 string  `json:"id"`
-	ObjectType         string  `json:"object_type"`
-	ObjectID           string  `json:"object_id"`
-	UserID             *string `json:"user_id,omitempty"`
-	GroupID            *string `json:"group_id,omitempty"`
-	Permission         *string `json:"permission,omitempty"`
-	RestrictObjectType *string `json:"restrict_object_type,omitempty"`
-	RoleID             *string `json:"role_id,omitempty"`
-	ObjectOrgID        string  `json:"_object_org_id"`
-	Created            *string `json:"created,omitempty"`
-}
-
-type EnvVar struct {
-	ID             string  `json:"id"`
-	ObjectType     string  `json:"object_type"`
-	ObjectID       string  `json:"object_id"`
-	Name           string  `json:"name"`
-	Created        *string `json:"created,omitempty"`
-	Used           *string `json:"used,omitempty"`
-	SecretType     *string `json:"secret_type,omitempty"`
-	SecretCategory *string `json:"secret_category,omitempty"`
-}
-
-type ProjectTag struct {
-	ID          string  `json:"id"`
-	ProjectID   string  `json:"project_id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Color       *string `json:"color,omitempty"`
-	Created     *string `json:"created,omitempty"`
-	UserID      *string `json:"user_id,omitempty"`
-}
-
-type ProjectScore struct {
-	ID          string          `json:"id"`
-	ProjectID   string          `json:"project_id"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description,omitempty"`
-	ScoreType   string          `json:"score_type"`
-	Categories  json.RawMessage `json:"categories,omitempty"`
-	Config      json.RawMessage `json:"config,omitempty"`
-	Created     *string         `json:"created,omitempty"`
-	UserID      *string         `json:"user_id,omitempty"`
-}
-
-type View struct {
-	ID          string          `json:"id"`
-	ObjectType  string          `json:"object_type"`
-	ObjectID    string          `json:"object_id"`
-	ViewType    string          `json:"view_type"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description"`
-	Starred     *bool           `json:"starred"`
-	ViewData    json.RawMessage `json:"view_data"`
-	Options     json.RawMessage `json:"options"`
-}
-
-type OrgAutomation struct {
-	ID          string          `json:"id"`
-	OrgID       string          `json:"org_id"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description"`
-	Config      json.RawMessage `json:"config"`
-}
-
-type MCPServer struct {
-	ID          string  `json:"id"`
-	ProjectID   string  `json:"project_id"`
-	Name        string  `json:"name"`
-	URL         string  `json:"url"`
-	Description *string `json:"description"`
-	DeletedAt   *string `json:"deleted_at"`
-}
-
-type ServiceToken struct {
-	ID                  string  `json:"id"`
-	Name                string  `json:"name"`
-	PreviewName         string  `json:"preview_name"`
-	Created             *string `json:"created,omitempty"`
-	ServiceAccountID    *string `json:"service_account_id,omitempty"`
-	ServiceAccountEmail *string `json:"service_account_email,omitempty"`
-	ServiceAccountName  *string `json:"service_account_name,omitempty"`
-	OrgID               *string `json:"org_id,omitempty"`
-}
-
-type AISecret struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	OrgID         string  `json:"org_id"`
-	Type          *string `json:"type,omitempty"`
-	PreviewSecret *string `json:"preview_secret,omitempty"`
-	Created       *string `json:"created,omitempty"`
-	UpdatedAt     *string `json:"updated_at,omitempty"`
-}
-
-type ProjectAutomation struct {
-	ID          string          `json:"id"`
-	ProjectID   string          `json:"project_id"`
-	UserID      *string         `json:"user_id,omitempty"`
-	Created     *string         `json:"created,omitempty"`
-	Name        string          `json:"name"`
-	Description *string         `json:"description,omitempty"`
-	Config      json.RawMessage `json:"config,omitempty"`
-}
-
-type User struct {
-	ID         string  `json:"id"`
-	GivenName  *string `json:"given_name,omitempty"`
-	FamilyName *string `json:"family_name,omitempty"`
-	Email      *string `json:"email,omitempty"`
-	AvatarURL  *string `json:"avatar_url,omitempty"`
-	Created    *string `json:"created,omitempty"`
-}
-
-// =============================================================================
-// List methods — fetch all objects of a given type.
-// =============================================================================
-
-func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
-	raw, err := c.ListAll(ctx, "/v1/project", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[Project](raw)
+func (c *Client) ListProjects(ctx context.Context) ([]openapi.Project, error) {
+	return client.ListAll("/v1/project", func(limit int, startingAfter *string) ([]openapi.Project, error) {
+		page, err := c.sdk.API.GetProjectWithResponse(ctx, &openapi.GetProjectParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(p openapi.Project) string { return p.Id.String() })
 }
 
 // GetOrganization verifies that the credential can read the selected org.
-func (c *Client) GetOrganization(ctx context.Context, id string) (*Organization, error) {
-	params := url.Values{"id": {id}}
-	raw, err := c.ListAll(ctx, "/v1/organization", params)
+func (c *Client) GetOrganization(ctx context.Context, id string) error {
+	orgID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("organization ID %q is not a UUID: %w", id, err)
 	}
-	organizations, err := UnmarshalAll[Organization](raw)
+	var ids openapi.Ids
+	if err := ids.FromIds0(orgID); err != nil {
+		return err
+	}
+	organizations, err := client.ListAll("/v1/organization", func(limit int, startingAfter *string) ([]openapi.Organization, error) {
+		page, err := c.sdk.API.GetOrganizationWithResponse(ctx, &openapi.GetOrganizationParams{Limit: &limit, StartingAfter: startingAfter, Ids: &ids})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(o openapi.Organization) string { return o.Id.String() })
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, organization := range organizations {
-		if organization.ID == id {
-			return &organization, nil
+		if organization.Id == orgID {
+			return nil
 		}
 	}
-	return nil, fmt.Errorf("organization %s is not readable with this credential", id)
+	return fmt.Errorf("organization %s is not readable with this credential", id)
 }
 
-func (c *Client) ListDatasets(ctx context.Context, projectID string) ([]Dataset, error) {
-	params := url.Values{}
-	if projectID != "" {
-		params.Set("project_id", projectID)
-	}
-	raw, err := c.ListAll(ctx, "/v1/dataset", params)
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[Dataset](raw)
+func (c *Client) ListDatasets(ctx context.Context) ([]Dataset, error) {
+	return client.ListAll("/v1/dataset", func(limit int, startingAfter *string) ([]Dataset, error) {
+		page, err := c.sdk.API.GetDatasetWithResponse(ctx, &openapi.GetDatasetParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(d Dataset) string { return d.Value.Id.String() })
 }
 
-func (c *Client) ListFunctions(ctx context.Context, projectID string) ([]Function, error) {
-	params := url.Values{}
-	if projectID != "" {
-		params.Set("project_id", projectID)
-	}
-	raw, err := c.ListAll(ctx, "/v1/function", params)
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[Function](raw)
+func (c *Client) ListFunctions(ctx context.Context) ([]Function, error) {
+	return client.ListAll("/v1/function", func(limit int, startingAfter *string) ([]Function, error) {
+		page, err := c.sdk.API.GetFunctionWithResponse(ctx, &openapi.GetFunctionParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(f Function) string { return f.Value.Id.String() })
 }
 
-func (c *Client) ListRoles(ctx context.Context) ([]Role, error) {
-	raw, err := c.ListAll(ctx, "/v1/role", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[Role](raw)
+func (c *Client) ListRoles(ctx context.Context) ([]openapi.Role, error) {
+	return client.ListAll("/v1/role", func(limit int, startingAfter *string) ([]openapi.Role, error) {
+		page, err := c.sdk.API.GetRoleWithResponse(ctx, &openapi.GetRoleParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(r openapi.Role) string { return r.Id.String() })
 }
 
-func (c *Client) ListGroups(ctx context.Context) ([]Group, error) {
-	raw, err := c.ListAll(ctx, "/v1/group", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[Group](raw)
+func (c *Client) ListGroups(ctx context.Context) ([]openapi.Group, error) {
+	return client.ListAll("/v1/group", func(limit int, startingAfter *string) ([]openapi.Group, error) {
+		page, err := c.sdk.API.GetGroupWithResponse(ctx, &openapi.GetGroupParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(g openapi.Group) string { return g.Id.String() })
 }
 
-func (c *Client) ListProjectGroups(ctx context.Context, orgID string) ([]ProjectGroup, error) {
-	raw, err := c.ListAll(ctx, "/v1/project_group", url.Values{"org_id": {orgID}})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[ProjectGroup](raw)
-}
-
-func (c *Client) ListACLs(ctx context.Context, objectType, objectID string) ([]ACL, error) {
-	params := url.Values{}
-	params.Set("object_type", objectType)
-	params.Set("object_id", objectID)
-	raw, err := c.ListAll(ctx, "/v1/acl", params)
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[ACL](raw)
+// ListProjectGroups lists an organization's project groups. The spec does not
+// declare the org_id filter, so it is added to each request.
+func (c *Client) ListProjectGroups(ctx context.Context, orgID string) ([]openapi.ProjectGroup, error) {
+	return client.ListAll("/v1/project_group", func(limit int, startingAfter *string) ([]openapi.ProjectGroup, error) {
+		page, err := c.sdk.API.GetProjectGroupWithResponse(ctx, &openapi.GetProjectGroupParams{Limit: &limit, StartingAfter: startingAfter}, client.WithQuery("org_id", orgID))
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(g openapi.ProjectGroup) string { return g.Id.String() })
 }
 
 // ListOrgACLs discovers direct ACLs on every object type in the credential's
 // organization, including scopes that are not discoverable from projects.
-func (c *Client) ListOrgACLs(ctx context.Context) ([]ACL, error) {
-	raw, err := c.ListAll(ctx, "/v1/acl/list_org", url.Values{})
+//
+// The pinned spec types this response as a bare array, but the API returns
+// {"objects": [...]}, so the body is decoded here instead of by the SDK.
+func (c *Client) ListOrgACLs(ctx context.Context) ([]openapi.Acl, error) {
+	return client.ListAll("/v1/acl/list_org", func(limit int, startingAfter *string) ([]openapi.Acl, error) {
+		resp, err := c.sdk.API.AclListOrg(ctx, &openapi.AclListOrgParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		raw, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response body: %w", err)
+		}
+		var body struct {
+			Objects []openapi.Acl `json:"objects"`
+		}
+		if err := json.Unmarshal(raw, &body); err != nil {
+			return nil, fmt.Errorf("failed to decode ACL list: %w", err)
+		}
+		return body.Objects, nil
+	}, func(a openapi.Acl) string { return a.Id.String() })
+}
+
+func (c *Client) GetACL(ctx context.Context, id string) (*openapi.Acl, error) {
+	resp, err := c.sdk.API.GetAclIdWithResponse(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return UnmarshalAll[ACL](raw)
+	return client.JSON(resp.JSON200)
 }
 
-func (c *Client) GetACL(ctx context.Context, id string) (*ACL, error) {
-	var acl ACL
-	if err := c.doRequest(ctx, "GET", "/v1/acl/"+url.PathEscape(id), nil, &acl); err != nil {
-		return nil, err
-	}
-	return &acl, nil
-}
-
-func (c *Client) ListEnvVars(ctx context.Context, objectType, objectID string) ([]EnvVar, error) {
-	params := url.Values{}
+// ListEnvVars lists the env vars in one scope. Unlike the other list
+// endpoints, /v1/env_var rejects limit and cursor parameters; its response
+// contains the full set for the requested scope.
+func (c *Client) ListEnvVars(ctx context.Context, objectType, objectID string) ([]openapi.EnvVar, error) {
+	params := &openapi.GetEnvVarParams{}
 	if objectType != "" {
-		params.Set("object_type", objectType)
+		t := openapi.EnvVarObjectType(objectType)
+		params.ObjectType = &t
 	}
 	if objectID != "" {
-		params.Set("object_id", objectID)
+		params.ObjectId = &objectID
 	}
-	// Unlike the other list endpoints, /v1/env_var rejects limit and cursor
-	// parameters. Its response contains the full set for the requested scope.
-	path := "/v1/env_var?" + params.Encode()
-	var response listResponse
-	err := c.doRequest(ctx, "GET", path, nil, &response)
+	resp, err := c.sdk.API.GetEnvVarWithResponse(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	return UnmarshalAll[EnvVar](response.Objects)
+	body, err := client.JSON(resp.JSON200)
+	if err != nil {
+		return nil, err
+	}
+	return body.Objects, nil
 }
 
-func (c *Client) ListProjectTags(ctx context.Context, projectID string) ([]ProjectTag, error) {
-	params := url.Values{}
-	if projectID != "" {
-		params.Set("project_id", projectID)
-	}
-	raw, err := c.ListAll(ctx, "/v1/project_tag", params)
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[ProjectTag](raw)
+func (c *Client) ListProjectTags(ctx context.Context) ([]openapi.ProjectTag, error) {
+	return client.ListAll("/v1/project_tag", func(limit int, startingAfter *string) ([]openapi.ProjectTag, error) {
+		page, err := c.sdk.API.GetProjectTagWithResponse(ctx, &openapi.GetProjectTagParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(t openapi.ProjectTag) string { return t.Id.String() })
 }
 
-func (c *Client) ListProjectScores(ctx context.Context, projectID string) ([]ProjectScore, error) {
-	params := url.Values{}
-	if projectID != "" {
-		params.Set("project_id", projectID)
-	}
-	raw, err := c.ListAll(ctx, "/v1/project_score", params)
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[ProjectScore](raw)
+func (c *Client) ListProjectScores(ctx context.Context) ([]ProjectScore, error) {
+	return client.ListAll("/v1/project_score", func(limit int, startingAfter *string) ([]ProjectScore, error) {
+		page, err := c.sdk.API.GetProjectScoreWithResponse(ctx, &openapi.GetProjectScoreParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(s ProjectScore) string { return s.Value.Id.String() })
 }
 
 func (c *Client) ListViews(ctx context.Context, objectType, objectID string) ([]View, error) {
-	params := url.Values{"object_type": {objectType}, "object_id": {objectID}}
-	raw, err := c.ListAll(ctx, "/v1/view", params)
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[View](raw)
+	return client.ListAll("/v1/view", func(limit int, startingAfter *string) ([]View, error) {
+		page, err := c.sdk.API.GetViewWithResponse(ctx, &openapi.GetViewParams{
+			Limit: &limit, StartingAfter: startingAfter,
+			ObjectType: openapi.AclObjectType(objectType), ObjectId: objectID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(v View) string { return v.Value.Id.String() })
 }
 
 func (c *Client) ListOrgAutomations(ctx context.Context) ([]OrgAutomation, error) {
-	raw, err := c.ListAll(ctx, "/v1/org_automation", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[OrgAutomation](raw)
+	return client.ListAll("/v1/org_automation", func(limit int, startingAfter *string) ([]OrgAutomation, error) {
+		page, err := c.sdk.API.GetOrgAutomationWithResponse(ctx, &openapi.GetOrgAutomationParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(a OrgAutomation) string { return a.Value.Id.String() })
 }
 
-func (c *Client) ListMCPServers(ctx context.Context) ([]MCPServer, error) {
-	raw, err := c.ListAll(ctx, "/v1/mcp_server", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[MCPServer](raw)
+func (c *Client) ListMCPServers(ctx context.Context) ([]openapi.MCPServer, error) {
+	return client.ListAll("/v1/mcp_server", func(limit int, startingAfter *string) ([]openapi.MCPServer, error) {
+		page, err := c.sdk.API.GetMcpServerWithResponse(ctx, &openapi.GetMcpServerParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(s openapi.MCPServer) string { return s.Id.String() })
 }
 
-func (c *Client) ListServiceTokens(ctx context.Context) ([]ServiceToken, error) {
-	raw, err := c.ListAll(ctx, "/v1/service_token", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[ServiceToken](raw)
+func (c *Client) ListServiceTokens(ctx context.Context) ([]openapi.ServiceToken, error) {
+	return client.ListAll("/v1/service_token", func(limit int, startingAfter *string) ([]openapi.ServiceToken, error) {
+		page, err := c.sdk.API.GetServiceTokenWithResponse(ctx, &openapi.GetServiceTokenParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(t openapi.ServiceToken) string { return t.Id.String() })
 }
 
-func (c *Client) ListAISecrets(ctx context.Context) ([]AISecret, error) {
-	raw, err := c.ListAll(ctx, "/v1/ai_secret", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[AISecret](raw)
+func (c *Client) ListAISecrets(ctx context.Context) ([]openapi.AISecret, error) {
+	return client.ListAll("/v1/ai_secret", func(limit int, startingAfter *string) ([]openapi.AISecret, error) {
+		page, err := c.sdk.API.GetAiSecretWithResponse(ctx, &openapi.GetAiSecretParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(s openapi.AISecret) string { return s.Id.String() })
 }
 
+// ListProjectAutomations lists every visible project automation; the list
+// endpoint does not declare a project_id filter.
 func (c *Client) ListProjectAutomations(ctx context.Context) ([]ProjectAutomation, error) {
-	// The public list endpoint does not declare a project_id filter.
-	raw, err := c.ListAll(ctx, "/v1/project_automation", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[ProjectAutomation](raw)
+	return client.ListAll("/v1/project_automation", func(limit int, startingAfter *string) ([]ProjectAutomation, error) {
+		page, err := c.sdk.API.GetProjectAutomationWithResponse(ctx, &openapi.GetProjectAutomationParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(a ProjectAutomation) string { return a.Value.Id.String() })
 }
 
-func (c *Client) ListUsers(ctx context.Context) ([]User, error) {
-	raw, err := c.ListAll(ctx, "/v1/user", url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	return UnmarshalAll[User](raw)
+func (c *Client) ListUsers(ctx context.Context) ([]openapi.User, error) {
+	return client.ListAll("/v1/user", func(limit int, startingAfter *string) ([]openapi.User, error) {
+		page, err := c.sdk.API.GetUserWithResponse(ctx, &openapi.GetUserParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(u openapi.User) string { return u.Id.String() })
 }

@@ -233,7 +233,7 @@ func testAccCheckProjectAutomationDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_project_automation" {
 			continue
 		}
-		_, err := c.GetProjectAutomation(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetProjectAutomationIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust_project_automation %s still exists", rs.Primary.ID)
 		}

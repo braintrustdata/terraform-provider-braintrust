@@ -1,6 +1,9 @@
 package provider
 
 import (
+	"context"
+
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -19,16 +22,47 @@ type aclModel struct {
 	Created            types.String `tfsdk:"created"`
 }
 
-// mapACLToModel maps a client.ACL to the Terraform model.
-func mapACLToModel(acl *client.ACL, model *aclModel) {
-	model.ID = types.StringValue(acl.ID)
-	model.ObjectType = types.StringValue(acl.ObjectType)
-	model.ObjectID = types.StringValue(acl.ObjectID)
-	model.UserID = stringPtrToTFValue(acl.UserID)
-	model.GroupID = stringPtrToTFValue(acl.GroupID)
-	model.Permission = stringPtrToTFValue(acl.Permission)
-	model.RestrictObjectType = stringPtrToTFValue(acl.RestrictObjectType)
-	model.RoleID = stringPtrToTFValue(acl.RoleID)
-	model.ObjectOrgID = types.StringValue(acl.ObjectOrgID)
-	model.Created = stringPtrToTFValue(acl.Created)
+// mapACLToModel maps an SDK ACL to the Terraform model.
+func mapACLToModel(acl *openapi.Acl, model *aclModel) {
+	model.ID = types.StringValue(acl.Id.String())
+	model.ObjectType = types.StringValue(string(acl.ObjectType))
+	model.ObjectID = types.StringValue(acl.ObjectId.String())
+	model.UserID = nullableUUIDToTF(acl.UserId)
+	model.GroupID = nullableUUIDToTF(acl.GroupId)
+	model.Permission = enumToTF(acl.Permission)
+	model.RestrictObjectType = enumToTF(acl.RestrictObjectType)
+	model.RoleID = nullableUUIDToTF(acl.RoleId)
+	model.ObjectOrgID = types.StringValue(acl.UnderscoreObjectOrgId.String())
+	model.Created = nullableTimeToTF(acl.Created, model.Created)
+}
+
+func getACL(ctx context.Context, c *client.Client, id string) (*openapi.Acl, error) {
+	resp, err := c.API.GetAclIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.JSON(resp.JSON200)
+}
+
+// aclItemFromModel builds the SDK request for an ACL, validating its IDs.
+func aclItemFromModel(plan aclModel) (openapi.AclItem, error) {
+	item := openapi.AclItem{
+		ObjectType:         openapi.AclObjectType(plan.ObjectType.ValueString()),
+		Permission:         tfStringToEnum[openapi.Permission](plan.Permission),
+		RestrictObjectType: tfStringToEnum[openapi.AclObjectType](plan.RestrictObjectType),
+	}
+	var err error
+	if item.ObjectId, err = parseUUID(plan.ObjectID, "object_id"); err != nil {
+		return item, err
+	}
+	if item.UserId, err = tfStringToNullableUUID(plan.UserID, "user_id"); err != nil {
+		return item, err
+	}
+	if item.GroupId, err = tfStringToNullableUUID(plan.GroupID, "group_id"); err != nil {
+		return item, err
+	}
+	if item.RoleId, err = tfStringToNullableUUID(plan.RoleID, "role_id"); err != nil {
+		return item, err
+	}
+	return item, nil
 }

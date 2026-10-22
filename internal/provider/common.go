@@ -128,11 +128,11 @@ func diffStringSlices(current, desired []string) (add, remove []string) {
 	return add, remove
 }
 
-// memberPermissionKey returns a unique string key for a MemberPermission.
-func memberPermissionKey(mp client.MemberPermission) string {
-	key := mp.Permission
+// memberPermissionKey returns a unique string key for a member permission.
+func memberPermissionKey(mp memberPermission) string {
+	key := string(mp.Permission)
 	if mp.RestrictObjectType != nil {
-		key += ":" + *mp.RestrictObjectType
+		key += ":" + string(*mp.RestrictObjectType)
 	}
 	return key
 }
@@ -197,7 +197,7 @@ func stringSetFromModel(set types.Set) []string {
 }
 
 // diffMemberPermissions computes the permissions to add and remove.
-func diffMemberPermissions(current, desired []client.MemberPermission) (add, remove []client.MemberPermission) {
+func diffMemberPermissions(current, desired []memberPermission) (add, remove []memberPermission) {
 	currentSet := make(map[string]bool, len(current))
 	for _, mp := range current {
 		currentSet[memberPermissionKey(mp)] = true

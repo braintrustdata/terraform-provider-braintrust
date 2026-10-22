@@ -1,10 +1,12 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -26,21 +28,59 @@ type functionModel struct {
 	MetadataJSON       types.String `tfsdk:"metadata_json"`
 }
 
-func mapFunctionToModel(function *client.Function, model *functionModel) {
-	model.ID = types.StringValue(function.ID)
-	model.XactID = types.StringValue(function.XactID)
-	model.ProjectID = types.StringValue(function.ProjectID)
-	model.OrgID = types.StringValue(function.OrgID)
-	model.Name = types.StringValue(function.Name)
-	model.Slug = types.StringValue(function.Slug)
-	model.Description = stringPtrToTFValue(function.Description)
-	model.Created = stringPtrToTFValue(function.Created)
-	model.Tags = stringSliceToTFList(function.Tags)
-	model.FunctionType = stringPtrToTFValue(function.FunctionType)
-	model.FunctionDataJSON = functionJSONState(function.FunctionData, model.FunctionDataJSON)
-	model.PromptDataJSON = optionalFunctionJSONState(function.PromptData, model.PromptDataJSON)
-	model.FunctionSchemaJSON = optionalFunctionJSONState(function.FunctionSchema, model.FunctionSchemaJSON)
-	model.MetadataJSON = optionalFunctionJSONState(function.Metadata, model.MetadataJSON)
+// function keeps the JSON-encoded attributes as raw JSON, which Terraform
+// passes through verbatim instead of round-tripping them through SDK models.
+type function = client.Raw[openapi.Function]
+
+func mapFunctionToModel(raw *function, model *functionModel) {
+	fn := raw.Value
+	model.ID = types.StringValue(fn.Id.String())
+	model.XactID = types.StringValue(fn.UnderscoreXactId)
+	model.ProjectID = types.StringValue(fn.ProjectId.String())
+	model.OrgID = types.StringValue(fn.OrgId.String())
+	model.Name = types.StringValue(fn.Name)
+	model.Slug = types.StringValue(fn.Slug)
+	model.Description = nullableStringToTF(fn.Description)
+	model.Created = nullableTimeToTF(fn.Created, model.Created)
+	model.Tags = stringSliceToTFList(nullableSliceValue(fn.Tags))
+	model.FunctionType = types.StringNull()
+	if nullableIsSet(fn.FunctionType) {
+		model.FunctionType = types.StringValue(string(fn.FunctionType.MustGet()))
+	}
+	model.FunctionDataJSON = functionJSONState(raw.Fields["function_data"], model.FunctionDataJSON)
+	model.PromptDataJSON = optionalFunctionJSONState(raw.Fields["prompt_data"], model.PromptDataJSON)
+	model.FunctionSchemaJSON = optionalFunctionJSONState(raw.Fields["function_schema"], model.FunctionSchemaJSON)
+	model.MetadataJSON = optionalFunctionJSONState(raw.Fields["metadata"], model.MetadataJSON)
+}
+
+func getFunction(ctx context.Context, c *client.Client, id string) (*function, error) {
+	resp, err := c.API.GetFunctionIdWithResponse(ctx, id, nil)
+	if err != nil {
+		return nil, err
+	}
+	return client.DecodeRaw(resp.JSON200, resp.Body)
+}
+
+// listFunctions lists a project's functions by name.
+func listFunctions(ctx context.Context, c *client.Client, name, projectID string) ([]openapi.Function, error) {
+	return client.ListAll("/v1/function", func(limit int, startingAfter *string) ([]openapi.Function, error) {
+		params := &openapi.GetFunctionParams{Limit: &limit, StartingAfter: startingAfter}
+		if name != "" {
+			params.FunctionName = &name
+		}
+		if projectID != "" {
+			params.ProjectId = &projectID
+		}
+		page, err := c.API.GetFunctionWithResponse(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(fn openapi.Function) string { return fn.Id.String() })
 }
 
 func optionalFunctionJSONState(raw json.RawMessage, existing types.String) types.String {
@@ -50,15 +90,15 @@ func optionalFunctionJSONState(raw json.RawMessage, existing types.String) types
 	return jsonState(raw, existing)
 }
 
-func functionJSONObject(value types.String, field string) (any, error) {
+func functionJSONObject(value types.String, field string) (json.RawMessage, error) {
 	if value.IsNull() || value.IsUnknown() {
 		return nil, nil
 	}
-	var object map[string]any
+	var object map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(value.ValueString()), &object); err != nil || object == nil {
 		return nil, fmt.Errorf("%s must be a JSON object", field)
 	}
-	return object, nil
+	return json.RawMessage(value.ValueString()), nil
 }
 
 // The API may add generated metadata such as a code hash to function_data.

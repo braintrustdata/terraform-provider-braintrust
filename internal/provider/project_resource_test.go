@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -137,18 +138,16 @@ func seedProjectBlindReviews() resource.TestCheckFunc {
 		if err != nil {
 			return err
 		}
-		project, err := c.GetProject(context.Background(), id)
+		_, current, err := getProject(context.Background(), c, id)
 		if err != nil {
 			return err
 		}
 		settings := map[string]json.RawMessage{}
-		if project.Settings != nil {
-			for k, v := range project.Settings.Raw {
-				settings[k] = v
-			}
+		for k, v := range current {
+			settings[k] = v
 		}
 		settings["blind_reviews"] = json.RawMessage("true")
-		_, err = c.UpdateProject(context.Background(), id, client.UpdateProjectRequest{Settings: settings})
+		_, err = updateProject(context.Background(), c, id, openapi.PatchProject{}, settings)
 		return err
 	}
 }
@@ -159,11 +158,11 @@ func checkProjectBlindReviews() resource.TestCheckFunc {
 		if err != nil {
 			return err
 		}
-		project, err := c.GetProject(context.Background(), id)
+		_, settings, err := getProject(context.Background(), c, id)
 		if err != nil {
 			return err
 		}
-		if project.Settings == nil || string(project.Settings.Raw["blind_reviews"]) != "true" {
+		if string(settings["blind_reviews"]) != "true" {
 			return fmt.Errorf("project %s lost unmanaged blind_reviews setting", id)
 		}
 		return nil
@@ -185,7 +184,7 @@ func testAccCheckProjectDestroy(s *terraform.State) error {
 			continue
 		}
 
-		_, err := c.GetProject(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetProjectIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust project %s still exists after destroy", rs.Primary.ID)
 		}

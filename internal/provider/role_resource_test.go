@@ -96,7 +96,7 @@ func testAccCheckRoleDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_role" {
 			continue
 		}
-		_, err := c.GetRole(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetRoleIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust role %s still exists after destroy", rs.Primary.ID)
 		}

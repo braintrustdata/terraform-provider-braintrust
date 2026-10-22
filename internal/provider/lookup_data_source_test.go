@@ -18,24 +18,26 @@ func TestDataSourceLookupRejectsAmbiguityAndSupportsScope(t *testing.T) {
 			if r.URL.Query().Get("role_name") != "Viewer" {
 				t.Errorf("unexpected role query: %s", r.URL.String())
 			}
-			_, _ = w.Write([]byte(`{"objects":[{"id":"system-role","name":"Viewer","org_id":null},{"id":"custom-role","name":"Viewer","org_id":"org-a"}]}`))
-		case "/v1/role/system-role":
-			_, _ = w.Write([]byte(`{"id":"system-role","name":"Viewer","org_id":null}`))
+			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000c1","name":"Viewer","org_id":null},{"id":"00000000-0000-0000-0000-0000000000c2","name":"Viewer","org_id":"00000000-0000-0000-0000-0000000000aa"}]}`))
+		case "/v1/role/00000000-0000-0000-0000-0000000000c1":
+			_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-0000000000c1","name":"Viewer","org_id":null}`))
 		case "/v1/project":
 			if r.URL.Query().Get("project_name") != "Shared" {
 				t.Errorf("unexpected project query: %s", r.URL.String())
 			}
-			_, _ = w.Write([]byte(`{"objects":[{"id":"project-a","name":"Shared","org_id":"org-a"},{"id":"project-b","name":"Shared","org_id":"org-b"}]}`))
+			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-00000000000a","name":"Shared","org_id":"00000000-0000-0000-0000-0000000000aa"},{"id":"00000000-0000-0000-0000-00000000000b","name":"Shared","org_id":"00000000-0000-0000-0000-0000000000bb"}]}`))
 		case "/v1/dataset":
-			if r.URL.Query().Get("dataset_name") != "Shared" || r.URL.Query().Get("project_id") != "project-a" {
+			if r.URL.Query().Get("dataset_name") != "Shared" || r.URL.Query().Get("project_id") != "00000000-0000-0000-0000-0000000000d0" {
 				t.Errorf("unexpected dataset query: %s", r.URL.String())
 			}
-			_, _ = w.Write([]byte(`{"objects":[{"id":"deleted-dataset","name":"Shared","project_id":"project-a","deleted_at":"2026-01-01"},{"id":"dataset-a","name":"Shared","project_id":"project-a"}]}`))
+			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000d1","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared","deleted_at":"2026-01-01T00:00:00.000Z"},{"id":"00000000-0000-0000-0000-0000000000d2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared"}]}`))
+		case "/v1/dataset/00000000-0000-0000-0000-0000000000d2":
+			_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-0000000000d2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared","metadata":{"owner":"team"}}`))
 		case "/v1/function":
-			if r.URL.Query().Get("function_name") != "Shared" || r.URL.Query().Get("project_id") != "project-a" {
+			if r.URL.Query().Get("function_name") != "Shared" || r.URL.Query().Get("project_id") != "00000000-0000-0000-0000-0000000000d0" {
 				t.Errorf("unexpected function query: %s", r.URL.String())
 			}
-			_, _ = w.Write([]byte(`{"objects":[{"id":"function-a","name":"Shared","project_id":"project-a"},{"id":"function-b","name":"Shared","project_id":"project-a"}]}`))
+			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000e1","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0"},{"id":"00000000-0000-0000-0000-0000000000e2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0"}]}`))
 		default:
 			t.Errorf("unexpected request: %s", r.URL.String())
 			w.WriteHeader(http.StatusNotFound)
@@ -51,12 +53,15 @@ func TestDataSourceLookupRejectsAmbiguityAndSupportsScope(t *testing.T) {
 		check     resource.TestCheckFunc
 	}{
 		{"ambiguous role", `data "braintrust_role" "test" { name = "Viewer" }`, "Ambiguous Role", nil},
-		{"scoped role", "data \"braintrust_role\" \"test\" {\n  name = \"Viewer\"\n  org_id = \"org-a\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_role.test", "id", "custom-role")},
-		{"system role by ID", `data "braintrust_role" "test" { id = "system-role" }`, "", resource.TestCheckResourceAttr("data.braintrust_role.test", "name", "Viewer")},
+		{"scoped role", "data \"braintrust_role\" \"test\" {\n  name = \"Viewer\"\n  org_id = \"00000000-0000-0000-0000-0000000000aa\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_role.test", "id", "00000000-0000-0000-0000-0000000000c2")},
+		{"system role by ID", `data "braintrust_role" "test" { id = "00000000-0000-0000-0000-0000000000c1" }`, "", resource.TestCheckResourceAttr("data.braintrust_role.test", "name", "Viewer")},
 		{"ambiguous project", `data "braintrust_project" "test" { name = "Shared" }`, "Ambiguous Project", nil},
-		{"scoped project", "data \"braintrust_project\" \"test\" {\n  name = \"Shared\"\n  org_id = \"org-a\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_project.test", "id", "project-a")},
-		{"active dataset", "data \"braintrust_dataset\" \"test\" {\n  name = \"Shared\"\n  project_id = \"project-a\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_dataset.test", "id", "dataset-a")},
-		{"ambiguous function", "data \"braintrust_function\" \"test\" {\n  name = \"Shared\"\n  project_id = \"project-a\"\n}", "Ambiguous Function", nil},
+		{"scoped project", "data \"braintrust_project\" \"test\" {\n  name = \"Shared\"\n  org_id = \"00000000-0000-0000-0000-0000000000aa\"\n}", "", resource.TestCheckResourceAttr("data.braintrust_project.test", "id", "00000000-0000-0000-0000-00000000000a")},
+		{"active dataset", "data \"braintrust_dataset\" \"test\" {\n  name = \"Shared\"\n  project_id = \"00000000-0000-0000-0000-0000000000d0\"\n}", "", resource.ComposeAggregateTestCheckFunc(
+			resource.TestCheckResourceAttr("data.braintrust_dataset.test", "id", "00000000-0000-0000-0000-0000000000d2"),
+			resource.TestCheckResourceAttr("data.braintrust_dataset.test", "metadata_json", `{"owner":"team"}`),
+		)},
+		{"ambiguous function", "data \"braintrust_function\" \"test\" {\n  name = \"Shared\"\n  project_id = \"00000000-0000-0000-0000-0000000000d0\"\n}", "Ambiguous Function", nil},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

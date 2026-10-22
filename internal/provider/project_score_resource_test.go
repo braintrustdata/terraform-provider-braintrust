@@ -177,7 +177,7 @@ func testAccCheckProjectScoreDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_project_score" {
 			continue
 		}
-		_, err := c.GetProjectScore(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetProjectScoreIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust project score %s still exists after destroy", rs.Primary.ID)
 		}

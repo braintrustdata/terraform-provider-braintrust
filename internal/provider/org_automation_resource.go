@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -74,24 +76,56 @@ func (r *orgAutomationResource) Configure(_ context.Context, req resource.Config
 	r.client = clientFromProviderData(req.ProviderData, &resp.Diagnostics)
 }
 
-func orgRetentionFromModel(model *orgAutomationModel) client.OrgRetentionConfig {
-	return client.OrgRetentionConfig{
-		EventType: "retention", ObjectType: model.RetentionConfig.ObjectType.ValueString(),
-		RetentionDays: model.RetentionConfig.RetentionDays.ValueInt64(),
+// These match the SDK's inline retention config structs, so values can be
+// assigned to the request fields directly.
+type (
+	orgRetentionCreateConfig = struct {
+		EventType     openapi.CreateOrgAutomationConfigEventType `json:"event_type"`
+		ObjectType    openapi.RetentionObjectType                `json:"object_type"`
+		RetentionDays int                                        `json:"retention_days"`
+	}
+	orgRetentionPatchConfig = struct {
+		EventType     openapi.PatchOrgAutomationConfigEventType `json:"event_type"`
+		ObjectType    openapi.RetentionObjectType               `json:"object_type"`
+		RetentionDays int                                       `json:"retention_days"`
+	}
+)
+
+func orgRetentionCreateFromModel(model *orgAutomationModel) orgRetentionCreateConfig {
+	return orgRetentionCreateConfig{
+		EventType:     openapi.CreateOrgAutomationConfigEventTypeRetention,
+		ObjectType:    openapi.RetentionObjectType(model.RetentionConfig.ObjectType.ValueString()),
+		RetentionDays: int(model.RetentionConfig.RetentionDays.ValueInt64()),
 	}
 }
 
-func mapOrgAutomationToModel(automation *client.OrgAutomation, model *orgAutomationModel) {
-	model.ID = types.StringValue(automation.ID)
-	model.OrgID = types.StringValue(automation.OrgID)
-	model.Name = types.StringValue(automation.Name)
-	model.Description = stringPtrToTFValue(automation.Description)
-	model.UserID = stringPtrToTFValue(automation.UserID)
-	model.Created = stringPtrToTFValue(automation.Created)
-	model.RetentionConfig = &retentionConfigModel{
-		ObjectType:    types.StringValue(automation.Config.ObjectType),
-		RetentionDays: types.Int64Value(automation.Config.RetentionDays),
+func orgRetentionPatchFromModel(model *orgAutomationModel) orgRetentionPatchConfig {
+	return orgRetentionPatchConfig{
+		EventType:     openapi.PatchOrgAutomationConfigEventTypeRetention,
+		ObjectType:    openapi.RetentionObjectType(model.RetentionConfig.ObjectType.ValueString()),
+		RetentionDays: int(model.RetentionConfig.RetentionDays.ValueInt64()),
 	}
+}
+
+func mapOrgAutomationToModel(automation *openapi.OrgAutomation, model *orgAutomationModel) {
+	model.ID = types.StringValue(automation.Id.String())
+	model.OrgID = types.StringValue(automation.OrgId.String())
+	model.Name = types.StringValue(automation.Name)
+	model.Description = nullableStringToTF(automation.Description)
+	model.UserID = nullableUUIDToTF(automation.UserId)
+	model.Created = nullableTimeToTF(automation.Created, model.Created)
+	model.RetentionConfig = &retentionConfigModel{
+		ObjectType:    types.StringValue(string(automation.Config.ObjectType)),
+		RetentionDays: types.Int64Value(int64(automation.Config.RetentionDays)),
+	}
+}
+
+func getOrgAutomation(ctx context.Context, c *client.Client, id string) (*openapi.OrgAutomation, error) {
+	resp, err := c.API.GetOrgAutomationIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.JSON(resp.JSON200)
 }
 
 func (r *orgAutomationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -100,20 +134,29 @@ func (r *orgAutomationResource) Create(ctx context.Context, req resource.CreateR
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	created, err := r.client.CreateOrgAutomation(ctx, client.CreateOrgAutomationRequest{
-		OrgID: plan.OrgID.ValueString(), Name: plan.Name.ValueString(),
-		Description: tfStringToPtr(plan.Description), Config: orgRetentionFromModel(&plan),
-	})
+	orgID, err := parseUUID(plan.OrgID, "org_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("org_id"), "Invalid Organization ID", err.Error())
+		return
+	}
+	createResp, err := client.Write(r.client.API.PostOrgAutomationWithResponse(ctx, openapi.CreateOrgAutomation{
+		OrgId: orgID, Name: plan.Name.ValueString(),
+		Description: tfStringToNullable(plan.Description), Config: orgRetentionCreateFromModel(&plan),
+	}))
+	var created *openapi.OrgAutomation
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "organization automation")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Braintrust Organization Automation", err.Error())
 		return
 	}
 	// Preserve the ID if a follow-up read fails so Terraform can manage cleanup.
-	automation, err := r.client.GetOrgAutomation(ctx, created.ID)
+	automation, err := getOrgAutomation(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapOrgAutomationToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-		resp.Diagnostics.AddError("Error Reading Organization Automation After Create", "Created ID "+created.ID+": "+err.Error())
+		resp.Diagnostics.AddError("Error Reading Organization Automation After Create", "Created ID "+created.Id.String()+": "+err.Error())
 		return
 	}
 	mapOrgAutomationToModel(automation, &plan)
@@ -126,7 +169,7 @@ func (r *orgAutomationResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	automation, err := r.client.GetOrgAutomation(ctx, state.ID.ValueString())
+	automation, err := getOrgAutomation(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -146,9 +189,19 @@ func (r *orgAutomationResource) Update(ctx context.Context, req resource.UpdateR
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	automation, err := r.client.UpdateOrgAutomation(ctx, state.ID.ValueString(), client.UpdateOrgAutomationRequest{
-		Name: plan.Name.ValueString(), Description: tfStringToPtr(plan.Description), Config: orgRetentionFromModel(&plan),
-	})
+	// Description is always sent; null clears it.
+	description := nullable.NewNullNullable[string]()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		description = nullable.NewNullableWithValue(plan.Description.ValueString())
+	}
+	updateResp, err := client.Write(r.client.API.PatchOrgAutomationIdWithResponse(ctx, state.ID.ValueString(), openapi.PatchOrgAutomation{
+		Name: nullable.NewNullableWithValue(plan.Name.ValueString()), Description: description,
+		Config: nullable.NewNullableWithValue(orgRetentionPatchFromModel(&plan)),
+	}))
+	var automation *openapi.OrgAutomation
+	if err == nil {
+		automation, err = client.JSON(updateResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust Organization Automation", err.Error())
 		return
@@ -163,7 +216,7 @@ func (r *orgAutomationResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	if err := r.client.DeleteOrgAutomation(ctx, state.ID.ValueString()); err != nil && !client.IsNotFoundError(err) {
+	if _, err := client.Write(r.client.API.DeleteOrgAutomationIdWithResponse(ctx, state.ID.ValueString())); err != nil && !client.IsNotFoundError(err) {
 		resp.Diagnostics.AddError("Error Deleting Braintrust Organization Automation", err.Error())
 	}
 }

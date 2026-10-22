@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -96,7 +98,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	var users []client.User
+	var users []openapi.User
 	var err error
 	var lookupKey string
 
@@ -104,12 +106,23 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		email := config.Email.ValueString()
 		lookupKey = email
 		tflog.Debug(ctx, "Looking up user by email", map[string]any{"email": email})
-		users, err = d.client.ListUsersByEmail(ctx, email)
+		var filter openapi.UserEmail
+		if err = filter.FromUserEmail0(email); err == nil {
+			users, err = listUsers(ctx, d.client, openapi.GetUserParams{Email: &filter})
+		}
 	} else if !config.ID.IsNull() && !config.ID.IsUnknown() {
 		id := config.ID.ValueString()
 		lookupKey = id
 		tflog.Debug(ctx, "Looking up user by ID", map[string]any{"id": id})
-		users, err = d.client.ListUsersByIDs(ctx, []string{id})
+		var userID uuid.UUID
+		if userID, err = parseUUID(config.ID, "id"); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("id"), "Invalid User ID", err.Error())
+			return
+		}
+		var filter openapi.Ids
+		if err = filter.FromIds0(userID); err == nil {
+			users, err = listUsers(ctx, d.client, openapi.GetUserParams{Ids: &filter})
+		}
 	} else {
 		resp.Diagnostics.AddError(
 			"Missing Lookup Key",
@@ -126,12 +139,12 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	var matches []client.User
+	var matches []openapi.User
 	for _, candidate := range users {
-		if !config.Email.IsNull() && !config.Email.IsUnknown() && (candidate.Email == nil || *candidate.Email != config.Email.ValueString()) {
+		if !config.Email.IsNull() && !config.Email.IsUnknown() && (!nullableIsSet(candidate.Email) || candidate.Email.MustGet() != config.Email.ValueString()) {
 			continue
 		}
-		if !config.ID.IsNull() && !config.ID.IsUnknown() && candidate.ID != config.ID.ValueString() {
+		if !config.ID.IsNull() && !config.ID.IsUnknown() && candidate.Id.String() != config.ID.ValueString() {
 			continue
 		}
 		matches = append(matches, candidate)
@@ -150,12 +163,28 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	user := &matches[0]
 	var state userDataSourceModel
-	state.ID = types.StringValue(user.ID)
-	state.Email = stringPtrToTFValue(user.Email)
-	state.GivenName = stringPtrToTFValue(user.GivenName)
-	state.FamilyName = stringPtrToTFValue(user.FamilyName)
-	state.AvatarURL = stringPtrToTFValue(user.AvatarURL)
-	state.Created = stringPtrToTFValue(user.Created)
+	state.ID = types.StringValue(user.Id.String())
+	state.Email = nullableStringToTF(user.Email)
+	state.GivenName = nullableStringToTF(user.GivenName)
+	state.FamilyName = nullableStringToTF(user.FamilyName)
+	state.AvatarURL = nullableStringToTF(user.AvatarUrl)
+	state.Created = nullableTimeToTF(user.Created, types.StringNull())
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// listUsers lists users matching the filters in params, across all pages.
+func listUsers(ctx context.Context, c *client.Client, params openapi.GetUserParams) ([]openapi.User, error) {
+	return client.ListAll("/v1/user", func(limit int, startingAfter *string) ([]openapi.User, error) {
+		params.Limit, params.StartingAfter = &limit, startingAfter
+		page, err := c.API.GetUserWithResponse(ctx, &params)
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, func(user openapi.User) string { return user.Id.String() })
 }

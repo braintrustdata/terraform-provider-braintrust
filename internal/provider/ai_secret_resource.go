@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -91,18 +93,22 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 
 	// Use PUT (replace) so that if an AI secret with this name already exists,
 	// we update it rather than silently returning the old one.
-	createReq := client.CreateAISecretRequest{
+	createReq := openapi.CreateAISecret{
 		Name:   plan.Name.ValueString(),
-		Secret: tfStringToPtr(plan.Secret),
-		Type:   tfStringToPtr(plan.Type),
+		Secret: tfStringToNullable(plan.Secret),
+		Type:   tfStringToNullable(plan.Type),
 	}
 
 	tflog.Debug(ctx, "Creating AI secret", map[string]any{
 		"name": createReq.Name,
-		"type": createReq.Type,
+		"type": plan.Type.ValueString(),
 	})
 
-	created, err := r.client.ReplaceAISecret(ctx, createReq)
+	replaceResp, err := client.Write(r.client.API.PutAiSecretWithResponse(ctx, createReq))
+	var created *openapi.AISecret
+	if err == nil {
+		created, err = client.JSON(replaceResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust AI Secret",
@@ -112,13 +118,13 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	// Re-read to get the full state.
-	secret, err := r.client.GetAISecret(ctx, created.ID)
+	secret, err := getAISecret(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapAISecretToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust AI Secret After Create",
-			"AI secret was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"AI secret was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -137,7 +143,7 @@ func (r *aiSecretResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	secret, err := r.client.GetAISecret(ctx, state.ID.ValueString())
+	secret, err := getAISecret(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "AI secret not found, removing from state", map[string]any{
@@ -173,31 +179,23 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	updateReq := client.UpdateAISecretRequest{}
-
-	// Always send name (it may have changed).
-	name := plan.Name.ValueString()
-	updateReq.Name = &name
-
-	// Handle secret: send if set, but the API doesn't support clearing secrets
-	// (no "set to empty" semantic), so we only send if non-null.
-	if !plan.Secret.IsNull() && !plan.Secret.IsUnknown() {
-		s := plan.Secret.ValueString()
-		updateReq.Secret = &s
-	}
-
-	// Handle type: send if set, clear if removed.
-	if !plan.Type.IsNull() && !plan.Type.IsUnknown() {
-		t := plan.Type.ValueString()
-		updateReq.Type = &t
-	} else if plan.Type.IsNull() && !state.Type.IsNull() {
-		empty := ""
-		updateReq.Type = &empty
+	updateReq := openapi.PatchAISecret{
+		// Always send name (it may have changed).
+		Name: nullable.NewNullableWithValue(plan.Name.ValueString()),
+		// The API doesn't support clearing secrets (no "set to empty"
+		// semantic), so the secret is only sent if set.
+		Secret: tfStringToNullable(plan.Secret),
+		// Type is sent if set and cleared if removed.
+		Type: patchString(plan.Type, state.Type),
 	}
 
 	tflog.Debug(ctx, "Updating AI secret", map[string]any{"id": state.ID.ValueString()})
 
-	secret, err := r.client.UpdateAISecret(ctx, state.ID.ValueString(), updateReq)
+	updateResp, err := client.Write(r.client.API.PatchAiSecretIdWithResponse(ctx, state.ID.ValueString(), updateReq))
+	var secret *openapi.AISecret
+	if err == nil {
+		secret, err = client.JSON(updateResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust AI Secret",
@@ -220,7 +218,7 @@ func (r *aiSecretResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	err := r.client.DeleteAISecret(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteAiSecretIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

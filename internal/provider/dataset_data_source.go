@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -91,7 +92,7 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	var dataset *client.Dataset
+	var dataset *dataset
 	var err error
 
 	if !config.Name.IsNull() && !config.Name.IsUnknown() {
@@ -112,7 +113,7 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			"project_id": projectID,
 		})
 
-		datasets, listErr := d.client.ListDatasets(ctx, name, projectID)
+		datasets, listErr := listDatasets(ctx, d.client, name, projectID)
 		if listErr != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Braintrust Dataset",
@@ -120,21 +121,28 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
+		var match *openapi.Dataset
 		for i := range datasets {
 			candidate := &datasets[i]
-			if candidate.Name == name && candidate.ProjectID == projectID && candidate.DeletedAt == nil {
-				if dataset != nil {
+			if candidate.Name == name && candidate.ProjectId.String() == projectID && !nullableIsSet(candidate.DeletedAt) {
+				if match != nil {
 					resp.Diagnostics.AddError("Ambiguous Dataset", "Multiple active datasets have the name "+name+" in project "+projectID+". Look up the dataset by ID.")
 					return
 				}
-				dataset = candidate
+				match = candidate
 			}
 		}
-		if dataset == nil {
+		if match == nil {
 			resp.Diagnostics.AddError(
 				"Dataset Not Found",
 				"No active dataset found with name "+name+" in project "+projectID+".",
 			)
+			return
+		}
+		// Re-read by ID so metadata is kept as raw JSON.
+		dataset, err = getDataset(ctx, d.client, match.Id.String())
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading Braintrust Dataset", "Could not read dataset ID "+match.Id.String()+": "+err.Error())
 			return
 		}
 	} else {
@@ -142,7 +150,7 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		id := config.ID.ValueString()
 		tflog.Debug(ctx, "Reading dataset data source", map[string]any{"id": id})
 
-		dataset, err = d.client.GetDataset(ctx, id)
+		dataset, err = getDataset(ctx, d.client, id)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error Reading Braintrust Dataset",
@@ -150,7 +158,7 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
-		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && dataset.ProjectID != config.ProjectID.ValueString() {
+		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && dataset.Value.ProjectId.String() != config.ProjectID.ValueString() {
 			resp.Diagnostics.AddError("Dataset Project Mismatch", "Dataset ID "+id+" does not belong to project_id "+config.ProjectID.ValueString()+".")
 			return
 		}

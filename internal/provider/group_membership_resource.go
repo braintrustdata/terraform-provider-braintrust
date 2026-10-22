@@ -6,7 +6,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -59,12 +61,17 @@ func (r *groupMembershipResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 	groupID, userID := plan.GroupID.ValueString(), plan.UserID.ValueString()
-	group, err := r.client.GetGroup(ctx, groupID)
+	userUUID, err := parseUUID(plan.UserID, "user_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("user_id"), "Invalid User ID", err.Error())
+		return
+	}
+	group, err := getGroup(ctx, r.client, groupID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Group", err.Error())
 		return
 	}
-	if slices.Contains(group.MemberUsers, userID) {
+	if slices.Contains(groupMemberUsers(group), userID) {
 		resp.Diagnostics.AddError("Group Membership Already Exists", "Import the existing membership instead of creating it again.")
 		return
 	}
@@ -73,12 +80,12 @@ func (r *groupMembershipResource) Create(ctx context.Context, req resource.Creat
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	group, err = r.client.UpdateGroup(ctx, groupID, &client.UpdateGroupRequest{AddMemberUsers: []string{userID}})
+	group, err = patchGroup(ctx, r.client, groupID, openapi.PatchGroup{AddMemberUsers: nullableSlice([]uuid.UUID{userUUID})})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Adding Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(group.MemberUsers, userID) {
+	if !slices.Contains(groupMemberUsers(group), userID) {
 		resp.Diagnostics.AddError("Group Membership Missing After Add", fmt.Sprintf("User %s was not returned as a member of group %s", userID, groupID))
 	}
 }
@@ -89,7 +96,7 @@ func (r *groupMembershipResource) Read(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	group, err := r.client.GetGroup(ctx, state.GroupID.ValueString())
+	group, err := getGroup(ctx, r.client, state.GroupID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -98,7 +105,7 @@ func (r *groupMembershipResource) Read(ctx context.Context, req resource.ReadReq
 		resp.Diagnostics.AddError("Error Reading Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(group.MemberUsers, state.UserID.ValueString()) {
+	if !slices.Contains(groupMemberUsers(group), state.UserID.ValueString()) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -117,7 +124,7 @@ func (r *groupMembershipResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 	groupID, userID := state.GroupID.ValueString(), state.UserID.ValueString()
-	group, err := r.client.GetGroup(ctx, groupID)
+	group, err := getGroup(ctx, r.client, groupID)
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return
@@ -125,10 +132,15 @@ func (r *groupMembershipResource) Delete(ctx context.Context, req resource.Delet
 		resp.Diagnostics.AddError("Error Reading Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(group.MemberUsers, userID) {
+	if !slices.Contains(groupMemberUsers(group), userID) {
 		return
 	}
-	_, err = r.client.UpdateGroup(ctx, groupID, &client.UpdateGroupRequest{RemoveMemberUsers: []string{userID}})
+	userUUID, err := parseUUID(state.UserID, "user_id")
+	if err != nil {
+		resp.Diagnostics.AddError("Error Removing Group Membership", err.Error())
+		return
+	}
+	_, err = patchGroup(ctx, r.client, groupID, openapi.PatchGroup{RemoveMemberUsers: nullableSlice([]uuid.UUID{userUUID})})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Removing Group Membership", err.Error())
 	}

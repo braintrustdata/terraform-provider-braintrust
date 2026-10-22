@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -33,33 +34,53 @@ type memberPermissionModel struct {
 	RestrictObjectType types.String `tfsdk:"restrict_object_type"`
 }
 
-// mapRoleToModel maps a client.Role to the shared Terraform model.
-func mapRoleToModel(role *client.Role, model *roleModel) {
-	model.ID = types.StringValue(role.ID)
-	model.OrgID = stringPtrToTFValue(role.OrgID)
+// memberPermission matches the SDK's inline member permission struct, so
+// slices of it can be assigned to SDK role fields directly.
+type memberPermission = struct {
+	Permission         openapi.Permission     `json:"permission"`
+	RestrictObjectType *openapi.AclObjectType `json:"restrict_object_type,omitempty"`
+}
+
+// mapRoleToModel maps an SDK role to the shared Terraform model.
+func mapRoleToModel(role *openapi.Role, model *roleModel) {
+	model.ID = types.StringValue(role.Id.String())
+	model.OrgID = nullableUUIDToTF(role.OrgId)
 	model.Name = types.StringValue(role.Name)
-	model.Description = stringPtrToTFValue(role.Description)
-	model.Created = stringPtrToTFValue(role.Created)
-	model.DeletedAt = stringPtrToTFValue(role.DeletedAt)
-	model.UserID = stringPtrToTFValue(role.UserID)
+	model.Description = nullableStringToTF(role.Description)
+	model.Created = nullableTimeToTF(role.Created, model.Created)
+	model.DeletedAt = nullableTimeToTF(role.DeletedAt, model.DeletedAt)
+	model.UserID = nullableUUIDToTF(role.UserId)
 
 	// Map member_permissions. Since this is a Set in the schema, Terraform
 	// handles ordering; no need to sort.
-	perms := make([]attr.Value, 0, len(role.MemberPermissions))
-	for _, mp := range role.MemberPermissions {
+	memberPermissions := nullableSliceValue(role.MemberPermissions)
+	perms := make([]attr.Value, 0, len(memberPermissions))
+	for _, mp := range memberPermissions {
+		restrict := types.StringNull()
+		if mp.RestrictObjectType != nil {
+			restrict = types.StringValue(string(*mp.RestrictObjectType))
+		}
 		perms = append(perms, types.ObjectValueMust(rolePermissionObjectType.AttrTypes, map[string]attr.Value{
-			"permission":           types.StringValue(mp.Permission),
-			"restrict_object_type": stringPtrToTFValue(mp.RestrictObjectType),
+			"permission":           types.StringValue(string(mp.Permission)),
+			"restrict_object_type": restrict,
 		}))
 	}
 	model.MemberPermissions = types.SetValueMust(rolePermissionObjectType, perms)
 
 	// Map member_roles.
-	model.MemberRoles = stringSliceToTFSet(role.MemberRoles)
+	model.MemberRoles = stringSliceToTFSet(uuidStrings(nullableSliceValue(role.MemberRoles)))
 }
 
-// memberPermissionsFromModel converts the TF model to client structs.
-func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]client.MemberPermission, diag.Diagnostics) {
+func getRole(ctx context.Context, c *client.Client, id string) (*openapi.Role, error) {
+	resp, err := c.API.GetRoleIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.JSON(resp.JSON200)
+}
+
+// memberPermissionsFromModel converts the TF model to SDK structs.
+func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]memberPermission, diag.Diagnostics) {
 	if value.IsNull() || value.IsUnknown() {
 		return nil, nil
 	}
@@ -68,11 +89,12 @@ func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]client.
 	if diags.HasError() {
 		return nil, diags
 	}
-	result := make([]client.MemberPermission, len(perms))
+	result := make([]memberPermission, len(perms))
 	for i, p := range perms {
-		result[i] = client.MemberPermission{
-			Permission:         p.Permission.ValueString(),
-			RestrictObjectType: tfStringToPtr(p.RestrictObjectType),
+		result[i] = memberPermission{Permission: openapi.Permission(p.Permission.ValueString())}
+		if restrict := tfStringToPtr(p.RestrictObjectType); restrict != nil {
+			objectType := openapi.AclObjectType(*restrict)
+			result[i].RestrictObjectType = &objectType
 		}
 	}
 	return result, diags

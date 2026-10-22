@@ -1,65 +1,47 @@
 package client
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
-func TestNameLookupsReadLaterPages(t *testing.T) {
-	for _, test := range []struct {
-		name, path, filter string
-		list               func(context.Context, *Client) (int, string, error)
-	}{
-		{"dataset", "/v1/dataset", "dataset_name", func(ctx context.Context, c *Client) (int, string, error) {
-			items, err := c.ListDatasets(ctx, "Shared", "project-a")
-			if err != nil {
-				return 0, "", err
+func TestListAllFollowsCursorAcrossPages(t *testing.T) {
+	var cursors []string
+	items, err := ListAll("/v1/thing", func(limit int, startingAfter *string) ([]string, error) {
+		if limit != listPageSize {
+			t.Errorf("limit = %d, want %d", limit, listPageSize)
+		}
+		cursor := ""
+		if startingAfter != nil {
+			cursor = *startingAfter
+		}
+		cursors = append(cursors, cursor)
+		if cursor == "" {
+			page := make([]string, listPageSize)
+			for i := range page {
+				page[i] = fmt.Sprintf("item-%03d", i)
 			}
-			return len(items), items[len(items)-1].ID, nil
-		}},
-		{"function", "/v1/function", "function_name", func(ctx context.Context, c *Client) (int, string, error) {
-			items, err := c.ListFunctions(ctx, "Shared", "project-a")
-			if err != nil {
-				return 0, "", err
-			}
-			return len(items), items[len(items)-1].ID, nil
-		}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			requests := 0
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requests++
-				q := r.URL.Query()
-				if r.URL.Path != test.path || q.Get(test.filter) != "Shared" || q.Get("project_id") != "project-a" || q.Get("limit") != "100" {
-					t.Errorf("unexpected list request: %s", r.URL.String())
-				}
-				w.Header().Set("Content-Type", "application/json")
-				if q.Get("starting_after") == "" {
-					objects := make([]map[string]string, 100)
-					for i := range objects {
-						objects[i] = map[string]string{"id": fmt.Sprintf("item-%03d", i), "name": "Shared", "project_id": "project-a"}
-					}
-					_ = json.NewEncoder(w).Encode(map[string]any{"objects": objects})
-					return
-				}
-				if q.Get("starting_after") != "item-099" {
-					t.Errorf("wrong cursor: %s", r.URL.String())
-				}
-				_ = json.NewEncoder(w).Encode(map[string]any{"objects": []map[string]string{{"id": "last", "name": "Shared", "project_id": "project-a"}}})
-			}))
-			defer server.Close()
-			c, err := NewClient(server.URL, "fixture", "")
-			if err != nil {
-				t.Fatal(err)
-			}
-			count, last, err := test.list(context.Background(), c)
-			if err != nil || count != 101 || last != "last" || requests != 2 {
-				t.Fatalf("want 101 objects across two pages; count=%d last=%q requests=%d error=%v", count, last, requests, err)
-			}
-		})
+			return page, nil
+		}
+		return []string{"last"}, nil
+	}, func(item string) string { return item })
+	if err != nil || len(items) != listPageSize+1 || items[len(items)-1] != "last" {
+		t.Fatalf("want %d items ending in last; got %d err=%v", listPageSize+1, len(items), err)
+	}
+	if len(cursors) != 2 || cursors[1] != "item-099" {
+		t.Fatalf("unexpected cursors: %q", cursors)
+	}
+}
+
+func TestListAllRejectsStuckCursor(t *testing.T) {
+	_, err := ListAll("/v1/thing", func(limit int, _ *string) ([]string, error) {
+		page := make([]string, limit)
+		for i := range page {
+			page[i] = "same"
+		}
+		return page, nil
+	}, func(item string) string { return item })
+	if err == nil {
+		t.Fatal("want an error when the cursor does not advance")
 	}
 }

@@ -78,7 +78,7 @@ func testAccCheckACLDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_acl" {
 			continue
 		}
-		_, err := c.GetACL(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetAclIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust ACL %s still exists after destroy", rs.Primary.ID)
 		}

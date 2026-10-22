@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -88,23 +90,52 @@ func viewJSONState(remote json.RawMessage, existing types.String) types.String {
 	return jsonState(remote, existing)
 }
 
-func mapViewToModel(view *client.View, model *viewModel) {
-	model.ID = types.StringValue(view.ID)
-	model.ObjectType = types.StringValue(view.ObjectType)
-	model.ObjectID = types.StringValue(view.ObjectID)
-	model.ViewType = types.StringValue(view.ViewType)
-	model.Name = types.StringValue(view.Name)
-	model.Description = stringPtrToTFValue(view.Description)
-	if view.Starred == nil {
+// view keeps view_data and options as raw JSON, which Terraform passes
+// through verbatim instead of round-tripping them through SDK models.
+type view = client.Raw[openapi.View]
+
+func mapViewToModel(raw *view, model *viewModel) {
+	v := raw.Value
+	model.ID = types.StringValue(v.Id.String())
+	model.ObjectType = types.StringValue(string(v.ObjectType))
+	model.ObjectID = types.StringValue(v.ObjectId.String())
+	model.ViewType = types.StringValue(string(v.ViewType.GetOrEmpty()))
+	model.Name = types.StringValue(v.Name)
+	model.Description = nullableStringToTF(v.Description)
+	if v.Starred == nil {
 		model.Starred = types.BoolNull()
 	} else {
-		model.Starred = types.BoolValue(*view.Starred)
+		model.Starred = types.BoolValue(*v.Starred)
 	}
-	model.ViewDataJSON = viewJSONState(view.ViewData, model.ViewDataJSON)
-	model.OptionsJSON = viewJSONState(view.Options, model.OptionsJSON)
-	model.Created = stringPtrToTFValue(view.Created)
-	model.UpdatedAt = stringPtrToTFValue(view.UpdatedAt)
-	model.UserID = stringPtrToTFValue(view.UserID)
+	model.ViewDataJSON = viewJSONState(raw.Fields["view_data"], model.ViewDataJSON)
+	model.OptionsJSON = viewJSONState(raw.Fields["options"], model.OptionsJSON)
+	model.Created = nullableTimeToTF(v.Created, model.Created)
+	model.UpdatedAt = nullableTimeToTF(v.UpdatedAt, model.UpdatedAt)
+	model.UserID = nullableUUIDToTF(v.UserId)
+}
+
+// Views are scoped to an object, so every request names it.
+func getView(ctx context.Context, c *client.Client, id, objectType, objectID string) (*view, error) {
+	resp, err := c.API.GetViewIdWithResponse(ctx, id, &openapi.GetViewIdParams{
+		ObjectType: openapi.AclObjectType(objectType),
+		ObjectId:   objectID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return client.DecodeRaw(resp.JSON200, resp.Body)
+}
+
+func patchView(ctx context.Context, c *client.Client, id string, patch openapi.PatchView, raw map[string]json.RawMessage) (*view, error) {
+	body, err := client.JSONBody(patch, raw)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Write(c.API.PatchViewIdWithBodyWithResponse(ctx, id, client.JSONContentType, body))
+	if err != nil {
+		return nil, err
+	}
+	return client.DecodeRaw(resp.JSON200, resp.Body)
 }
 
 func (r *viewResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -123,29 +154,55 @@ func (r *viewResource) Create(ctx context.Context, req resource.CreateRequest, r
 		resp.Diagnostics.AddError("Invalid View Options", err.Error())
 		return
 	}
-	// POST signals an existing same-name view through x-bt-found-existing.
-	// The client rejects that result rather than silently adopting the view.
-	created, err := r.client.CreateView(ctx, client.CreateViewRequest{ObjectType: plan.ObjectType.ValueString(), ObjectID: plan.ObjectID.ValueString(), ViewType: plan.ViewType.ValueString(), Name: plan.Name.ValueString(), Description: tfStringToPtr(plan.Description), ViewData: viewData, Options: options})
+	objectID, err := parseUUID(plan.ObjectID, "object_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("object_id"), "Invalid Object ID", err.Error())
+		return
+	}
+	body, err := client.JSONBody(openapi.CreateView{
+		ObjectType:  openapi.AclObjectType(plan.ObjectType.ValueString()),
+		ObjectId:    objectID,
+		ViewType:    nullable.NewNullableWithValue(openapi.CreateViewViewType(plan.ViewType.ValueString())),
+		Name:        plan.Name.ValueString(),
+		Description: tfStringToNullable(plan.Description),
+	}, map[string]json.RawMessage{"view_data": viewData, "options": options})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Braintrust View", err.Error())
 		return
 	}
+	// POST signals an existing same-name view through x-bt-found-existing.
+	// Reject that result rather than silently adopting the view.
+	createResp, err := client.Write(r.client.API.PostViewWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *view
+	if err == nil {
+		existing := fmt.Sprintf("view %q in %s %s", plan.Name.ValueString(), plan.ObjectType.ValueString(), plan.ObjectID.ValueString())
+		var createdBody *openapi.View
+		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, existing)
+		if err == nil {
+			created, err = client.DecodeRaw(createdBody, createResp.Body)
+		}
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust View", err.Error())
+		return
+	}
+	createdID := created.Value.Id.String()
 	// Starred is not accepted by POST. Set it after creation when requested.
 	if !plan.Starred.IsNull() && !plan.Starred.IsUnknown() && plan.Starred.ValueBool() {
 		starred := true
-		_, err = r.client.UpdateView(ctx, created.ID, client.UpdateViewRequest{ObjectType: created.ObjectType, ObjectID: created.ObjectID, Starred: &starred})
+		_, err = patchView(ctx, r.client, createdID, openapi.PatchView{ObjectType: created.Value.ObjectType, ObjectId: created.Value.ObjectId, Starred: &starred}, nil)
 		if err != nil {
 			mapViewToModel(created, &plan)
 			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-			resp.Diagnostics.AddError("Error Starring Created View", "View was created (ID: "+created.ID+") but could not be starred: "+err.Error())
+			resp.Diagnostics.AddError("Error Starring Created View", "View was created (ID: "+createdID+") but could not be starred: "+err.Error())
 			return
 		}
 	}
-	view, err := r.client.GetView(ctx, created.ID, created.ObjectType, created.ObjectID)
+	view, err := getView(ctx, r.client, createdID, string(created.Value.ObjectType), created.Value.ObjectId.String())
 	if err != nil {
 		mapViewToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-		resp.Diagnostics.AddError("Error Reading Created View", "View was created (ID: "+created.ID+") but could not be read: "+err.Error())
+		resp.Diagnostics.AddError("Error Reading Created View", "View was created (ID: "+createdID+") but could not be read: "+err.Error())
 		return
 	}
 	mapViewToModel(view, &plan)
@@ -158,7 +215,7 @@ func (r *viewResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	view, err := r.client.GetView(ctx, state.ID.ValueString(), state.ObjectType.ValueString(), state.ObjectID.ValueString())
+	view, err := getView(ctx, r.client, state.ID.ValueString(), state.ObjectType.ValueString(), state.ObjectID.ValueString())
 	if client.IsNotFoundError(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -178,14 +235,18 @@ func (r *viewResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	update := client.UpdateViewRequest{ObjectType: state.ObjectType.ValueString(), ObjectID: state.ObjectID.ValueString()}
+	objectID, err := parseUUID(state.ObjectID, "object_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("object_id"), "Invalid Object ID", err.Error())
+		return
+	}
+	update := openapi.PatchView{ObjectType: openapi.AclObjectType(state.ObjectType.ValueString()), ObjectId: objectID}
+	raw := map[string]json.RawMessage{}
 	if !plan.Name.Equal(state.Name) {
-		name := plan.Name.ValueString()
-		update.Name = &name
+		update.Name = nullable.NewNullableWithValue(plan.Name.ValueString())
 	}
 	if !plan.Description.Equal(state.Description) {
-		description := plan.Description.ValueString()
-		update.Description = &description
+		update.Description = nullable.NewNullableWithValue(plan.Description.ValueString())
 	}
 	if !plan.Starred.Equal(state.Starred) && !plan.Starred.IsNull() {
 		starred := plan.Starred.ValueBool()
@@ -201,7 +262,7 @@ func (r *viewResource) Update(ctx context.Context, req resource.UpdateRequest, r
 			resp.Diagnostics.AddError("Cannot Clear View Data", "Set view_data_json to jsonencode({}) to clear it, or replace the view.")
 			return
 		}
-		update.ViewData = &data
+		raw["view_data"] = data
 	}
 	if !scoreJSONEqual(plan.OptionsJSON, state.OptionsJSON) {
 		options, err := viewJSONInput(plan.OptionsJSON, "options_json")
@@ -213,9 +274,9 @@ func (r *viewResource) Update(ctx context.Context, req resource.UpdateRequest, r
 			resp.Diagnostics.AddError("Cannot Remove View Options", "Braintrust merges options on PATCH. Keep existing keys or replace the view to remove them.")
 			return
 		}
-		update.Options = &options
+		raw["options"] = options
 	}
-	view, err := r.client.UpdateView(ctx, state.ID.ValueString(), update)
+	view, err := patchView(ctx, r.client, state.ID.ValueString(), update, raw)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust View", err.Error())
 		return
@@ -253,7 +314,13 @@ func (r *viewResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	if err := r.client.DeleteView(ctx, state.ID.ValueString(), state.ObjectType.ValueString(), state.ObjectID.ValueString()); err != nil && !client.IsNotFoundError(err) {
+	objectID, err := parseUUID(state.ObjectID, "object_id")
+	if err != nil {
+		resp.Diagnostics.AddError("Error Deleting Braintrust View", err.Error())
+		return
+	}
+	scope := openapi.DeleteView{ObjectType: openapi.AclObjectType(state.ObjectType.ValueString()), ObjectId: objectID}
+	if _, err := client.Write(r.client.API.DeleteViewIdWithResponse(ctx, state.ID.ValueString(), scope)); err != nil && !client.IsNotFoundError(err) {
 		resp.Diagnostics.AddError("Error Deleting Braintrust View", err.Error())
 	}
 }

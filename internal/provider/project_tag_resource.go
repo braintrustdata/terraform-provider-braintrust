@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -79,19 +81,28 @@ func (r *projectTagResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	createReq := client.CreateProjectTagRequest{
-		ProjectID:   plan.ProjectID.ValueString(),
+	projectID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
+	}
+	createReq := openapi.CreateProjectTag{
+		ProjectId:   projectID,
 		Name:        plan.Name.ValueString(),
-		Description: tfStringToPtr(plan.Description),
-		Color:       tfStringToPtr(plan.Color),
+		Description: tfStringToNullable(plan.Description),
+		Color:       tfStringToNullable(plan.Color),
 	}
 
 	tflog.Debug(ctx, "Creating project tag", map[string]any{
-		"project_id": createReq.ProjectID,
+		"project_id": plan.ProjectID.ValueString(),
 		"name":       createReq.Name,
 	})
 
-	created, err := r.client.CreateProjectTag(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostProjectTagWithResponse(ctx, createReq))
+	var created *openapi.ProjectTag
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project tag")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Project Tag",
@@ -101,13 +112,13 @@ func (r *projectTagResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	// Re-read to get the full state.
-	tag, err := r.client.GetProjectTag(ctx, created.ID)
+	tag, err := getProjectTag(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapProjectTagToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Project Tag After Create",
-			"Tag was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"Tag was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -126,7 +137,7 @@ func (r *projectTagResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	tag, err := r.client.GetProjectTag(ctx, state.ID.ValueString())
+	tag, err := getProjectTag(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Project tag not found, removing from state", map[string]any{
@@ -161,28 +172,17 @@ func (r *projectTagResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	name := plan.Name.ValueString()
-	updateReq := client.UpdateProjectTagRequest{
-		Name: &name,
+	updateReq := openapi.PatchProjectTag{
+		Name:        nullable.NewNullableWithValue(plan.Name.ValueString()),
+		Description: patchString(plan.Description, state.Description),
+		Color:       patchString(plan.Color, state.Color),
 	}
 
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		desc := plan.Description.ValueString()
-		updateReq.Description = &desc
-	} else if plan.Description.IsNull() && !state.Description.IsNull() {
-		empty := ""
-		updateReq.Description = &empty
+	updateResp, err := client.Write(r.client.API.PatchProjectTagIdWithResponse(ctx, state.ID.ValueString(), updateReq))
+	var tag *openapi.ProjectTag
+	if err == nil {
+		tag, err = client.JSON(updateResp.JSON200)
 	}
-
-	if !plan.Color.IsNull() && !plan.Color.IsUnknown() {
-		color := plan.Color.ValueString()
-		updateReq.Color = &color
-	} else if plan.Color.IsNull() && !state.Color.IsNull() {
-		empty := ""
-		updateReq.Color = &empty
-	}
-
-	tag, err := r.client.UpdateProjectTag(ctx, state.ID.ValueString(), updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Project Tag",
@@ -205,7 +205,7 @@ func (r *projectTagResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.client.DeleteProjectTag(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteProjectTagIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return
@@ -215,6 +215,14 @@ func (r *projectTagResource) Delete(ctx context.Context, req resource.DeleteRequ
 			"Could not delete project tag ID "+state.ID.ValueString()+": "+err.Error(),
 		)
 	}
+}
+
+func getProjectTag(ctx context.Context, c *client.Client, id string) (*openapi.ProjectTag, error) {
+	resp, err := c.API.GetProjectTagIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.JSON(resp.JSON200)
 }
 
 func (r *projectTagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

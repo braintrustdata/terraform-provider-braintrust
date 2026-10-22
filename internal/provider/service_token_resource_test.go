@@ -89,7 +89,7 @@ func testAccCheckServiceTokenDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_service_token" {
 			continue
 		}
-		_, err := c.GetServiceToken(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetServiceTokenIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust service token %s still exists after destroy", rs.Primary.ID)
 		}

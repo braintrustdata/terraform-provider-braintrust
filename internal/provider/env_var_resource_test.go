@@ -66,7 +66,7 @@ func testAccCheckEnvVarDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_env_var" {
 			continue
 		}
-		_, err := c.GetEnvVar(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetEnvVarIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust env var %s still exists after destroy", rs.Primary.ID)
 		}

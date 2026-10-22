@@ -63,7 +63,7 @@ func testAccCheckAISecretDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_ai_secret" {
 			continue
 		}
-		_, err := c.GetAISecret(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetAiSecretIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust AI secret %s still exists after destroy", rs.Primary.ID)
 		}

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -96,7 +97,7 @@ func (d *groupDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		"name": name, "org_id": orgID,
 	})
 
-	groups, err := d.client.ListGroups(ctx, name, orgID)
+	groups, err := listGroups(ctx, d.client, name, orgID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Group",
@@ -105,10 +106,10 @@ func (d *groupDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	var match *client.Group
+	var match *openapi.Group
 	for i := range groups {
 		group := &groups[i]
-		if group.Name == name && group.DeletedAt == nil && (orgID == "" || group.OrgID == orgID) {
+		if group.Name == name && !nullableIsSet(group.DeletedAt) && (orgID == "" || group.OrgId.String() == orgID) {
 			if match != nil {
 				resp.Diagnostics.AddError(
 					"Ambiguous Group",
