@@ -53,6 +53,16 @@ func TestVerifyACLTargetsKeepsOrderAndSkipsOnlyMissingTargets(t *testing.T) {
 		t.Fatalf("progress = %d and reads = %d, want 8 each", progress, reads.Load())
 	}
 
+	valid, err = verifyACLTargets(context.Background(), acls, func(_ context.Context, id string) error {
+		if id == missing {
+			return &client.APIError{StatusCode: 403, Message: "Object Does not exist"}
+		}
+		return nil
+	}, nil)
+	if err != nil || valid[3] {
+		t.Fatalf("a missing target must be skipped regardless of message case; valid=%v err=%v", valid[3], err)
+	}
+
 	want := errors.New("permission denied")
 	_, err = verifyACLTargets(context.Background(), acls, func(_ context.Context, id string) error {
 		if id == missing {

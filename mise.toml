@@ -1,5 +1,6 @@
-# Tool versions match CI (.github/workflows).
+# Source of truth for tool versions; scripts/check-tool-versions.sh (run in CI) fails if copies elsewhere drift.
 [tools]
 go = "1.26.9"
 terraform = "1.15.8"
 golangci-lint = "2.14.0"
+goreleaser = "2.19.0"

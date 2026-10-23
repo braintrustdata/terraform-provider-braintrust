@@ -68,7 +68,7 @@ func mapRoleToModel(role *openapi.Role, model *roleModel) {
 	model.MemberPermissions = types.SetValueMust(rolePermissionObjectType, perms)
 
 	// Map member_roles.
-	model.MemberRoles = stringSliceToTFSet(uuidStrings(nullableSliceValue(role.MemberRoles)))
+	model.MemberRoles = stringSliceToTFSet(client.UUIDStrings(nullableSliceValue(role.MemberRoles)))
 }
 
 func getRole(ctx context.Context, c *client.Client, id string) (*openapi.Role, error) {
@@ -91,10 +91,9 @@ func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]memberP
 	}
 	result := make([]memberPermission, len(perms))
 	for i, p := range perms {
-		result[i] = memberPermission{Permission: openapi.Permission(p.Permission.ValueString())}
-		if restrict := tfStringToPtr(p.RestrictObjectType); restrict != nil {
-			objectType := openapi.AclObjectType(*restrict)
-			result[i].RestrictObjectType = &objectType
+		result[i] = memberPermission{
+			Permission:         openapi.Permission(p.Permission.ValueString()),
+			RestrictObjectType: tfStringToEnum[openapi.AclObjectType](p.RestrictObjectType),
 		}
 	}
 	return result, diags

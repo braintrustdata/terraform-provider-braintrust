@@ -170,3 +170,74 @@ func TestCreatedRejectsExistingObject(t *testing.T) {
 		t.Fatalf("creating an existing project must require import; got %v", err)
 	}
 }
+
+func TestCreatedUndecodedBodyIsUncertain(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		status      int
+		contentType string
+	}{
+		{"non-200 success", http.StatusCreated, "application/json"},
+		{"non-JSON content type", http.StatusOK, "text/plain"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", test.contentType)
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(fixtureProject))
+			}))
+			defer server.Close()
+			c, err := NewClient(server.URL, "fixture", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := Write(c.API.PostProjectWithResponse(context.Background(), openapi.CreateProject{Name: "fixture"}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Created(resp.HTTPResponse, resp.JSON200, "project"); !IsUncertainWriteError(err) {
+				t.Fatalf("a committed create without a decoded body must be uncertain; got %v", err)
+			}
+			if _, err := Written(resp.JSON200); !IsUncertainWriteError(err) {
+				t.Fatalf("a committed write without a decoded body must be uncertain; got %v", err)
+			}
+		})
+	}
+}
+
+func TestWrittenRawUndecodableFieldsAreUncertain(t *testing.T) {
+	project := openapi.Project{Name: "fixture"}
+	if _, err := WrittenRaw(&project, []byte("not json")); !IsUncertainWriteError(err) {
+		t.Fatalf("want an uncertain write; got %v", err)
+	}
+	if raw, err := WrittenRaw(&project, []byte(`{"name":"fixture"}`)); err != nil || raw.Value != &project {
+		t.Fatalf("want the decoded body; got %v, %v", raw, err)
+	}
+}
+
+func TestWriteNotSentIsNotUncertain(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("request with empty id must not be sent: %s", r.URL.Path)
+	}))
+	defer server.Close()
+	c, err := NewClient(server.URL, "fixture", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Write(c.API.DeleteProjectIdWithResponse(context.Background(), ""))
+	var notSent *RequestNotSentError
+	if !errors.As(err, &notSent) || IsUncertainWriteError(err) {
+		t.Fatalf("an unsent write must not be uncertain; got %v", err)
+	}
+}
+
+func TestIsNotFoundErrorIgnoresCase(t *testing.T) {
+	for _, message := range []string{"object does not exist", "Object Does Not Exist", "DOES NOT EXIST"} {
+		if !IsNotFoundError(&APIError{StatusCode: http.StatusForbidden, Message: message}) {
+			t.Errorf("want not found for 403 %q", message)
+		}
+	}
+	if IsNotFoundError(&APIError{StatusCode: http.StatusForbidden, Message: "permission denied"}) {
+		t.Error("an unrelated 403 must not be not found")
+	}
+}

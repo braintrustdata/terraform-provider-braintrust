@@ -116,7 +116,7 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 		var createdBody *openapi.Dataset
 		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "dataset")
 		if err == nil {
-			created, err = client.DecodeRaw(createdBody, createResp.Body)
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
 		}
 	}
 	if err != nil {
@@ -217,7 +217,7 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	updateResp, err := client.Write(r.client.API.PatchDatasetIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
 	var dataset *dataset
 	if err == nil {
-		dataset, err = client.DecodeRaw(updateResp.JSON200, updateResp.Body)
+		dataset, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

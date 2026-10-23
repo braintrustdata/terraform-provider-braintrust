@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 
-	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -74,25 +73,18 @@ func (d *functionDataSource) Read(ctx context.Context, req datasource.ReadReques
 			resp.Diagnostics.AddError("Error Listing Braintrust Functions", err.Error())
 			return
 		}
-		var match *openapi.Function
 		for i := range functions {
-			candidate := &functions[i]
+			candidate := functions[i].Value
 			if candidate.Name == name && candidate.ProjectId.String() == projectID {
-				if match != nil {
+				if function != nil {
 					resp.Diagnostics.AddError("Ambiguous Function", "Multiple functions have this name in the project. Look up by ID.")
 					return
 				}
-				match = candidate
+				function = &functions[i]
 			}
 		}
-		if match == nil {
+		if function == nil {
 			resp.Diagnostics.AddError("Function Not Found", "No function with this name exists in the project.")
-			return
-		}
-		// Re-read by ID so the JSON attributes are kept as raw JSON.
-		function, err = getFunction(ctx, d.client, match.Id.String())
-		if err != nil {
-			resp.Diagnostics.AddError("Error Reading Braintrust Function", err.Error())
 			return
 		}
 	} else {

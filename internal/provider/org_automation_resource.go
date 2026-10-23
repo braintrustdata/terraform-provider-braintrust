@@ -200,7 +200,7 @@ func (r *orgAutomationResource) Update(ctx context.Context, req resource.UpdateR
 	}))
 	var automation *openapi.OrgAutomation
 	if err == nil {
-		automation, err = client.JSON(updateResp.JSON200)
+		automation, err = client.Written(updateResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust Organization Automation", err.Error())

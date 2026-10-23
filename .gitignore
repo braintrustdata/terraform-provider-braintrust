@@ -19,8 +19,6 @@ go.work.sum
 
 # Dependency directories
 vendor/
-__pycache__/
-*.pyc
 
 # IDE
 .idea/
@@ -46,9 +44,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-# Generated code generation intermediate spec
-provider_code_spec.json
-
 # Environment variables (secrets)
 .env
 .env.*
@@ -56,5 +51,3 @@ provider_code_spec.json
 # GoReleaser
 dist/
 
-# Offline exporter/provider check evidence
-tests/evidence/

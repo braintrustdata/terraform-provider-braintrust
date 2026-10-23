@@ -237,7 +237,7 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	updateResp, err := client.Write(r.client.API.PatchRoleIdWithResponse(ctx, state.ID.ValueString(), updateReq))
 	var role *openapi.Role
 	if err == nil {
-		role, err = client.JSON(updateResp.JSON200)
+		role, err = client.Written(updateResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

@@ -125,7 +125,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	} else {
 		name := config.Name.ValueString()
 		tflog.Debug(ctx, "Looking up role by name", map[string]any{"name": name})
-		roles, err := client.ListAll("/v1/role", func(limit int, startingAfter *string) ([]openapi.Role, error) {
+		roles, err := client.ListObjects("/v1/role", func(limit int, startingAfter *string) (*client.Page[openapi.Role], error) {
 			page, err := d.client.API.GetRoleWithResponse(ctx, &openapi.GetRoleParams{
 				Limit:         &limit,
 				StartingAfter: startingAfter,
@@ -134,11 +134,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 			if err != nil {
 				return nil, err
 			}
-			body, err := client.JSON(page.JSON200)
-			if err != nil {
-				return nil, err
-			}
-			return body.Objects, nil
+			return page.JSON200, nil
 		}, func(role openapi.Role) string { return role.Id.String() })
 		if err != nil {
 			resp.Diagnostics.AddError("Error Reading Braintrust Role", "Could not list roles: "+err.Error())

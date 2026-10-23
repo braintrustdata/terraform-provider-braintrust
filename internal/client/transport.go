@@ -37,7 +37,7 @@ func (d *doer) Do(req *http.Request) (*http.Response, error) {
 	// Generated operations interpolate IDs into the path, so an empty ID
 	// yields a trailing or doubled slash that would hit a different endpoint.
 	if strings.HasSuffix(path, "/") || strings.Contains(path, "//") {
-		return nil, fmt.Errorf("%s %s: resource id is required", method, path)
+		return nil, &RequestNotSentError{Cause: fmt.Errorf("%s %s: resource id is required", method, path)}
 	}
 
 	var lastErr error
@@ -176,8 +176,9 @@ func cloneRequest(req *http.Request, attempt int) (*http.Request, error) {
 }
 
 // Write marks errors from a non-idempotent generated call as uncertain. The
-// transport already classifies HTTP failures; this covers responses that were
-// received but could not be decoded, where the write may have committed.
+// transport already classifies HTTP failures and requests it refused to send;
+// this covers responses that were received but could not be decoded, where
+// the write may have committed.
 func Write[R any](resp R, err error) (R, error) {
 	if err != nil && !isClassified(err) {
 		err = &UncertainWriteError{Method: "write", Cause: fmt.Errorf("failed to decode response: %w", err)}
@@ -188,9 +189,11 @@ func Write[R any](resp R, err error) (R, error) {
 func isClassified(err error) bool {
 	var apiErr *APIError
 	var notFound *NotFoundError
+	var notSent *RequestNotSentError
 	return IsUncertainWriteError(err) ||
 		errors.As(err, &apiErr) ||
 		errors.As(err, &notFound) ||
+		errors.As(err, &notSent) ||
 		errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded)
 }
@@ -229,13 +232,57 @@ func ListAll[T any](what string, page func(limit int, startingAfter *string) ([]
 	}
 }
 
+var errUnexpectedBody = errors.New("braintrust API returned an unexpected response body")
+
+// Page is the decoded body of a generated list response.
+type Page[T any] = struct {
+	Objects []T `json:"objects"`
+}
+
+// ListObjects is ListAll for a generated list operation; page returns the
+// response's decoded body (JSON200).
+func ListObjects[T any](what string, page func(limit int, startingAfter *string) (*Page[T], error), idOf func(T) string) ([]T, error) {
+	return ListAll(what, func(limit int, startingAfter *string) ([]T, error) {
+		decoded, err := page(limit, startingAfter)
+		if err != nil {
+			return nil, err
+		}
+		body, err := JSON(decoded)
+		if err != nil {
+			return nil, err
+		}
+		return body.Objects, nil
+	}, idOf)
+}
+
 // JSON returns a generated response's decoded body, or an error when the
 // generated client did not decode one (for example, a non-JSON content type).
+// Use Written for write responses.
 func JSON[T any](v *T) (*T, error) {
 	if v == nil {
-		return nil, errors.New("braintrust API returned an unexpected response body")
+		return nil, errUnexpectedBody
 	}
 	return v, nil
+}
+
+// Written returns a successful write response's decoded body. A missing body
+// means the write succeeded but its result was not observed, so the error is
+// an UncertainWriteError.
+func Written[T any](v *T) (*T, error) {
+	if v == nil {
+		return nil, &UncertainWriteError{Method: "write", Cause: errUnexpectedBody}
+	}
+	return v, nil
+}
+
+// WrittenRaw is DecodeRaw for a successful write response; decode failures are
+// UncertainWriteErrors.
+func WrittenRaw[T any](v *T, body []byte) (*Raw[T], error) {
+	raw, err := DecodeRaw(v, body)
+	if err != nil {
+		return nil, &UncertainWriteError{Method: "write", Cause: err}
+	}
+	return raw, nil
 }
 
 // Created unwraps a successful generated create response: it rejects objects
@@ -244,7 +291,7 @@ func Created[T any](resp *http.Response, body *T, resourceType string) (*T, erro
 	if err := RejectExisting(resp, resourceType); err != nil {
 		return nil, err
 	}
-	return JSON(body)
+	return Written(body)
 }
 
 // WithQuery adds a query parameter to a generated request. It covers filters

@@ -159,7 +159,7 @@ func (r *mcpServerResource) Update(ctx context.Context, req resource.UpdateReque
 	}))
 	var server *openapi.MCPServer
 	if err == nil {
-		server, err = client.JSON(updateResp.JSON200)
+		server, err = client.Written(updateResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust MCP Server", err.Error())

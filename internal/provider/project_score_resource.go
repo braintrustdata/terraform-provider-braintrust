@@ -149,7 +149,7 @@ func (r *projectScoreResource) Create(ctx context.Context, req resource.CreateRe
 		var createdBody *openapi.ProjectScore
 		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project score")
 		if err == nil {
-			created, err = client.DecodeRaw(createdBody, createResp.Body)
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
 		}
 	}
 	if err != nil {
@@ -251,7 +251,7 @@ func (r *projectScoreResource) Update(ctx context.Context, req resource.UpdateRe
 	updateResp, err := client.Write(r.client.API.PatchProjectScoreIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
 	var score *projectScore
 	if err == nil {
-		score, err = client.DecodeRaw(updateResp.JSON200, updateResp.Body)
+		score, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

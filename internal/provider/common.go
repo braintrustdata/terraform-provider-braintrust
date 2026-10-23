@@ -68,16 +68,6 @@ func stringPtrToTFValue(s *string) types.String {
 	return types.StringNull()
 }
 
-// tfStringToPtr converts a types.String to a *string for API requests.
-// Returns nil if the value is null or unknown.
-func tfStringToPtr(s types.String) *string {
-	if s.IsNull() || s.IsUnknown() {
-		return nil
-	}
-	v := s.ValueString()
-	return &v
-}
-
 // computedStringAttribute returns a Computed string schema attribute with
 // UseStateForUnknown, suitable for server-assigned fields like id, org_id, etc.
 func computedStringAttribute(description string) schema.StringAttribute {

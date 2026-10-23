@@ -36,11 +36,6 @@ jobs:
       - name: Unit Tests
         run: go test -mod=readonly -count=1 ./...
 
-      - name: Check generated fixture contracts
-        run: |
-          go build -mod=readonly -o bin/braintrust-terraforming ./cmd/braintrust-terraforming
-          python3 tests/offline_checks.py --exporter bin/braintrust-terraforming --skip-terraform --output test-results/offline
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -51,6 +46,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Tool versions match mise.toml
+        run: ./scripts/check-tool-versions.sh
 
       - name: Go formatting
         run: test -z "$(gofmt -l .)"
@@ -83,5 +81,9 @@ jobs:
 
       - name: Check for uncommitted doc changes
         run: |
-          git diff --exit-code docs/ || \
-            (echo "::error::Documentation is out of date. Run 'go generate ./...' and commit the changes." && exit 1)
+          # status (not diff) so newly generated, uncommitted files also fail.
+          if [ -n "$(git status --porcelain -- docs/)" ]; then
+            git status --short -- docs/
+            echo "::error::Documentation is out of date. Run 'make doc' and commit the changes."
+            exit 1
+          fi

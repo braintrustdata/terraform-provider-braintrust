@@ -20,7 +20,7 @@ type projectTagModel struct {
 func mapProjectTagToModel(tag *openapi.ProjectTag, model *projectTagModel) {
 	model.ID = types.StringValue(tag.Id.String())
 	model.ProjectID = types.StringValue(tag.ProjectId.String())
-	model.UserID = types.StringValue(tag.UserId.String())
+	model.UserID = optionalUUIDToTF(tag.UserId)
 	model.Name = types.StringValue(tag.Name)
 	model.Description = nullableStringToTF(tag.Description)
 	model.Color = nullableStringToTF(tag.Color)

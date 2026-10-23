@@ -54,9 +54,9 @@ func getDataset(ctx context.Context, c *client.Client, id string) (*dataset, err
 	return client.DecodeRaw(resp.JSON200, resp.Body)
 }
 
-// listDatasets lists a project's datasets by name.
-func listDatasets(ctx context.Context, c *client.Client, name, projectID string) ([]openapi.Dataset, error) {
-	return client.ListAll("/v1/dataset", func(limit int, startingAfter *string) ([]openapi.Dataset, error) {
+// listDatasets lists a project's datasets by name, keeping each object's raw JSON.
+func listDatasets(ctx context.Context, c *client.Client, name, projectID string) ([]dataset, error) {
+	return client.ListAll("/v1/dataset", func(limit int, startingAfter *string) ([]dataset, error) {
 		params := &openapi.GetDatasetParams{Limit: &limit, StartingAfter: startingAfter}
 		if name != "" {
 			params.DatasetName = &name
@@ -72,8 +72,8 @@ func listDatasets(ctx context.Context, c *client.Client, name, projectID string)
 		if err != nil {
 			return nil, err
 		}
-		return body.Objects, nil
-	}, func(ds openapi.Dataset) string { return ds.Id.String() })
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(ds dataset) string { return ds.Value.Id.String() })
 }
 
 func datasetMetadataInput(value types.String) (json.RawMessage, error) {

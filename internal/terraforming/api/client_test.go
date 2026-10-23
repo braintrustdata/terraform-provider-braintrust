@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -95,5 +96,25 @@ func TestListDatasetsKeepsRawMetadata(t *testing.T) {
 	}
 	if len(datasets) != 1 || string(datasets[0].Fields["metadata"]) != `{"big":12345678901234567890}` {
 		t.Fatalf("metadata was not preserved: %#v", datasets)
+	}
+}
+
+// IDs passed with --org-id are compared to API IDs as strings, so the verified
+// ID must be returned in canonical form.
+func TestGetOrganizationReturnsCanonicalID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"objects": []map[string]string{{"id": fixtureOrgID, "name": "org"}}})
+	}))
+	defer server.Close()
+	c, err := NewClient(server.URL, "fixture", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []string{fixtureOrgID, strings.ToUpper(fixtureOrgID), "{" + fixtureOrgID + "}"} {
+		id, err := c.GetOrganization(context.Background(), input)
+		if err != nil || id != fixtureOrgID {
+			t.Fatalf("GetOrganization(%q) = %q, %v; want %q", input, id, err, fixtureOrgID)
+		}
 	}
 }

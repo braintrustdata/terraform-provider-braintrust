@@ -303,7 +303,7 @@ func (r *projectAutomationResource) Create(ctx context.Context, req resource.Cre
 		var createdBody *openapi.ProjectAutomation
 		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project automation")
 		if err == nil {
-			created, err = client.DecodeRaw(createdBody, createResp.Body)
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
 		}
 	}
 	if err != nil {
@@ -387,7 +387,7 @@ func (r *projectAutomationResource) Update(ctx context.Context, req resource.Upd
 	updateResp, err := client.Write(r.client.API.PatchProjectAutomationIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
 	var automation *projectAutomation
 	if err == nil {
-		automation, err = client.DecodeRaw(updateResp.JSON200, updateResp.Body)
+		automation, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Project Automation", err.Error())

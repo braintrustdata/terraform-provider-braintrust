@@ -148,11 +148,6 @@ func (r *ReferenceResolver) RoleDataSources() []DataBlock {
 	return blocks
 }
 
-// IsLinked returns true if the given resource type should use references.
-func (r *ReferenceResolver) IsLinked(terraformType string) bool {
-	return r.linkedTypes[terraformType]
-}
-
 // HasLinkedTypes returns true if any linked types are configured.
 func (r *ReferenceResolver) HasLinkedTypes() bool {
 	return len(r.linkedTypes) > 0

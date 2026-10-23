@@ -4,14 +4,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/oapi-codegen/nullable"
 )
 
-// apiTimeLayout matches the timestamps the Braintrust API returns, so values
-// decoded into time.Time render the same as the raw API strings did.
-const apiTimeLayout = "2006-01-02T15:04:05.000Z07:00"
+// apiTimeLayout matches the millisecond timestamps the Braintrust API returns,
+// so values decoded into time.Time render the same as the raw API strings did.
+// Timestamps with sub-millisecond precision use preciseTimeLayout instead, so
+// no precision is lost.
+const (
+	apiTimeLayout     = "2006-01-02T15:04:05.000Z07:00"
+	preciseTimeLayout = time.RFC3339Nano
+)
 
 // nullableStringToTF converts an SDK nullable string to a Terraform value.
 // Unspecified and null both map to null.
@@ -24,10 +30,11 @@ func nullableStringToTF(v nullable.Nullable[string]) types.String {
 
 // nullableUUIDToTF converts an SDK nullable UUID to a Terraform value.
 func nullableUUIDToTF(v nullable.Nullable[uuid.UUID]) types.String {
-	if !v.IsSpecified() || v.IsNull() {
+	id, ok := client.OptionalUUID(v)
+	if !ok {
 		return types.StringNull()
 	}
-	return types.StringValue(v.MustGet().String())
+	return types.StringValue(id)
 }
 
 // nullableTimeToTF converts an SDK nullable timestamp to a Terraform value.
@@ -43,7 +50,20 @@ func nullableTimeToTF(v nullable.Nullable[time.Time], prior types.String) types.
 			return prior
 		}
 	}
-	return types.StringValue(t.UTC().Format(apiTimeLayout))
+	layout := apiTimeLayout
+	if t.Nanosecond()%int(time.Millisecond) != 0 {
+		layout = preciseTimeLayout
+	}
+	return types.StringValue(t.UTC().Format(layout))
+}
+
+// optionalUUIDToTF converts an SDK UUID the API may return as null or omit.
+// The SDK decodes those as the zero UUID, which maps to null.
+func optionalUUIDToTF(id uuid.UUID) types.String {
+	if id == uuid.Nil {
+		return types.StringNull()
+	}
+	return types.StringValue(id.String())
 }
 
 // tfStringToNullable converts a Terraform value to an SDK nullable string.
@@ -57,7 +77,8 @@ func tfStringToNullable(s types.String) nullable.Nullable[string] {
 
 // nullableIsSet reports whether an SDK nullable holds a non-null value.
 func nullableIsSet[T any](v nullable.Nullable[T]) bool {
-	return v.IsSpecified() && !v.IsNull()
+	_, ok := client.Optional(v)
+	return ok
 }
 
 // patchString builds a PATCH field for an optional string attribute: the
@@ -80,15 +101,6 @@ func parseUUID(value types.String, attribute string) (uuid.UUID, error) {
 		return uuid.UUID{}, fmt.Errorf("%s must be a UUID: %w", attribute, err)
 	}
 	return id, nil
-}
-
-// uuidStrings formats SDK UUIDs as Terraform ID strings.
-func uuidStrings(ids []uuid.UUID) []string {
-	result := make([]string, len(ids))
-	for i, id := range ids {
-		result[i] = id.String()
-	}
-	return result
 }
 
 // parseUUIDs parses Terraform ID strings for an SDK request.
@@ -115,10 +127,8 @@ func nullableSlice[T any](values []T) nullable.Nullable[[]T] {
 
 // nullableSliceValue returns the slice in an SDK nullable, or nil.
 func nullableSliceValue[T any](v nullable.Nullable[[]T]) []T {
-	if !nullableIsSet(v) {
-		return nil
-	}
-	return v.MustGet()
+	values, _ := client.Optional(v)
+	return values
 }
 
 // diffUUIDs computes the IDs to add and remove to go from current to desired,
@@ -158,8 +168,9 @@ func tfStringToEnum[T ~string](s types.String) *T {
 
 // enumToTF converts an optional SDK enum to a Terraform value.
 func enumToTF[T ~string](v *T) types.String {
-	if v == nil {
+	value, ok := client.OptionalEnum(v)
+	if !ok {
 		return types.StringNull()
 	}
-	return types.StringValue(string(*v))
+	return types.StringValue(value)
 }

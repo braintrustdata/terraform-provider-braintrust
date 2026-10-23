@@ -65,16 +65,12 @@ func getServiceToken(ctx context.Context, c *client.Client, id string) (*openapi
 // listServiceTokensByName lists service tokens by name. The spec does not
 // declare the endpoint's name filter, so it is added to each request.
 func listServiceTokensByName(ctx context.Context, c *client.Client, name string) ([]openapi.ServiceToken, error) {
-	return client.ListAll("/v1/service_token", func(limit int, startingAfter *string) ([]openapi.ServiceToken, error) {
+	return client.ListObjects("/v1/service_token", func(limit int, startingAfter *string) (*client.Page[openapi.ServiceToken], error) {
 		page, err := c.API.GetServiceTokenWithResponse(ctx, &openapi.GetServiceTokenParams{Limit: &limit, StartingAfter: startingAfter}, client.WithQuery("name", name))
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(token openapi.ServiceToken) string { return token.Id.String() })
 }
 

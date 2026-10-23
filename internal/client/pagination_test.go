@@ -45,3 +45,24 @@ func TestListAllRejectsStuckCursor(t *testing.T) {
 		t.Fatal("want an error when the cursor does not advance")
 	}
 }
+
+func TestListObjectsFollowsCursorAndRejectsMissingBody(t *testing.T) {
+	items, err := ListObjects("/v1/thing", func(limit int, startingAfter *string) (*Page[string], error) {
+		if startingAfter == nil {
+			page := make([]string, limit)
+			for i := range page {
+				page[i] = fmt.Sprintf("item-%03d", i)
+			}
+			return &Page[string]{Objects: page}, nil
+		}
+		return &Page[string]{Objects: []string{"last"}}, nil
+	}, func(item string) string { return item })
+	if err != nil || len(items) != listPageSize+1 || items[len(items)-1] != "last" {
+		t.Fatalf("want %d items ending in last; got %d err=%v", listPageSize+1, len(items), err)
+	}
+
+	_, err = ListObjects("/v1/thing", func(int, *string) (*Page[string], error) { return nil, nil }, func(item string) string { return item })
+	if err == nil {
+		t.Fatal("want an error for a page without a decoded body")
+	}
+}

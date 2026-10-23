@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 
-	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -121,28 +120,21 @@ func (d *datasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			)
 			return
 		}
-		var match *openapi.Dataset
 		for i := range datasets {
-			candidate := &datasets[i]
+			candidate := datasets[i].Value
 			if candidate.Name == name && candidate.ProjectId.String() == projectID && !nullableIsSet(candidate.DeletedAt) {
-				if match != nil {
+				if dataset != nil {
 					resp.Diagnostics.AddError("Ambiguous Dataset", "Multiple active datasets have the name "+name+" in project "+projectID+". Look up the dataset by ID.")
 					return
 				}
-				match = candidate
+				dataset = &datasets[i]
 			}
 		}
-		if match == nil {
+		if dataset == nil {
 			resp.Diagnostics.AddError(
 				"Dataset Not Found",
 				"No active dataset found with name "+name+" in project "+projectID+".",
 			)
-			return
-		}
-		// Re-read by ID so metadata is kept as raw JSON.
-		dataset, err = getDataset(ctx, d.client, match.Id.String())
-		if err != nil {
-			resp.Diagnostics.AddError("Error Reading Braintrust Dataset", "Could not read dataset ID "+match.Id.String()+": "+err.Error())
 			return
 		}
 	} else {

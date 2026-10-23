@@ -38,7 +38,7 @@ func mapProjectScoreToModel(raw *projectScore, model *projectScoreModel) {
 	score := raw.Value
 	model.ID = types.StringValue(score.Id.String())
 	model.ProjectID = types.StringValue(score.ProjectId.String())
-	model.UserID = types.StringValue(score.UserId.String())
+	model.UserID = optionalUUIDToTF(score.UserId)
 	model.Name = types.StringValue(score.Name)
 	model.Description = nullableStringToTF(score.Description)
 	model.ScoreType = types.StringValue(string(score.ScoreType))

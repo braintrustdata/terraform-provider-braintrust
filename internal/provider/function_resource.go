@@ -126,7 +126,7 @@ func (r *functionResource) Create(ctx context.Context, req resource.CreateReques
 		var createdBody *openapi.Function
 		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "function")
 		if err == nil {
-			created, err = client.DecodeRaw(createdBody, createResp.Body)
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
 		}
 	}
 	if err != nil {
@@ -205,7 +205,7 @@ func (r *functionResource) Update(ctx context.Context, req resource.UpdateReques
 	updateResp, err := client.Write(r.client.API.PatchFunctionIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
 	var updated *function
 	if err == nil {
-		updated, err = client.DecodeRaw(updateResp.JSON200, updateResp.Body)
+		updated, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust Function", err.Error())

@@ -175,16 +175,12 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 // listUsers lists users matching the filters in params, across all pages.
 func listUsers(ctx context.Context, c *client.Client, params openapi.GetUserParams) ([]openapi.User, error) {
-	return client.ListAll("/v1/user", func(limit int, startingAfter *string) ([]openapi.User, error) {
+	return client.ListObjects("/v1/user", func(limit int, startingAfter *string) (*client.Page[openapi.User], error) {
 		params.Limit, params.StartingAfter = &limit, startingAfter
 		page, err := c.API.GetUserWithResponse(ctx, &params)
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(user openapi.User) string { return user.Id.String() })
 }

@@ -181,7 +181,7 @@ func (r *projectTagResource) Update(ctx context.Context, req resource.UpdateRequ
 	updateResp, err := client.Write(r.client.API.PatchProjectTagIdWithResponse(ctx, state.ID.ValueString(), updateReq))
 	var tag *openapi.ProjectTag
 	if err == nil {
-		tag, err = client.JSON(updateResp.JSON200)
+		tag, err = client.Written(updateResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

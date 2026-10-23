@@ -101,6 +101,16 @@ func (e *UncertainWriteError) Error() string {
 
 func (e *UncertainWriteError) Unwrap() error { return e.Cause }
 
+// RequestNotSentError means a request was rejected before it was sent, so a
+// write cannot have committed.
+type RequestNotSentError struct {
+	Cause error
+}
+
+func (e *RequestNotSentError) Error() string { return e.Cause.Error() }
+
+func (e *RequestNotSentError) Unwrap() error { return e.Cause }
+
 func IsUncertainWriteError(err error) bool {
 	var uncertain *UncertainWriteError
 	return errors.As(err, &uncertain)
@@ -123,7 +133,7 @@ func IsNotFoundError(err error) bool {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) &&
 		(apiErr.StatusCode == http.StatusForbidden || apiErr.StatusCode == http.StatusBadRequest) &&
-		strings.Contains(apiErr.Message, "does not exist") {
+		strings.Contains(strings.ToLower(apiErr.Message), "does not exist") {
 		return true
 	}
 	return false

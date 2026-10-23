@@ -32,11 +32,11 @@ func mapGroupToModel(group *openapi.Group, model *groupModel) {
 	model.UserID = nullableUUIDToTF(group.UserId)
 
 	model.MemberUsers = stringSliceToTFSet(groupMemberUsers(group))
-	model.MemberGroups = stringSliceToTFSet(uuidStrings(nullableSliceValue(group.MemberGroups)))
+	model.MemberGroups = stringSliceToTFSet(client.UUIDStrings(nullableSliceValue(group.MemberGroups)))
 }
 
 func groupMemberUsers(group *openapi.Group) []string {
-	return uuidStrings(nullableSliceValue(group.MemberUsers))
+	return client.UUIDStrings(nullableSliceValue(group.MemberUsers))
 }
 
 func getGroup(ctx context.Context, c *client.Client, id string) (*openapi.Group, error) {
@@ -52,13 +52,13 @@ func patchGroup(ctx context.Context, c *client.Client, id string, patch openapi.
 	if err != nil {
 		return nil, err
 	}
-	return client.JSON(resp.JSON200)
+	return client.Written(resp.JSON200)
 }
 
 // listGroups lists groups by name. The endpoint cannot filter by org_id, so
 // that filter is applied here; an empty orgID matches every organization.
 func listGroups(ctx context.Context, c *client.Client, name, orgID string) ([]openapi.Group, error) {
-	groups, err := client.ListAll("/v1/group", func(limit int, startingAfter *string) ([]openapi.Group, error) {
+	groups, err := client.ListObjects("/v1/group", func(limit int, startingAfter *string) (*client.Page[openapi.Group], error) {
 		params := &openapi.GetGroupParams{Limit: &limit, StartingAfter: startingAfter}
 		if name != "" {
 			params.GroupName = &name
@@ -67,11 +67,7 @@ func listGroups(ctx context.Context, c *client.Client, name, orgID string) ([]op
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(group openapi.Group) string { return group.Id.String() })
 	if err != nil || orgID == "" {
 		return groups, err

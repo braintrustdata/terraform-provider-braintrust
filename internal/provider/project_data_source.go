@@ -111,7 +111,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		name := config.Name.ValueString()
 		tflog.Debug(ctx, "Looking up project by name", map[string]any{"name": name})
 
-		projects, listErr := client.ListAll("/v1/project", func(limit int, startingAfter *string) ([]openapi.Project, error) {
+		projects, listErr := client.ListObjects("/v1/project", func(limit int, startingAfter *string) (*client.Page[openapi.Project], error) {
 			page, err := d.client.API.GetProjectWithResponse(ctx, &openapi.GetProjectParams{
 				Limit:         &limit,
 				StartingAfter: startingAfter,
@@ -120,11 +120,7 @@ func (d *projectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			if err != nil {
 				return nil, err
 			}
-			body, err := client.JSON(page.JSON200)
-			if err != nil {
-				return nil, err
-			}
-			return body.Objects, nil
+			return page.JSON200, nil
 		}, func(p openapi.Project) string { return p.Id.String() })
 		if listErr != nil {
 			resp.Diagnostics.AddError(

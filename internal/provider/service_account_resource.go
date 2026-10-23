@@ -164,5 +164,5 @@ func patchOrganizationMembers(ctx context.Context, c *client.Client, change map[
 	if err != nil {
 		return nil, err
 	}
-	return client.JSON(resp.JSON200)
+	return client.Written(resp.JSON200)
 }

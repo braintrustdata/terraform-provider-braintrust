@@ -140,7 +140,7 @@ func (r *serviceTokenResource) Create(ctx context.Context, req resource.CreateRe
 	createResp, err := client.Write(r.client.API.PostServiceTokenWithResponse(ctx, createReq))
 	var output *openapi.CreateServiceTokenOutput
 	if err == nil {
-		output, err = client.JSON(createResp.JSON200)
+		output, err = client.Written(createResp.JSON200)
 	}
 	if err != nil {
 		if client.IsUncertainWriteError(err) {

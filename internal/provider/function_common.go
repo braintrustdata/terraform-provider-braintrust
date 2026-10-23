@@ -61,9 +61,9 @@ func getFunction(ctx context.Context, c *client.Client, id string) (*function, e
 	return client.DecodeRaw(resp.JSON200, resp.Body)
 }
 
-// listFunctions lists a project's functions by name.
-func listFunctions(ctx context.Context, c *client.Client, name, projectID string) ([]openapi.Function, error) {
-	return client.ListAll("/v1/function", func(limit int, startingAfter *string) ([]openapi.Function, error) {
+// listFunctions lists a project's functions by name, keeping each object's raw JSON.
+func listFunctions(ctx context.Context, c *client.Client, name, projectID string) ([]function, error) {
+	return client.ListAll("/v1/function", func(limit int, startingAfter *string) ([]function, error) {
 		params := &openapi.GetFunctionParams{Limit: &limit, StartingAfter: startingAfter}
 		if name != "" {
 			params.FunctionName = &name
@@ -79,8 +79,8 @@ func listFunctions(ctx context.Context, c *client.Client, name, projectID string
 		if err != nil {
 			return nil, err
 		}
-		return body.Objects, nil
-	}, func(fn openapi.Function) string { return fn.Id.String() })
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(fn function) string { return fn.Value.Id.String() })
 }
 
 func optionalFunctionJSONState(raw json.RawMessage, existing types.String) types.String {

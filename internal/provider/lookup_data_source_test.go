@@ -30,12 +30,14 @@ func TestDataSourceLookupRejectsAmbiguityAndSupportsScope(t *testing.T) {
 			if r.URL.Query().Get("dataset_name") != "Shared" || r.URL.Query().Get("project_id") != "00000000-0000-0000-0000-0000000000d0" {
 				t.Errorf("unexpected dataset query: %s", r.URL.String())
 			}
-			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000d1","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared","deleted_at":"2026-01-01T00:00:00.000Z"},{"id":"00000000-0000-0000-0000-0000000000d2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared"}]}`))
-		case "/v1/dataset/00000000-0000-0000-0000-0000000000d2":
-			_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-0000000000d2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared","metadata":{"owner":"team"}}`))
+			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000d1","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared","deleted_at":"2026-01-01T00:00:00.000Z"},{"id":"00000000-0000-0000-0000-0000000000d2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0","url_slug":"shared","metadata":{"owner":"team"}}]}`))
 		case "/v1/function":
-			if r.URL.Query().Get("function_name") != "Shared" || r.URL.Query().Get("project_id") != "00000000-0000-0000-0000-0000000000d0" {
+			if r.URL.Query().Get("project_id") != "00000000-0000-0000-0000-0000000000d0" {
 				t.Errorf("unexpected function query: %s", r.URL.String())
+			}
+			if r.URL.Query().Get("function_name") == "Solo" {
+				_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000e3","name":"Solo","project_id":"00000000-0000-0000-0000-0000000000d0","function_data":{"type":"prompt","future_key":1}}]}`))
+				return
 			}
 			_, _ = w.Write([]byte(`{"objects":[{"id":"00000000-0000-0000-0000-0000000000e1","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0"},{"id":"00000000-0000-0000-0000-0000000000e2","name":"Shared","project_id":"00000000-0000-0000-0000-0000000000d0"}]}`))
 		default:
@@ -60,6 +62,10 @@ func TestDataSourceLookupRejectsAmbiguityAndSupportsScope(t *testing.T) {
 		{"active dataset", "data \"braintrust_dataset\" \"test\" {\n  name = \"Shared\"\n  project_id = \"00000000-0000-0000-0000-0000000000d0\"\n}", "", resource.ComposeAggregateTestCheckFunc(
 			resource.TestCheckResourceAttr("data.braintrust_dataset.test", "id", "00000000-0000-0000-0000-0000000000d2"),
 			resource.TestCheckResourceAttr("data.braintrust_dataset.test", "metadata_json", `{"owner":"team"}`),
+		)},
+		{"unique function", "data \"braintrust_function\" \"test\" {\n  name = \"Solo\"\n  project_id = \"00000000-0000-0000-0000-0000000000d0\"\n}", "", resource.ComposeAggregateTestCheckFunc(
+			resource.TestCheckResourceAttr("data.braintrust_function.test", "id", "00000000-0000-0000-0000-0000000000e3"),
+			resource.TestCheckResourceAttr("data.braintrust_function.test", "function_data_json", `{"future_key":1,"type":"prompt"}`),
 		)},
 		{"ambiguous function", "data \"braintrust_function\" \"test\" {\n  name = \"Shared\"\n  project_id = \"00000000-0000-0000-0000-0000000000d0\"\n}", "Ambiguous Function", nil},
 	}

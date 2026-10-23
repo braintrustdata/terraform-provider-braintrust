@@ -107,7 +107,7 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 	replaceResp, err := client.Write(r.client.API.PutAiSecretWithResponse(ctx, createReq))
 	var created *openapi.AISecret
 	if err == nil {
-		created, err = client.JSON(replaceResp.JSON200)
+		created, err = client.Written(replaceResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -194,7 +194,7 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 	updateResp, err := client.Write(r.client.API.PatchAiSecretIdWithResponse(ctx, state.ID.ValueString(), updateReq))
 	var secret *openapi.AISecret
 	if err == nil {
-		secret, err = client.JSON(updateResp.JSON200)
+		secret, err = client.Written(updateResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

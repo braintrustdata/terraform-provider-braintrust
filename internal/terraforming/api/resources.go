@@ -23,49 +23,42 @@ type (
 )
 
 func (c *Client) ListProjects(ctx context.Context) ([]openapi.Project, error) {
-	return client.ListAll("/v1/project", func(limit int, startingAfter *string) ([]openapi.Project, error) {
+	return client.ListObjects("/v1/project", func(limit int, startingAfter *string) (*client.Page[openapi.Project], error) {
 		page, err := c.sdk.API.GetProjectWithResponse(ctx, &openapi.GetProjectParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(p openapi.Project) string { return p.Id.String() })
 }
 
-// GetOrganization verifies that the credential can read the selected org.
-func (c *Client) GetOrganization(ctx context.Context, id string) error {
+// GetOrganization verifies that the credential can read the selected org and
+// returns its canonical ID.
+func (c *Client) GetOrganization(ctx context.Context, id string) (string, error) {
 	orgID, err := uuid.Parse(id)
 	if err != nil {
-		return fmt.Errorf("organization ID %q is not a UUID: %w", id, err)
+		return "", fmt.Errorf("organization ID %q is not a UUID: %w", id, err)
 	}
 	var ids openapi.Ids
 	if err := ids.FromIds0(orgID); err != nil {
-		return err
+		return "", err
 	}
-	organizations, err := client.ListAll("/v1/organization", func(limit int, startingAfter *string) ([]openapi.Organization, error) {
+	organizations, err := client.ListObjects("/v1/organization", func(limit int, startingAfter *string) (*client.Page[openapi.Organization], error) {
 		page, err := c.sdk.API.GetOrganizationWithResponse(ctx, &openapi.GetOrganizationParams{Limit: &limit, StartingAfter: startingAfter, Ids: &ids})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(o openapi.Organization) string { return o.Id.String() })
 	if err != nil {
-		return err
+		return "", err
 	}
 	for _, organization := range organizations {
 		if organization.Id == orgID {
-			return nil
+			return orgID.String(), nil
 		}
 	}
-	return fmt.Errorf("organization %s is not readable with this credential", id)
+	return "", fmt.Errorf("organization %s is not readable with this credential", id)
 }
 
 func (c *Client) ListDatasets(ctx context.Context) ([]Dataset, error) {
@@ -97,46 +90,34 @@ func (c *Client) ListFunctions(ctx context.Context) ([]Function, error) {
 }
 
 func (c *Client) ListRoles(ctx context.Context) ([]openapi.Role, error) {
-	return client.ListAll("/v1/role", func(limit int, startingAfter *string) ([]openapi.Role, error) {
+	return client.ListObjects("/v1/role", func(limit int, startingAfter *string) (*client.Page[openapi.Role], error) {
 		page, err := c.sdk.API.GetRoleWithResponse(ctx, &openapi.GetRoleParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(r openapi.Role) string { return r.Id.String() })
 }
 
 func (c *Client) ListGroups(ctx context.Context) ([]openapi.Group, error) {
-	return client.ListAll("/v1/group", func(limit int, startingAfter *string) ([]openapi.Group, error) {
+	return client.ListObjects("/v1/group", func(limit int, startingAfter *string) (*client.Page[openapi.Group], error) {
 		page, err := c.sdk.API.GetGroupWithResponse(ctx, &openapi.GetGroupParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(g openapi.Group) string { return g.Id.String() })
 }
 
 // ListProjectGroups lists an organization's project groups. The spec does not
 // declare the org_id filter, so it is added to each request.
 func (c *Client) ListProjectGroups(ctx context.Context, orgID string) ([]openapi.ProjectGroup, error) {
-	return client.ListAll("/v1/project_group", func(limit int, startingAfter *string) ([]openapi.ProjectGroup, error) {
+	return client.ListObjects("/v1/project_group", func(limit int, startingAfter *string) (*client.Page[openapi.ProjectGroup], error) {
 		page, err := c.sdk.API.GetProjectGroupWithResponse(ctx, &openapi.GetProjectGroupParams{Limit: &limit, StartingAfter: startingAfter}, client.WithQuery("org_id", orgID))
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(g openapi.ProjectGroup) string { return g.Id.String() })
 }
 
@@ -198,16 +179,12 @@ func (c *Client) ListEnvVars(ctx context.Context, objectType, objectID string) (
 }
 
 func (c *Client) ListProjectTags(ctx context.Context) ([]openapi.ProjectTag, error) {
-	return client.ListAll("/v1/project_tag", func(limit int, startingAfter *string) ([]openapi.ProjectTag, error) {
+	return client.ListObjects("/v1/project_tag", func(limit int, startingAfter *string) (*client.Page[openapi.ProjectTag], error) {
 		page, err := c.sdk.API.GetProjectTagWithResponse(ctx, &openapi.GetProjectTagParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(t openapi.ProjectTag) string { return t.Id.String() })
 }
 
@@ -257,44 +234,32 @@ func (c *Client) ListOrgAutomations(ctx context.Context) ([]OrgAutomation, error
 }
 
 func (c *Client) ListMCPServers(ctx context.Context) ([]openapi.MCPServer, error) {
-	return client.ListAll("/v1/mcp_server", func(limit int, startingAfter *string) ([]openapi.MCPServer, error) {
+	return client.ListObjects("/v1/mcp_server", func(limit int, startingAfter *string) (*client.Page[openapi.MCPServer], error) {
 		page, err := c.sdk.API.GetMcpServerWithResponse(ctx, &openapi.GetMcpServerParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(s openapi.MCPServer) string { return s.Id.String() })
 }
 
 func (c *Client) ListServiceTokens(ctx context.Context) ([]openapi.ServiceToken, error) {
-	return client.ListAll("/v1/service_token", func(limit int, startingAfter *string) ([]openapi.ServiceToken, error) {
+	return client.ListObjects("/v1/service_token", func(limit int, startingAfter *string) (*client.Page[openapi.ServiceToken], error) {
 		page, err := c.sdk.API.GetServiceTokenWithResponse(ctx, &openapi.GetServiceTokenParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(t openapi.ServiceToken) string { return t.Id.String() })
 }
 
 func (c *Client) ListAISecrets(ctx context.Context) ([]openapi.AISecret, error) {
-	return client.ListAll("/v1/ai_secret", func(limit int, startingAfter *string) ([]openapi.AISecret, error) {
+	return client.ListObjects("/v1/ai_secret", func(limit int, startingAfter *string) (*client.Page[openapi.AISecret], error) {
 		page, err := c.sdk.API.GetAiSecretWithResponse(ctx, &openapi.GetAiSecretParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(s openapi.AISecret) string { return s.Id.String() })
 }
 
@@ -315,15 +280,11 @@ func (c *Client) ListProjectAutomations(ctx context.Context) ([]ProjectAutomatio
 }
 
 func (c *Client) ListUsers(ctx context.Context) ([]openapi.User, error) {
-	return client.ListAll("/v1/user", func(limit int, startingAfter *string) ([]openapi.User, error) {
+	return client.ListObjects("/v1/user", func(limit int, startingAfter *string) (*client.Page[openapi.User], error) {
 		page, err := c.sdk.API.GetUserWithResponse(ctx, &openapi.GetUserParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(u openapi.User) string { return u.Id.String() })
 }

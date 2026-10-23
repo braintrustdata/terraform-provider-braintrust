@@ -64,7 +64,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		if _, err := output.Write(dataSourceHCL); err != nil {
 			return fmt.Errorf("failed to write data sources: %w", err)
 		}
-		if _, err := output.Write([]byte("\n")); err != nil {
+		if _, err := output.WriteString("\n"); err != nil {
 			return fmt.Errorf("failed to write separator: %w", err)
 		}
 	}
@@ -145,7 +145,7 @@ func fetchAndBuildBlocks(ctx context.Context, resourceTypes []string) ([]hcl.Res
 			fmt.Fprintf(os.Stderr, "Warning: failed to list users for linking: %v\n", err)
 		} else {
 			for _, u := range users {
-				if email, ok := optional(u.Email); ok {
+				if email, ok := client.Optional(u.Email); ok {
 					resolver.RegisterUser(u.Id.String(), email)
 				}
 			}
@@ -254,7 +254,7 @@ func buildProjectBlocks(projects []openapi.Project, resolver *hcl.ReferenceResol
 		id := p.Id.String()
 		name := hcl.ResourceNameFromIDAndLabel(id, p.Name)
 		fields := map[string]any{"name": p.Name}
-		if description, ok := optional(p.Description); ok {
+		if description, ok := client.Optional(p.Description); ok {
 			fields["description"] = description
 		}
 		blocks = append(blocks, hcl.ResourceBlock{
@@ -280,7 +280,7 @@ func roleBlocksFromRoles(roles []openapi.Role, orgID string, resolver *hcl.Refer
 	var blocks []hcl.ResourceBlock
 	for _, r := range roles {
 		id := r.Id.String()
-		roleOrgID, hasOrg := optionalUUID(r.OrgId)
+		roleOrgID, hasOrg := client.OptionalUUID(r.OrgId)
 		if hasOrg && roleOrgID != orgID {
 			continue
 		}
@@ -295,22 +295,22 @@ func roleBlocksFromRoles(roles []openapi.Role, orgID string, resolver *hcl.Refer
 		resolver.Register(id, "braintrust_role", name)
 
 		fields := map[string]any{"name": r.Name}
-		if description, ok := optional(r.Description); ok {
+		if description, ok := client.Optional(r.Description); ok {
 			fields["description"] = description
 		}
-		if memberPermissions, _ := optional(r.MemberPermissions); len(memberPermissions) > 0 {
+		if memberPermissions, _ := client.Optional(r.MemberPermissions); len(memberPermissions) > 0 {
 			perms := make([]any, len(memberPermissions))
 			for i, mp := range memberPermissions {
 				pm := map[string]any{"permission": string(mp.Permission)}
-				if restrict, ok := optionalEnum(mp.RestrictObjectType); ok {
+				if restrict, ok := client.OptionalEnum(mp.RestrictObjectType); ok {
 					pm["restrict_object_type"] = restrict
 				}
 				perms[i] = pm
 			}
 			fields["member_permissions"] = perms
 		}
-		if memberRoles, _ := optional(r.MemberRoles); len(memberRoles) > 0 {
-			fields["member_roles"] = uuidStrings(memberRoles)
+		if memberRoles, _ := client.Optional(r.MemberRoles); len(memberRoles) > 0 {
+			fields["member_roles"] = client.UUIDStrings(memberRoles)
 		}
 
 		blocks = append(blocks, hcl.ResourceBlock{
@@ -348,12 +348,12 @@ func buildGroupBlocks(ctx context.Context, orgID string, resolver *hcl.Reference
 		resolver.Register(id, "braintrust_group", name)
 
 		fields := map[string]any{"name": g.Name}
-		if description, ok := optional(g.Description); ok {
+		if description, ok := client.Optional(g.Description); ok {
 			fields["description"] = description
 		}
-		if users, _ := optional(g.MemberUsers); len(users) > 0 {
+		if users, _ := client.Optional(g.MemberUsers); len(users) > 0 {
 			memberUsers := make([]any, 0, len(users))
-			for _, userID := range uuidStrings(users) {
+			for _, userID := range client.UUIDStrings(users) {
 				if !linkUsers {
 					memberUsers = append(memberUsers, userID)
 					continue
@@ -370,8 +370,8 @@ func buildGroupBlocks(ctx context.Context, orgID string, resolver *hcl.Reference
 			}
 			fields["member_users"] = memberUsers
 		}
-		if memberGroups, _ := optional(g.MemberGroups); len(memberGroups) > 0 {
-			fields["member_groups"] = uuidStrings(memberGroups)
+		if memberGroups, _ := client.Optional(g.MemberGroups); len(memberGroups) > 0 {
+			fields["member_groups"] = client.UUIDStrings(memberGroups)
 		}
 
 		blocks = append(blocks, hcl.ResourceBlock{
@@ -410,8 +410,8 @@ func buildBuiltinGroupMembershipBlocks(ctx context.Context, orgID string, resolv
 			continue
 		}
 		resolver.RegisterGroupDataSource(groupID, group.Name, groupOrgID)
-		members, _ := optional(group.MemberUsers)
-		for _, userID := range uuidStrings(members) {
+		members, _ := client.Optional(group.MemberUsers)
+		for _, userID := range client.UUIDStrings(members) {
 			// GET /v1/user only exposes human users. The API does not say
 			// whether a service-account membership is manual or automatic,
 			// so never put an unresolved account under Terraform ownership.
@@ -459,12 +459,12 @@ func buildProjectGroupBlocks(ctx context.Context, orgID string, resolver *hcl.Re
 		name := hcl.ResourceNameFromIDAndLabel(groupID, group.Name)
 		resolver.Register(groupID, "braintrust_project_group", name)
 		fields := map[string]any{"org_id": groupOrgID, "name": group.Name}
-		if description, ok := optional(group.Description); ok {
+		if description, ok := client.Optional(group.Description); ok {
 			fields["description"] = description
 		}
 		if inlineMembers && len(group.MemberProjects) > 0 {
 			members := make([]any, 0, len(group.MemberProjects))
-			for _, projectID := range uuidStrings(group.MemberProjects) {
+			for _, projectID := range client.UUIDStrings(group.MemberProjects) {
 				if ref := resolver.Resolve("member_projects", projectID); ref != "" {
 					members = append(members, hcl.RawExpression(ref))
 				} else {
@@ -489,7 +489,7 @@ func buildProjectGroupMembershipBlocks(ctx context.Context, orgID string, resolv
 		if groupOrgID != orgID {
 			return nil, fmt.Errorf("project group %s belongs to unexpected organization %s", groupID, groupOrgID)
 		}
-		for _, projectID := range uuidStrings(group.MemberProjects) {
+		for _, projectID := range client.UUIDStrings(group.MemberProjects) {
 			fields := map[string]any{"project_group_id": groupID, "project_id": projectID}
 			linked := map[string]string{}
 			if ref := resolver.Resolve("project_group_id", groupID); ref != "" {
@@ -536,7 +536,7 @@ func buildACLBlocks(ctx context.Context, orgID string, resolver *hcl.ReferenceRe
 		return nil, fmt.Errorf("list roles for ACL classification: %w", err)
 	}
 	for _, role := range roles {
-		if _, hasOrg := optionalUUID(role.OrgId); !hasOrg {
+		if _, hasOrg := client.OptionalUUID(role.OrgId); !hasOrg {
 			resolver.RegisterRoleDataSource(role.Id.String(), role.Name)
 		}
 	}
@@ -598,31 +598,31 @@ func buildACLBlocks(ctx context.Context, orgID string, resolver *hcl.ReferenceRe
 		}
 		linked := make(map[string]string)
 
-		if groupID, ok := optionalUUID(a.GroupId); ok {
+		if groupID, ok := client.OptionalUUID(a.GroupId); ok {
 			if ref := resolver.Resolve("group_id", groupID); ref != "" {
 				linked["group_id"] = ref
 			} else {
 				fields["group_id"] = groupID
 			}
 		}
-		if roleID, ok := optionalUUID(a.RoleId); ok {
+		if roleID, ok := client.OptionalUUID(a.RoleId); ok {
 			if ref := resolver.Resolve("role_id", roleID); ref != "" {
 				linked["role_id"] = ref
 			} else {
 				fields["role_id"] = roleID
 			}
 		}
-		if userID, ok := optionalUUID(a.UserId); ok {
+		if userID, ok := client.OptionalUUID(a.UserId); ok {
 			if ref, ok := resolver.UserRef(userID); ok {
 				linked["user_id"] = ref
 			} else {
 				fields["user_id"] = userID
 			}
 		}
-		if permission, ok := optionalEnum(a.Permission); ok {
+		if permission, ok := client.OptionalEnum(a.Permission); ok {
 			fields["permission"] = permission
 		}
-		if restrict, ok := optionalEnum(a.RestrictObjectType); ok {
+		if restrict, ok := client.OptionalEnum(a.RestrictObjectType); ok {
 			fields["restrict_object_type"] = restrict
 		}
 
@@ -681,8 +681,8 @@ func verifyACLTargets(ctx context.Context, acls []openapi.Acl, read func(context
 }
 
 func isDefaultBuiltinACL(acl openapi.Acl, orgID string, resolver *hcl.ReferenceResolver) bool {
-	groupID, hasGroup := optionalUUID(acl.GroupId)
-	_, hasUser := optionalUUID(acl.UserId)
+	groupID, hasGroup := client.OptionalUUID(acl.GroupId)
+	_, hasUser := client.OptionalUUID(acl.UserId)
 	if !hasGroup || acl.ObjectId.String() != orgID || hasUser || acl.RestrictObjectType != nil {
 		return false
 	}
@@ -690,8 +690,8 @@ func isDefaultBuiltinACL(acl openapi.Acl, orgID string, resolver *hcl.ReferenceR
 	if groupName == "" {
 		return false
 	}
-	roleID, hasRole := optionalUUID(acl.RoleId)
-	permission, hasPermission := optionalEnum(acl.Permission)
+	roleID, hasRole := client.OptionalUUID(acl.RoleId)
+	permission, hasPermission := client.OptionalEnum(acl.Permission)
 	if acl.ObjectType == "org_ai_secret" && !hasRole && hasPermission && permission == "read" {
 		return groupName == "Engineers" || groupName == "Viewers" || groupName == "All AI Provider Access"
 	}
@@ -763,10 +763,10 @@ func buildDatasetBlocks(ctx context.Context, projects []openapi.Project, resolve
 			} else {
 				fields["project_id"] = projectID
 			}
-			if description, ok := optional(d.Description); ok {
+			if description, ok := client.Optional(d.Description); ok {
 				fields["description"] = description
 			}
-			if tags, ok := optional(d.Tags); ok {
+			if tags, ok := client.Optional(d.Tags); ok {
 				fields["tags"] = tags
 			}
 			if metadata := raw.Fields["metadata"]; len(metadata) > 0 {
@@ -821,7 +821,7 @@ func buildProjectScoreBlocks(ctx context.Context, projects []openapi.Project, re
 			} else {
 				fields["project_id"] = projectID
 			}
-			if description, ok := optional(s.Description); ok {
+			if description, ok := client.Optional(s.Description); ok {
 				fields["description"] = description
 			}
 			if rawCategories := raw.Fields["categories"]; len(rawCategories) > 0 {
@@ -916,7 +916,7 @@ func buildViewBlocks(ctx context.Context, projects []openapi.Project, orgID stri
 	blocks := make([]hcl.ResourceBlock, 0, len(views))
 	for _, raw := range views {
 		v, id, objectType, objectID := raw.Value, raw.Value.Id.String(), string(raw.Value.ObjectType), raw.Value.ObjectId.String()
-		viewType, _ := optional(v.ViewType)
+		viewType, _ := client.Optional(v.ViewType)
 		fields := map[string]any{"object_type": objectType, "view_type": string(viewType), "name": v.Name}
 		linked := map[string]string{}
 		if ref := resolver.Resolve("object_id", objectID); ref != "" {
@@ -924,7 +924,7 @@ func buildViewBlocks(ctx context.Context, projects []openapi.Project, orgID stri
 		} else {
 			fields["object_id"] = objectID
 		}
-		if description, ok := optional(v.Description); ok {
+		if description, ok := client.Optional(v.Description); ok {
 			fields["description"] = description
 		}
 		if v.Starred != nil {
@@ -986,13 +986,13 @@ func buildFunctionBlocks(ctx context.Context, projects []openapi.Project, resolv
 			} else {
 				fields["project_id"] = projectID
 			}
-			if description, ok := optional(function.Description); ok {
+			if description, ok := client.Optional(function.Description); ok {
 				fields["description"] = description
 			}
-			if tags, _ := optional(function.Tags); len(tags) > 0 {
+			if tags, _ := client.Optional(function.Tags); len(tags) > 0 {
 				fields["tags"] = tags
 			}
-			if functionType, ok := optional(function.FunctionType); ok {
+			if functionType, ok := client.Optional(function.FunctionType); ok {
 				fields["function_type"] = string(functionType)
 			}
 			functionData := raw.Fields["function_data"]
@@ -1050,10 +1050,10 @@ func buildProjectTagBlocks(ctx context.Context, projects []openapi.Project, reso
 			} else {
 				fields["project_id"] = projectID
 			}
-			if description, ok := optional(t.Description); ok {
+			if description, ok := client.Optional(t.Description); ok {
 				fields["description"] = description
 			}
-			if color, ok := optional(t.Color); ok {
+			if color, ok := client.Optional(t.Color); ok {
 				fields["color"] = color
 			}
 
@@ -1089,7 +1089,7 @@ func buildProjectAutomationBlocks(ctx context.Context, projects []openapi.Projec
 			} else {
 				fields["project_id"] = projectID
 			}
-			if description, ok := optional(a.Description); ok {
+			if description, ok := client.Optional(a.Description); ok {
 				fields["description"] = description
 			}
 
@@ -1155,7 +1155,7 @@ func buildOrgAutomationBlocks(ctx context.Context, orgID string) ([]hcl.Resource
 				"retention_days": float64(*config.RetentionDays),
 			},
 		}
-		if description, ok := optional(automation.Description); ok {
+		if description, ok := client.Optional(automation.Description); ok {
 			fields["description"] = description
 		}
 		blocks = append(blocks, hcl.ResourceBlock{
@@ -1178,7 +1178,7 @@ func buildMCPServerBlocks(ctx context.Context, projects []openapi.Project, resol
 	var blocks []hcl.ResourceBlock
 	for _, server := range servers {
 		id, projectID := server.Id.String(), server.ProjectId.String()
-		if _, deleted := optional(server.DeletedAt); !selectedProjects[projectID] || deleted {
+		if _, deleted := client.Optional(server.DeletedAt); !selectedProjects[projectID] || deleted {
 			continue
 		}
 		fields := map[string]any{"name": server.Name, "url": server.Url}
@@ -1188,7 +1188,7 @@ func buildMCPServerBlocks(ctx context.Context, projects []openapi.Project, resol
 		} else {
 			fields["project_id"] = projectID
 		}
-		if description, ok := optional(server.Description); ok {
+		if description, ok := client.Optional(server.Description); ok {
 			fields["description"] = description
 		}
 		blocks = append(blocks, hcl.ResourceBlock{
@@ -1402,7 +1402,8 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 		return nil, nil, err
 	}
 	for _, envVars := range projectEnvVars {
-		for _, ev := range envVars {
+		for i := range envVars {
+			ev := &envVars[i]
 			id, objectID := ev.Id.String(), ev.ObjectId.String()
 			if seen[id] {
 				continue
@@ -1421,7 +1422,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 				delete(fields, "object_id")
 			}
 
-			if secretType, ok := optional(ev.SecretType); ok {
+			if secretType, ok := client.Optional(ev.SecretType); ok {
 				fields["secret_type"] = secretType
 			}
 			// The API does not return values for either ordinary or typed env vars.
@@ -1446,7 +1447,8 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 		if err != nil {
 			return nil, nil, fmt.Errorf("list env vars for organization %s: %w", orgID, err)
 		}
-		for _, ev := range orgVars {
+		for i := range orgVars {
+			ev := &orgVars[i]
 			id, objectID := ev.Id.String(), ev.ObjectId.String()
 			if seen[id] {
 				continue
@@ -1461,7 +1463,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 			}
 			linked := make(map[string]string)
 
-			if secretType, ok := optional(ev.SecretType); ok {
+			if secretType, ok := client.Optional(ev.SecretType); ok {
 				fields["secret_type"] = secretType
 			}
 			varName := "braintrust_env_var_" + api.SanitizeName(ev.Name) + "_" + api.SanitizeName(id) + "_value"
@@ -1489,13 +1491,13 @@ func buildServiceTokenBlocks(ctx context.Context, orgID string, resolver *hcl.Re
 	}
 	var blocks []hcl.ResourceBlock
 	for _, t := range tokens {
-		if tokenOrgID, ok := optionalUUID(t.OrgId); !ok || tokenOrgID != orgID {
+		if tokenOrgID, ok := client.OptionalUUID(t.OrgId); !ok || tokenOrgID != orgID {
 			continue
 		}
 		id := t.Id.String()
 		name := hcl.ResourceNameFromIDAndLabel(id, t.Name)
 		fields := map[string]any{"name": t.Name}
-		if serviceAccountID, ok := optionalUUID(t.ServiceAccountId); ok {
+		if serviceAccountID, ok := client.OptionalUUID(t.ServiceAccountId); ok {
 			fields["service_account_id"] = serviceAccountID
 		}
 
@@ -1527,7 +1529,7 @@ func buildAISecretBlocks(ctx context.Context, orgID string, resolver *hcl.Refere
 		fields := map[string]any{"name": s.Name}
 		linked := make(map[string]string)
 
-		if secretType, ok := optional(s.Type); ok {
+		if secretType, ok := client.Optional(s.Type); ok {
 			fields["type"] = secretType
 		}
 
@@ -1578,10 +1580,11 @@ func canonicalJSON(raw json.RawMessage) (string, error) {
 
 func resolveOrgID(ctx context.Context, projects []openapi.Project, explicit string) (string, error) {
 	if explicit != "" {
-		if err := apiClient.GetOrganization(ctx, explicit); err != nil {
+		orgID, err := apiClient.GetOrganization(ctx, explicit)
+		if err != nil {
 			return "", fmt.Errorf("verify selected organization %s: %w", explicit, err)
 		}
-		return explicit, nil
+		return orgID, nil
 	}
 	orgIDs := make(map[string]bool)
 	for _, project := range projects {

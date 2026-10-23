@@ -131,7 +131,7 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 	replaceResp, err := client.Write(r.client.API.PutEnvVarWithResponse(ctx, replaceReq))
 	var created *openapi.EnvVar
 	if err == nil {
-		created, err = client.JSON(replaceResp.JSON200)
+		created, err = client.Written(replaceResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -214,7 +214,7 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 	updateResp, err := client.Write(r.client.API.PatchEnvVarIdWithResponse(ctx, state.ID.ValueString(), updateReq))
 	var envVar *openapi.EnvVar
 	if err == nil {
-		envVar, err = client.JSON(updateResp.JSON200)
+		envVar, err = client.Written(updateResp.JSON200)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

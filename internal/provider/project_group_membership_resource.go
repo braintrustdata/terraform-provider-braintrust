@@ -74,7 +74,7 @@ func (r *projectGroupMembershipResource) Create(ctx context.Context, req resourc
 		resp.Diagnostics.AddError("Error Reading Project Group", err.Error())
 		return
 	}
-	if slices.Contains(uuidStrings(group.MemberProjects), projectID) {
+	if slices.Contains(client.UUIDStrings(group.MemberProjects), projectID) {
 		resp.Diagnostics.AddError("Project Group Membership Already Exists", "Import the existing membership instead of creating it again.")
 		return
 	}
@@ -90,7 +90,7 @@ func (r *projectGroupMembershipResource) Create(ctx context.Context, req resourc
 		resp.Diagnostics.AddError("Error Adding Project Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(uuidStrings(group.MemberProjects), projectID) {
+	if !slices.Contains(client.UUIDStrings(group.MemberProjects), projectID) {
 		resp.Diagnostics.AddError("Project Group Membership Missing After Add", fmt.Sprintf("Project %s was not returned as a member of group %s", projectID, groupID))
 	}
 }
@@ -110,7 +110,7 @@ func (r *projectGroupMembershipResource) Read(ctx context.Context, req resource.
 		resp.Diagnostics.AddError("Error Reading Project Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(uuidStrings(group.MemberProjects), state.ProjectID.ValueString()) {
+	if !slices.Contains(client.UUIDStrings(group.MemberProjects), state.ProjectID.ValueString()) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -137,7 +137,7 @@ func (r *projectGroupMembershipResource) Delete(ctx context.Context, req resourc
 		resp.Diagnostics.AddError("Error Reading Project Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(uuidStrings(group.MemberProjects), projectID) {
+	if !slices.Contains(client.UUIDStrings(group.MemberProjects), projectID) {
 		return
 	}
 	projectUUID, err := parseUUID(state.ProjectID, "project_id")

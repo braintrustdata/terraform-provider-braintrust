@@ -135,7 +135,7 @@ func patchView(ctx context.Context, c *client.Client, id string, patch openapi.P
 	if err != nil {
 		return nil, err
 	}
-	return client.DecodeRaw(resp.JSON200, resp.Body)
+	return client.WrittenRaw(resp.JSON200, resp.Body)
 }
 
 func (r *viewResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -179,7 +179,7 @@ func (r *viewResource) Create(ctx context.Context, req resource.CreateRequest, r
 		var createdBody *openapi.View
 		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, existing)
 		if err == nil {
-			created, err = client.DecodeRaw(createdBody, createResp.Body)
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
 		}
 	}
 	if err != nil {

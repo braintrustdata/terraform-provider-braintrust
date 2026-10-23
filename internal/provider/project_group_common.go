@@ -27,7 +27,7 @@ func mapProjectGroupToModel(group *openapi.ProjectGroup, model *projectGroupMode
 	model.Created = nullableTimeToTF(group.Created, model.Created)
 	model.DeletedAt = nullableTimeToTF(group.DeletedAt, model.DeletedAt)
 	model.UserID = nullableUUIDToTF(group.UserId)
-	model.MemberProjects = stringSliceToTFSet(uuidStrings(group.MemberProjects))
+	model.MemberProjects = stringSliceToTFSet(client.UUIDStrings(group.MemberProjects))
 }
 
 func getProjectGroup(ctx context.Context, c *client.Client, id string) (*openapi.ProjectGroup, error) {
@@ -43,13 +43,13 @@ func patchProjectGroup(ctx context.Context, c *client.Client, id string, patch o
 	if err != nil {
 		return nil, err
 	}
-	return client.JSON(resp.JSON200)
+	return client.Written(resp.JSON200)
 }
 
 // listProjectGroups lists project groups by name. The endpoint cannot filter
 // by org_id, so that filter is applied here; an empty orgID matches all.
 func listProjectGroups(ctx context.Context, c *client.Client, orgID, name string) ([]openapi.ProjectGroup, error) {
-	groups, err := client.ListAll("/v1/project_group", func(limit int, startingAfter *string) ([]openapi.ProjectGroup, error) {
+	groups, err := client.ListObjects("/v1/project_group", func(limit int, startingAfter *string) (*client.Page[openapi.ProjectGroup], error) {
 		params := &openapi.GetProjectGroupParams{Limit: &limit, StartingAfter: startingAfter}
 		if name != "" {
 			params.ProjectGroupName = &name
@@ -58,11 +58,7 @@ func listProjectGroups(ctx context.Context, c *client.Client, orgID, name string
 		if err != nil {
 			return nil, err
 		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return body.Objects, nil
+		return page.JSON200, nil
 	}, func(group openapi.ProjectGroup) string { return group.Id.String() })
 	if err != nil || orgID == "" {
 		return groups, err
