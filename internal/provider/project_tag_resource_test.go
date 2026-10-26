@@ -62,7 +62,7 @@ func testAccCheckProjectTagDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_project_tag" {
 			continue
 		}
-		_, err := c.GetProjectTag(context.Background(), rs.Primary.ID)
+		_, err := c.API.GetProjectTagIdWithResponse(context.Background(), rs.Primary.ID)
 		if err == nil {
 			return fmt.Errorf("braintrust project tag %s still exists after destroy", rs.Primary.ID)
 		}

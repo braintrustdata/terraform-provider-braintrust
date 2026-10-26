@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -99,21 +101,43 @@ func (r *functionResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Invalid Function Schema", err.Error())
 		return
 	}
-	created, err := r.client.CreateFunction(ctx, client.CreateFunctionRequest{
-		ProjectID: plan.ProjectID.ValueString(), Name: plan.Name.ValueString(), Slug: plan.Slug.ValueString(),
-		FunctionType: tfStringToPtr(plan.FunctionType), FunctionData: functionData,
-		Description: tfStringToPtr(plan.Description), Tags: stringListFromModel(plan.Tags),
-		PromptData: promptData, FunctionSchema: functionSchema,
+	projectID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
+	}
+	createReq := openapi.CreateFunction{
+		ProjectId: projectID, Name: plan.Name.ValueString(), Slug: plan.Slug.ValueString(),
+		Description: tfStringToNullable(plan.Description), Tags: nullableSlice(stringListFromModel(plan.Tags)),
+	}
+	if functionType := tfStringToEnum[openapi.FunctionTypeEnumNullish](plan.FunctionType); functionType != nil {
+		createReq.FunctionType = nullable.NewNullableWithValue(*functionType)
+	}
+	body, err := client.JSONBody(createReq, map[string]json.RawMessage{
+		"function_data": functionData, "prompt_data": promptData, "function_schema": functionSchema,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Braintrust Function", err.Error())
 		return
 	}
-	function, err := r.client.GetFunction(ctx, created.ID)
+	createResp, err := client.Write(r.client.API.PostFunctionWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *function
+	if err == nil {
+		var createdBody *openapi.Function
+		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "function")
+		if err == nil {
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
+		}
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust Function", err.Error())
+		return
+	}
+	function, err := getFunction(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapFunctionToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-		resp.Diagnostics.AddError("Error Reading Braintrust Function After Create", fmt.Sprintf("Function was created (ID: %s) but could not be read: %s", created.ID, err))
+		resp.Diagnostics.AddError("Error Reading Braintrust Function After Create", fmt.Sprintf("Function was created (ID: %s) but could not be read: %s", created.Value.Id, err))
 		return
 	}
 	mapFunctionToModel(function, &plan)
@@ -126,7 +150,7 @@ func (r *functionResource) Read(ctx context.Context, req resource.ReadRequest, r
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	function, err := r.client.GetFunction(ctx, state.ID.ValueString())
+	function, err := getFunction(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -156,28 +180,33 @@ func (r *functionResource) Update(ctx context.Context, req resource.UpdateReques
 		resp.Diagnostics.AddError("Invalid Prompt Data", err.Error())
 		return
 	}
-	name := plan.Name.ValueString()
-	update := client.UpdateFunctionRequest{Name: &name, FunctionData: functionData}
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		description := plan.Description.ValueString()
-		update.Description = &description
-	} else if plan.Description.IsNull() && !state.Description.IsNull() {
-		empty := ""
-		update.Description = &empty
+	update := openapi.PatchFunction{
+		Name:        nullable.NewNullableWithValue(plan.Name.ValueString()),
+		Description: patchString(plan.Description, state.Description),
 	}
 	if !plan.Tags.IsNull() && !plan.Tags.IsUnknown() {
 		tags := stringListFromModel(plan.Tags)
 		if tags == nil {
 			tags = []string{}
 		}
-		update.Tags = &tags
+		update.Tags = nullable.NewNullableWithValue(tags)
 	}
+	raw := map[string]json.RawMessage{"function_data": functionData}
 	if promptData != nil {
-		update.PromptData = promptData
+		raw["prompt_data"] = promptData
 	} else if plan.PromptDataJSON.IsNull() && !state.PromptDataJSON.IsNull() {
-		update.PromptData = json.RawMessage("null")
+		raw["prompt_data"] = json.RawMessage("null")
 	}
-	updated, err := r.client.UpdateFunction(ctx, state.ID.ValueString(), update)
+	body, err := client.JSONBody(update, raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Braintrust Function", err.Error())
+		return
+	}
+	updateResp, err := client.Write(r.client.API.PatchFunctionIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var updated *function
+	if err == nil {
+		updated, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust Function", err.Error())
 		return
@@ -192,7 +221,7 @@ func (r *functionResource) Delete(ctx context.Context, req resource.DeleteReques
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	if err := r.client.DeleteFunction(ctx, state.ID.ValueString()); err != nil && !client.IsNotFoundError(err) {
+	if _, err := client.Write(r.client.API.DeleteFunctionIdWithResponse(ctx, state.ID.ValueString())); err != nil && !client.IsNotFoundError(err) {
 		resp.Diagnostics.AddError("Error Deleting Braintrust Function", err.Error())
 	}
 }

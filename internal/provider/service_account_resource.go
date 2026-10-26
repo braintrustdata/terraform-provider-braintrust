@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -73,17 +74,11 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	createReq := client.PatchOrganizationMembersRequest{
-		InviteUsers: &client.InviteUsersRequest{
-			ServiceAccounts: []client.ServiceAccountInvite{
-				{Name: plan.Name.ValueString()},
-			},
-		},
-	}
-
 	tflog.Debug(ctx, "Creating service account", map[string]any{"name": plan.Name.ValueString()})
 
-	output, err := r.client.PatchOrganizationMembers(ctx, createReq)
+	output, err := patchOrganizationMembers(ctx, r.client, map[string]any{
+		"invite_users": map[string]any{"service_accounts": []map[string]string{{"name": plan.Name.ValueString()}}},
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Service Account",
@@ -92,7 +87,7 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	if len(output.AddedUsers) == 0 {
+	if len(nullableSliceValue(output.AddedUsers)) == 0 {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Service Account",
 			"Service account creation succeeded but no created member was returned by the API response.",
@@ -100,9 +95,9 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	created := output.AddedUsers[0]
-	plan.ID = types.StringValue(created.ID)
-	plan.Email = stringPtrToTFValue(created.Email)
+	created := output.AddedUsers.MustGet()[0]
+	plan.ID = types.StringValue(created.Id.String())
+	plan.Email = nullableStringToTF(created.Email)
 	// The membership response does not expose a creation timestamp, and the
 	// public user endpoint excludes service accounts.
 	plan.Created = types.StringNull()
@@ -144,13 +139,9 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	deleteReq := client.PatchOrganizationMembersRequest{
-		RemoveUsers: &client.RemoveUsersRequest{
-			IDs: []string{state.ID.ValueString()},
-		},
-	}
-
-	_, err := r.client.PatchOrganizationMembers(ctx, deleteReq)
+	_, err := patchOrganizationMembers(ctx, r.client, map[string]any{
+		"remove_users": map[string]any{"ids": []string{state.ID.ValueString()}},
+	})
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return
@@ -160,4 +151,18 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 			fmt.Sprintf("Could not delete service account ID %s: %s", state.ID.ValueString(), err.Error()),
 		)
 	}
+}
+
+// patchOrganizationMembers sends a membership change. The SDK request type
+// nests anonymous structs, so the body is built as plain JSON instead.
+func patchOrganizationMembers(ctx context.Context, c *client.Client, change map[string]any) (*openapi.PatchOrganizationMembersOutput, error) {
+	body, err := client.JSONBody(change, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Write(c.API.PatchOrganizationMembersWithBodyWithResponse(ctx, client.JSONContentType, body))
+	if err != nil {
+		return nil, err
+	}
+	return client.Written(resp.JSON200)
 }

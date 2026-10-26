@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -68,15 +70,23 @@ func (r *mcpServerResource) Configure(_ context.Context, req resource.ConfigureR
 	r.client = clientFromProviderData(req.ProviderData, &resp.Diagnostics)
 }
 
-func mapMCPServerToModel(server *client.MCPServer, model *mcpServerModel) {
-	model.ID = types.StringValue(server.ID)
-	model.ProjectID = types.StringValue(server.ProjectID)
+func mapMCPServerToModel(server *openapi.MCPServer, model *mcpServerModel) {
+	model.ID = types.StringValue(server.Id.String())
+	model.ProjectID = types.StringValue(server.ProjectId.String())
 	model.Name = types.StringValue(server.Name)
-	model.URL = types.StringValue(server.URL)
-	model.Description = stringPtrToTFValue(server.Description)
-	model.UserID = stringPtrToTFValue(server.UserID)
-	model.Created = stringPtrToTFValue(server.Created)
-	model.DeletedAt = stringPtrToTFValue(server.DeletedAt)
+	model.URL = types.StringValue(server.Url)
+	model.Description = nullableStringToTF(server.Description)
+	model.UserID = nullableUUIDToTF(server.UserId)
+	model.Created = nullableTimeToTF(server.Created, model.Created)
+	model.DeletedAt = nullableTimeToTF(server.DeletedAt, model.DeletedAt)
+}
+
+func getMCPServer(ctx context.Context, c *client.Client, id string) (*openapi.MCPServer, error) {
+	resp, err := c.API.GetMcpServerIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.JSON(resp.JSON200)
 }
 
 func (r *mcpServerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -85,19 +95,28 @@ func (r *mcpServerResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	created, err := r.client.CreateMCPServer(ctx, client.CreateMCPServerRequest{
-		ProjectID: plan.ProjectID.ValueString(), Name: plan.Name.ValueString(),
-		URL: plan.URL.ValueString(), Description: tfStringToPtr(plan.Description),
-	})
+	projectID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
+	}
+	createResp, err := client.Write(r.client.API.PostMcpServerWithResponse(ctx, openapi.CreateMCPServer{
+		ProjectId: projectID, Name: plan.Name.ValueString(),
+		Url: plan.URL.ValueString(), Description: tfStringToNullable(plan.Description),
+	}))
+	var created *openapi.MCPServer
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "MCP server")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Braintrust MCP Server", err.Error())
 		return
 	}
-	server, err := r.client.GetMCPServer(ctx, created.ID)
+	server, err := getMCPServer(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapMCPServerToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-		resp.Diagnostics.AddError("Error Reading MCP Server After Create", "Created ID "+created.ID+": "+err.Error())
+		resp.Diagnostics.AddError("Error Reading MCP Server After Create", "Created ID "+created.Id.String()+": "+err.Error())
 		return
 	}
 	mapMCPServerToModel(server, &plan)
@@ -110,7 +129,7 @@ func (r *mcpServerResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	server, err := r.client.GetMCPServer(ctx, state.ID.ValueString())
+	server, err := getMCPServer(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -130,9 +149,18 @@ func (r *mcpServerResource) Update(ctx context.Context, req resource.UpdateReque
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	server, err := r.client.UpdateMCPServer(ctx, state.ID.ValueString(), client.UpdateMCPServerRequest{
-		Name: plan.Name.ValueString(), URL: plan.URL.ValueString(), Description: tfStringToPtr(plan.Description),
-	})
+	// Description is always sent; null clears it.
+	description := nullable.NewNullNullable[string]()
+	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
+		description = nullable.NewNullableWithValue(plan.Description.ValueString())
+	}
+	updateResp, err := client.Write(r.client.API.PatchMcpServerIdWithResponse(ctx, state.ID.ValueString(), openapi.PatchMCPServer{
+		Name: nullable.NewNullableWithValue(plan.Name.ValueString()), Url: nullable.NewNullableWithValue(plan.URL.ValueString()), Description: description,
+	}))
+	var server *openapi.MCPServer
+	if err == nil {
+		server, err = client.Written(updateResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust MCP Server", err.Error())
 		return
@@ -147,7 +175,7 @@ func (r *mcpServerResource) Delete(ctx context.Context, req resource.DeleteReque
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	if err := r.client.DeleteMCPServer(ctx, state.ID.ValueString()); err != nil && !client.IsNotFoundError(err) {
+	if _, err := client.Write(r.client.API.DeleteMcpServerIdWithResponse(ctx, state.ID.ValueString())); err != nil && !client.IsNotFoundError(err) {
 		resp.Diagnostics.AddError("Error Deleting Braintrust MCP Server", err.Error())
 	}
 }

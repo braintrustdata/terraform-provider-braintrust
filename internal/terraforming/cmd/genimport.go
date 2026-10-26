@@ -70,7 +70,7 @@ func runGenImport(cmd *cobra.Command, args []string) error {
 		if _, err := output.Write(dataSourceHCL); err != nil {
 			return fmt.Errorf("failed to write data sources: %w", err)
 		}
-		if _, err := output.Write([]byte("\n")); err != nil {
+		if _, err := output.WriteString("\n"); err != nil {
 			return fmt.Errorf("failed to write separator: %w", err)
 		}
 	}
@@ -90,7 +90,7 @@ func runGenImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Separator.
-	if _, err := output.Write([]byte("\n# =============================================================================\n# Import blocks — run `terraform apply` to import existing resources into state.\n# =============================================================================\n\n")); err != nil {
+	if _, err := output.WriteString("\n# =============================================================================\n# Import blocks — run `terraform apply` to import existing resources into state.\n# =============================================================================\n\n"); err != nil {
 		return fmt.Errorf("failed to write separator: %w", err)
 	}
 

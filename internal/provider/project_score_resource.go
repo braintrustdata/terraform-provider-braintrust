@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 // Valid project score types from the Braintrust API.
@@ -108,31 +110,48 @@ func (r *projectScoreResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	createReq := client.CreateProjectScoreRequest{
-		ProjectID:   plan.ProjectID.ValueString(),
-		Name:        plan.Name.ValueString(),
-		Description: tfStringToPtr(plan.Description),
-		ScoreType:   plan.ScoreType.ValueString(),
+	projectID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
 	}
-	var err error
-	createReq.Categories, err = projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
+	createReq := openapi.CreateProjectScore{
+		ProjectId:   projectID,
+		Name:        plan.Name.ValueString(),
+		Description: tfStringToNullable(plan.Description),
+		ScoreType:   openapi.ProjectScoreType(plan.ScoreType.ValueString()),
+	}
+	categories, err := projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Score Categories", err.Error())
 		return
 	}
-	createReq.Config, err = projectScoreJSONInput(plan.ConfigJSON, "config_json")
+	config, err := projectScoreJSONInput(plan.ConfigJSON, "config_json")
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Score Config", err.Error())
 		return
 	}
+	body, err := client.JSONBody(createReq, map[string]json.RawMessage{"categories": categories, "config": config})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust Project Score", err.Error())
+		return
+	}
 
 	tflog.Debug(ctx, "Creating project score", map[string]any{
-		"project_id": createReq.ProjectID,
+		"project_id": plan.ProjectID.ValueString(),
 		"name":       createReq.Name,
 		"score_type": createReq.ScoreType,
 	})
 
-	created, err := r.client.CreateProjectScore(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostProjectScoreWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *projectScore
+	if err == nil {
+		var createdBody *openapi.ProjectScore
+		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project score")
+		if err == nil {
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
+		}
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Project Score",
@@ -142,13 +161,13 @@ func (r *projectScoreResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	// Re-read to get the full state.
-	score, err := r.client.GetProjectScore(ctx, created.ID)
+	score, err := getProjectScore(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapProjectScoreToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Project Score After Create",
-			"Score was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"Score was created (ID: "+created.Value.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -167,7 +186,7 @@ func (r *projectScoreResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	score, err := r.client.GetProjectScore(ctx, state.ID.ValueString())
+	score, err := getProjectScore(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Project score not found, removing from state", map[string]any{
@@ -202,19 +221,18 @@ func (r *projectScoreResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	name := plan.Name.ValueString()
-	updateReq := client.UpdateProjectScoreRequest{
-		Name: &name,
+	updateReq := openapi.PatchProjectScore{
+		Name:        nullable.NewNullableWithValue(plan.Name.ValueString()),
+		Description: patchString(plan.Description, state.Description),
 	}
+	raw := map[string]json.RawMessage{}
 	if !scoreJSONEqual(plan.CategoriesJSON, state.CategoriesJSON) {
 		categories, err := projectScoreJSONInput(plan.CategoriesJSON, "categories_json")
 		if err != nil {
 			resp.Diagnostics.AddError("Invalid Score Categories", err.Error())
 			return
 		}
-		if categories != nil {
-			updateReq.Categories = &categories
-		}
+		raw["categories"] = categories
 	}
 	if !scoreJSONEqual(plan.ConfigJSON, state.ConfigJSON) {
 		config, err := projectScoreJSONInput(plan.ConfigJSON, "config_json")
@@ -222,20 +240,19 @@ func (r *projectScoreResource) Update(ctx context.Context, req resource.UpdateRe
 			resp.Diagnostics.AddError("Invalid Score Config", err.Error())
 			return
 		}
-		if config != nil {
-			updateReq.Config = &config
-		}
+		raw["config"] = config
+	}
+	body, err := client.JSONBody(updateReq, raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Braintrust Project Score", err.Error())
+		return
 	}
 
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		desc := plan.Description.ValueString()
-		updateReq.Description = &desc
-	} else if plan.Description.IsNull() && !state.Description.IsNull() {
-		empty := ""
-		updateReq.Description = &empty
+	updateResp, err := client.Write(r.client.API.PatchProjectScoreIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var score *projectScore
+	if err == nil {
+		score, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
-
-	score, err := r.client.UpdateProjectScore(ctx, state.ID.ValueString(), updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Project Score",
@@ -258,7 +275,7 @@ func (r *projectScoreResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.DeleteProjectScore(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteProjectScoreIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

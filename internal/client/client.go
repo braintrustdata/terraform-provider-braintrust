@@ -1,18 +1,13 @@
 package client
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"math/rand/v2"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 )
 
 const (
@@ -48,10 +43,9 @@ var retriableStatusCodes = map[int]bool{
 
 // Client is the Braintrust API client.
 type Client struct {
-	baseURL    string
-	apiKey     string
-	httpClient *http.Client
-	userAgent  string
+	// API is the generated Braintrust SDK client. Its transport returns an
+	// error for every non-2xx response, so a nil error means success.
+	API *openapi.ClientWithResponses
 }
 
 // NewClient creates a new Braintrust API client.
@@ -68,14 +62,15 @@ func NewClient(baseURL, apiKey, userAgent string) (*Client, error) {
 		userAgent = defaultUserAgent
 	}
 
-	return &Client{
-		baseURL: baseURL,
-		apiKey:  apiKey,
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
-		userAgent: userAgent,
-	}, nil
+	api, err := openapi.NewClientWithResponses(baseURL, openapi.WithHTTPClient(&doer{
+		httpClient: &http.Client{Timeout: defaultTimeout},
+		apiKey:     apiKey,
+		userAgent:  userAgent,
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Braintrust API client: %w", err)
+	}
+	return &Client{API: api}, nil
 }
 
 // APIError represents an error returned by the Braintrust API.
@@ -106,6 +101,16 @@ func (e *UncertainWriteError) Error() string {
 
 func (e *UncertainWriteError) Unwrap() error { return e.Cause }
 
+// RequestNotSentError means a request was rejected before it was sent, so a
+// write cannot have committed.
+type RequestNotSentError struct {
+	Cause error
+}
+
+func (e *RequestNotSentError) Error() string { return e.Cause.Error() }
+
+func (e *RequestNotSentError) Unwrap() error { return e.Cause }
+
 func IsUncertainWriteError(err error) bool {
 	var uncertain *UncertainWriteError
 	return errors.As(err, &uncertain)
@@ -128,180 +133,8 @@ func IsNotFoundError(err error) bool {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) &&
 		(apiErr.StatusCode == http.StatusForbidden || apiErr.StatusCode == http.StatusBadRequest) &&
-		strings.Contains(apiErr.Message, "does not exist") {
+		strings.Contains(strings.ToLower(apiErr.Message), "does not exist") {
 		return true
 	}
 	return false
-}
-
-// doRequest performs an HTTP request with retry logic and returns the result.
-// Reads can be retried after network errors and transient HTTP statuses. Writes
-// are retried only when the API explicitly rejects them with 429; after a
-// transport error or 5xx, the server may have committed a non-idempotent write.
-func (c *Client) doRequest(ctx context.Context, method, path string, body any, result any) error {
-	return c.doRequestWithHeaders(ctx, method, path, body, result, nil)
-}
-
-// createNew rejects Braintrust's idempotent POST response for an existing
-// object. Adopting that object as newly created Terraform state would make a
-// later destroy delete infrastructure this configuration did not create.
-func (c *Client) createNew(ctx context.Context, path string, body any, result any, resourceType string) error {
-	var headers http.Header
-	if err := c.doRequestWithHeaders(ctx, http.MethodPost, path, body, result, &headers); err != nil {
-		return err
-	}
-	if headers.Get("x-bt-found-existing") != "" {
-		return fmt.Errorf("%s already exists; import the existing resource instead of creating it", resourceType)
-	}
-	return nil
-}
-
-// doRequestWithHeaders exposes response headers for endpoints where a successful
-// status still carries lifecycle information (for example, found-existing).
-func (c *Client) doRequestWithHeaders(ctx context.Context, method, path string, body any, result any, responseHeaders *http.Header) error {
-	url := fmt.Sprintf("%s%s", c.baseURL, path)
-
-	tflog.Debug(ctx, "Braintrust API request", map[string]any{
-		"method": method,
-		"path":   path,
-	})
-
-	var lastErr error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			// Exponential backoff with jitter: (1s, 2s, 4s) + rand(0, 1s)
-			backoff := time.Duration(1<<uint(attempt-1))*time.Second +
-				time.Duration(rand.Int64N(int64(maxJitter)))
-
-			tflog.Debug(ctx, "Retrying Braintrust API request", map[string]any{
-				"method":  method,
-				"path":    path,
-				"attempt": attempt,
-				"backoff": backoff.String(),
-				"error":   lastErr.Error(),
-			})
-
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(backoff):
-			}
-		}
-
-		// Create body reader for each attempt.
-		var bodyReader io.Reader
-		if body != nil {
-			jsonBody, err := json.Marshal(body)
-			if err != nil {
-				return fmt.Errorf("failed to marshal request body: %w", err)
-			}
-			bodyReader = bytes.NewReader(jsonBody)
-		}
-
-		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", c.userAgent)
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to execute request: %w", err)
-			// Don't retry if the context is done (canceled or deadline exceeded).
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			if method != http.MethodGet {
-				return &UncertainWriteError{Method: method, Cause: lastErr}
-			}
-			continue
-		}
-
-		// Read and close the response body immediately (not deferred)
-		// to avoid leaking file descriptors across retry iterations.
-		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
-		_ = resp.Body.Close() // intentionally discarding close error
-		if err != nil {
-			if method != http.MethodGet {
-				return &UncertainWriteError{Method: method, Cause: fmt.Errorf("failed to read response body: %w", err)}
-			}
-			return fmt.Errorf("failed to read response body: %w", err)
-		}
-
-		// Success
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			if responseHeaders != nil {
-				*responseHeaders = resp.Header.Clone()
-			}
-			tflog.Debug(ctx, "Braintrust API request succeeded", map[string]any{
-				"method":      method,
-				"path":        path,
-				"status_code": resp.StatusCode,
-				"attempts":    attempt + 1,
-			})
-			if result != nil && len(respBody) > 0 {
-				if err := json.Unmarshal(respBody, result); err != nil {
-					if method != http.MethodGet {
-						return &UncertainWriteError{Method: method, Cause: fmt.Errorf("failed to unmarshal response: %w", err)}
-					}
-					return fmt.Errorf("failed to unmarshal response: %w", err)
-				}
-			}
-			return nil
-		}
-
-		// Not Found - don't retry
-		if resp.StatusCode == http.StatusNotFound {
-			tflog.Debug(ctx, "Braintrust API resource not found", map[string]any{
-				"method":      method,
-				"path":        path,
-				"status_code": resp.StatusCode,
-			})
-			message := string(respBody)
-			if message == "" {
-				message = "not found"
-			}
-			return &NotFoundError{Message: message}
-		}
-
-		// Retriable error
-		if retriableStatusCodes[resp.StatusCode] {
-			lastErr = &APIError{
-				StatusCode: resp.StatusCode,
-				Message:    string(respBody),
-			}
-			if method != http.MethodGet && resp.StatusCode != http.StatusTooManyRequests {
-				return &UncertainWriteError{Method: method, Cause: lastErr}
-			}
-			continue
-		}
-
-		// Non-retriable error
-		tflog.Error(ctx, "Braintrust API request failed", map[string]any{
-			"method":      method,
-			"path":        path,
-			"status_code": resp.StatusCode,
-		})
-		return &APIError{
-			StatusCode: resp.StatusCode,
-			Message:    string(respBody),
-		}
-	}
-
-	tflog.Error(ctx, "Braintrust API request failed after retries", map[string]any{
-		"method":      method,
-		"path":        path,
-		"max_retries": maxRetries,
-	})
-
-	if lastErr != nil {
-		return fmt.Errorf("request failed after %d retries: %w", maxRetries, lastErr)
-	}
-	return fmt.Errorf("request failed after %d retries", maxRetries)
 }

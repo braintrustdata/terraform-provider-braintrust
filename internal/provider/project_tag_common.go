@@ -1,7 +1,7 @@
 package provider
 
 import (
-	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -16,13 +16,13 @@ type projectTagModel struct {
 	Created     types.String `tfsdk:"created"`
 }
 
-// mapProjectTagToModel maps a client.ProjectTag to the Terraform model.
-func mapProjectTagToModel(tag *client.ProjectTag, model *projectTagModel) {
-	model.ID = types.StringValue(tag.ID)
-	model.ProjectID = types.StringValue(tag.ProjectID)
-	model.UserID = stringPtrToTFValue(tag.UserID)
+// mapProjectTagToModel maps an SDK project tag to the Terraform model.
+func mapProjectTagToModel(tag *openapi.ProjectTag, model *projectTagModel) {
+	model.ID = types.StringValue(tag.Id.String())
+	model.ProjectID = types.StringValue(tag.ProjectId.String())
+	model.UserID = optionalUUIDToTF(tag.UserId)
 	model.Name = types.StringValue(tag.Name)
-	model.Description = stringPtrToTFValue(tag.Description)
-	model.Color = stringPtrToTFValue(tag.Color)
-	model.Created = stringPtrToTFValue(tag.Created)
+	model.Description = nullableStringToTF(tag.Description)
+	model.Color = nullableStringToTF(tag.Color)
+	model.Created = nullableTimeToTF(tag.Created, model.Created)
 }

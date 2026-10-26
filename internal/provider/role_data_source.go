@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -107,34 +108,44 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	var role *client.Role
+	var role *openapi.Role
 	if !config.ID.IsNull() && !config.ID.IsUnknown() {
 		id := config.ID.ValueString()
 		tflog.Debug(ctx, "Looking up role by ID", map[string]any{"id": id})
 		var err error
-		role, err = d.client.GetRole(ctx, id)
+		role, err = getRole(ctx, d.client, id)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Reading Braintrust Role", "Could not read role ID "+id+": "+err.Error())
 			return
 		}
-		if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && (role.OrgID == nil || *role.OrgID != config.OrgID.ValueString()) {
+		if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && nullableUUIDToTF(role.OrgId).ValueString() != config.OrgID.ValueString() {
 			resp.Diagnostics.AddError("Role Organization Mismatch", "Role ID "+id+" does not belong to org_id "+config.OrgID.ValueString()+".")
 			return
 		}
 	} else {
 		name := config.Name.ValueString()
 		tflog.Debug(ctx, "Looking up role by name", map[string]any{"name": name})
-		roles, err := d.client.ListRoles(ctx, name)
+		roles, err := client.ListObjects("/v1/role", func(limit int, startingAfter *string) (*client.Page[openapi.Role], error) {
+			page, err := d.client.API.GetRoleWithResponse(ctx, &openapi.GetRoleParams{
+				Limit:         &limit,
+				StartingAfter: startingAfter,
+				RoleName:      &name,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return page.JSON200, nil
+		}, func(role openapi.Role) string { return role.Id.String() })
 		if err != nil {
 			resp.Diagnostics.AddError("Error Reading Braintrust Role", "Could not list roles: "+err.Error())
 			return
 		}
 		for i := range roles {
 			candidate := &roles[i]
-			if candidate.Name != name || candidate.DeletedAt != nil {
+			if candidate.Name != name || nullableIsSet(candidate.DeletedAt) {
 				continue
 			}
-			if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && (candidate.OrgID == nil || *candidate.OrgID != config.OrgID.ValueString()) {
+			if !config.OrgID.IsNull() && !config.OrgID.IsUnknown() && nullableUUIDToTF(candidate.OrgId).ValueString() != config.OrgID.ValueString() {
 				continue
 			}
 			if role != nil {

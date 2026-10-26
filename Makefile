@@ -13,31 +13,6 @@ install: build
 	mkdir -p $(HOME)/.terraform.d/plugins
 	mv ./$(BINARY) $(HOME)/.terraform.d/plugins/$(BINARY)
 
-# Code generation pipeline: OpenAPI spec -> provider code spec -> Go code
-generate:
-	tfplugingen-openapi generate \
-		--config ./generator_config.yml \
-		--output ./provider_code_spec.json \
-		./internal/openapispec/openapi_spec.json
-	tfplugingen-framework generate resources \
-		--input ./provider_code_spec.json \
-		--output ./internal
-	tfplugingen-framework generate data-sources \
-		--input ./provider_code_spec.json \
-		--output ./internal
-
-# Scaffold a new resource (usage: make scaffold-resource NAME=foo)
-scaffold-resource:
-	tfplugingen-framework scaffold resource \
-		--name $(NAME) \
-		--output-dir ./internal/provider
-
-# Scaffold a new data source (usage: make scaffold-datasource NAME=foo)
-scaffold-datasource:
-	tfplugingen-framework scaffold data-source \
-		--name $(NAME) \
-		--output-dir ./internal/provider
-
 doc:
 	go generate ./...
 
@@ -45,22 +20,28 @@ test: deps
 	go test -mod=readonly -count=1 ./...
 
 test-acceptance: deps
-	TF_ACC=1 go test -v -mod=readonly -count=1 -p 5 -parallel 10 ./...
+	./scripts/test-acceptance.sh
+
+test-acceptance-local: deps
+	BRAINTRUST_API_URL=http://localhost:8000 ./scripts/test-acceptance.sh
 
 check-docs: doc
-	git diff --exit-code -- docs
+	@test -z "$$(git status --porcelain -- docs)" || (git status --short -- docs; echo "docs/ is out of date; commit the regenerated files"; exit 1)
+
+check-versions:
+	./scripts/check-tool-versions.sh
 
 deps:
 	go mod tidy
 
 fmt:
-	gofmt -w internal/
+	gofmt -w .
 
 lint:
 	golangci-lint run ./...
 
 lint-fix:
-	gofmt -w internal/
+	gofmt -w .
 	golangci-lint run --fix ./...
 
 # Install a git pre-commit hook that runs formatting and lint checks.
@@ -69,7 +50,7 @@ install-hooks:
 	@echo 'set -e' >> .git/hooks/pre-commit
 	@echo '' >> .git/hooks/pre-commit
 	@echo '# Check formatting' >> .git/hooks/pre-commit
-	@echo 'UNFORMATTED=$$(gofmt -l internal/)' >> .git/hooks/pre-commit
+	@echo 'UNFORMATTED=$$(gofmt -l .)' >> .git/hooks/pre-commit
 	@echo 'if [ -n "$$UNFORMATTED" ]; then' >> .git/hooks/pre-commit
 	@echo '  echo "Error: Go files not formatted. Run: make fmt"' >> .git/hooks/pre-commit
 	@echo '  echo "$$UNFORMATTED"' >> .git/hooks/pre-commit
@@ -86,4 +67,4 @@ install-hooks:
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
 
-.PHONY: default build build-terraforming install generate scaffold-resource scaffold-datasource doc test test-acceptance check-docs deps fmt lint lint-fix install-hooks
+.PHONY: default build build-terraforming install doc test test-acceptance test-acceptance-local check-docs check-versions deps fmt lint lint-fix install-hooks

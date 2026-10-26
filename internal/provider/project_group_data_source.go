@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -48,14 +49,14 @@ func (d *projectGroupDataSource) Read(ctx context.Context, req datasource.ReadRe
 	if resp.Diagnostics.HasError() || !requireClient(d.client, &resp.Diagnostics) {
 		return
 	}
-	groups, err := d.client.ListProjectGroups(ctx, config.OrgID.ValueString(), config.Name.ValueString())
+	groups, err := listProjectGroups(ctx, d.client, config.OrgID.ValueString(), config.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Project Group", err.Error())
 		return
 	}
-	var match *client.ProjectGroup
+	var match *openapi.ProjectGroup
 	for i := range groups {
-		if groups[i].OrgID == config.OrgID.ValueString() && groups[i].Name == config.Name.ValueString() && groups[i].DeletedAt == nil {
+		if groups[i].OrgId.String() == config.OrgID.ValueString() && groups[i].Name == config.Name.ValueString() && !nullableIsSet(groups[i].DeletedAt) {
 			if match != nil {
 				resp.Diagnostics.AddError("Ambiguous Project Group", "Multiple active project groups matched the organization ID and name.")
 				return

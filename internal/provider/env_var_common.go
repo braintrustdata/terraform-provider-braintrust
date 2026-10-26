@@ -1,6 +1,9 @@
 package provider
 
 import (
+	"context"
+
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -18,17 +21,29 @@ type envVarModel struct {
 	SecretCategory types.String `tfsdk:"secret_category"`
 }
 
-// mapEnvVarToModel maps a client.EnvVar to the Terraform model.
+// mapEnvVarToModel maps an SDK env var to the Terraform model.
 // Note: value is write-only and never returned by the API, so we
 // leave model.Value unchanged (preserving whatever Terraform has in state).
-func mapEnvVarToModel(envVar *client.EnvVar, model *envVarModel) {
-	model.ID = types.StringValue(envVar.ID)
-	model.ObjectType = types.StringValue(envVar.ObjectType)
-	model.ObjectID = types.StringValue(envVar.ObjectID)
+func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
+	model.ID = types.StringValue(envVar.Id.String())
+	model.ObjectType = types.StringValue(string(envVar.ObjectType))
+	model.ObjectID = types.StringValue(envVar.ObjectId.String())
 	model.Name = types.StringValue(envVar.Name)
-	model.Created = stringPtrToTFValue(envVar.Created)
-	model.Used = stringPtrToTFValue(envVar.Used)
-	model.SecretType = stringPtrToTFValue(envVar.SecretType)
-	model.SecretCategory = stringPtrToTFValue(envVar.SecretCategory)
+	model.Created = nullableTimeToTF(envVar.Created, model.Created)
+	model.Used = nullableTimeToTF(envVar.Used, model.Used)
+	model.SecretType = nullableStringToTF(envVar.SecretType)
+	if envVar.SecretCategory != nil {
+		model.SecretCategory = types.StringValue(string(*envVar.SecretCategory))
+	} else {
+		model.SecretCategory = types.StringNull()
+	}
 	// model.Value is intentionally NOT set here -- see doc comment.
+}
+
+func getEnvVar(ctx context.Context, c *client.Client, id string) (*openapi.EnvVar, error) {
+	resp, err := c.API.GetEnvVarIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.JSON(resp.JSON200)
 }

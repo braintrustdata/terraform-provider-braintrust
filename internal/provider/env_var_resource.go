@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -108,21 +109,30 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Use PUT (replace) so that if an env var with this name already exists
 	// in the same scope, we update it rather than silently returning the old one.
-	replaceReq := client.ReplaceEnvVarRequest{
-		ObjectType: plan.ObjectType.ValueString(),
-		ObjectID:   plan.ObjectID.ValueString(),
+	objectID, err := parseUUID(plan.ObjectID, "object_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("object_id"), "Invalid Object ID", err.Error())
+		return
+	}
+	replaceReq := openapi.PutEnvVarJSONRequestBody{
+		ObjectType: openapi.PutEnvVarJSONBodyObjectType(plan.ObjectType.ValueString()),
+		ObjectId:   objectID,
 		Name:       plan.Name.ValueString(),
-		Value:      tfStringToPtr(plan.Value),
-		SecretType: tfStringToPtr(plan.SecretType),
+		Value:      tfStringToNullable(plan.Value),
+		SecretType: tfStringToNullable(plan.SecretType),
 	}
 
 	tflog.Debug(ctx, "Creating env var", map[string]any{
 		"object_type": replaceReq.ObjectType,
-		"object_id":   replaceReq.ObjectID,
+		"object_id":   plan.ObjectID.ValueString(),
 		"name":        replaceReq.Name,
 	})
 
-	created, err := r.client.ReplaceEnvVar(ctx, replaceReq)
+	replaceResp, err := client.Write(r.client.API.PutEnvVarWithResponse(ctx, replaceReq))
+	var created *openapi.EnvVar
+	if err == nil {
+		created, err = client.Written(replaceResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Env Var",
@@ -132,13 +142,13 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	// Re-read to get full state.
-	envVar, err := r.client.GetEnvVar(ctx, created.ID)
+	envVar, err := getEnvVar(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapEnvVarToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Env Var After Create",
-			"Env var was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"Env var was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -157,7 +167,7 @@ func (r *envVarResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	envVar, err := r.client.GetEnvVar(ctx, state.ID.ValueString())
+	envVar, err := getEnvVar(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Env var not found, removing from state", map[string]any{
@@ -192,32 +202,20 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	name := plan.Name.ValueString()
-	updateReq := client.UpdateEnvVarRequest{
-		Name: &name,
-	}
-
-	// Handle value: send explicitly if set, clear if removed from config.
-	if !plan.Value.IsNull() && !plan.Value.IsUnknown() {
-		v := plan.Value.ValueString()
-		updateReq.Value = &v
-	} else if plan.Value.IsNull() && !state.Value.IsNull() {
-		empty := ""
-		updateReq.Value = &empty
-	}
-
-	// Handle secret_type: send explicitly if set, clear if removed from config.
-	if !plan.SecretType.IsNull() && !plan.SecretType.IsUnknown() {
-		st := plan.SecretType.ValueString()
-		updateReq.SecretType = &st
-	} else if plan.SecretType.IsNull() && !state.SecretType.IsNull() {
-		empty := ""
-		updateReq.SecretType = &empty
+	// Value and secret_type are sent when set and cleared when removed from config.
+	updateReq := openapi.PatchEnvVarIdJSONRequestBody{
+		Name:       plan.Name.ValueString(),
+		Value:      patchString(plan.Value, state.Value),
+		SecretType: patchString(plan.SecretType, state.SecretType),
 	}
 
 	tflog.Debug(ctx, "Updating env var", map[string]any{"id": state.ID.ValueString()})
 
-	envVar, err := r.client.UpdateEnvVar(ctx, state.ID.ValueString(), updateReq)
+	updateResp, err := client.Write(r.client.API.PatchEnvVarIdWithResponse(ctx, state.ID.ValueString(), updateReq))
+	var envVar *openapi.EnvVar
+	if err == nil {
+		envVar, err = client.Written(updateResp.JSON200)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Env Var",
@@ -240,7 +238,7 @@ func (r *envVarResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := r.client.DeleteEnvVar(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteEnvVarIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

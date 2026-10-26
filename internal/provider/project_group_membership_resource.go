@@ -6,7 +6,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -62,12 +64,17 @@ func (r *projectGroupMembershipResource) Create(ctx context.Context, req resourc
 		return
 	}
 	groupID, projectID := plan.ProjectGroupID.ValueString(), plan.ProjectID.ValueString()
-	group, err := r.client.GetProjectGroup(ctx, groupID)
+	projectUUID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
+	}
+	group, err := getProjectGroup(ctx, r.client, groupID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Project Group", err.Error())
 		return
 	}
-	if slices.Contains(group.MemberProjects, projectID) {
+	if slices.Contains(client.UUIDStrings(group.MemberProjects), projectID) {
 		resp.Diagnostics.AddError("Project Group Membership Already Exists", "Import the existing membership instead of creating it again.")
 		return
 	}
@@ -78,12 +85,12 @@ func (r *projectGroupMembershipResource) Create(ctx context.Context, req resourc
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	group, err = r.client.UpdateProjectGroup(ctx, groupID, client.UpdateProjectGroupRequest{AddMemberProjects: []string{projectID}})
+	group, err = patchProjectGroup(ctx, r.client, groupID, openapi.PatchProjectGroup{AddMemberProjects: nullableSlice([]uuid.UUID{projectUUID})})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Adding Project Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(group.MemberProjects, projectID) {
+	if !slices.Contains(client.UUIDStrings(group.MemberProjects), projectID) {
 		resp.Diagnostics.AddError("Project Group Membership Missing After Add", fmt.Sprintf("Project %s was not returned as a member of group %s", projectID, groupID))
 	}
 }
@@ -94,7 +101,7 @@ func (r *projectGroupMembershipResource) Read(ctx context.Context, req resource.
 	if resp.Diagnostics.HasError() || !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
-	group, err := r.client.GetProjectGroup(ctx, state.ProjectGroupID.ValueString())
+	group, err := getProjectGroup(ctx, r.client, state.ProjectGroupID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -103,7 +110,7 @@ func (r *projectGroupMembershipResource) Read(ctx context.Context, req resource.
 		resp.Diagnostics.AddError("Error Reading Project Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(group.MemberProjects, state.ProjectID.ValueString()) {
+	if !slices.Contains(client.UUIDStrings(group.MemberProjects), state.ProjectID.ValueString()) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -122,7 +129,7 @@ func (r *projectGroupMembershipResource) Delete(ctx context.Context, req resourc
 		return
 	}
 	groupID, projectID := state.ProjectGroupID.ValueString(), state.ProjectID.ValueString()
-	group, err := r.client.GetProjectGroup(ctx, groupID)
+	group, err := getProjectGroup(ctx, r.client, groupID)
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return
@@ -130,10 +137,15 @@ func (r *projectGroupMembershipResource) Delete(ctx context.Context, req resourc
 		resp.Diagnostics.AddError("Error Reading Project Group Membership", err.Error())
 		return
 	}
-	if !slices.Contains(group.MemberProjects, projectID) {
+	if !slices.Contains(client.UUIDStrings(group.MemberProjects), projectID) {
 		return
 	}
-	_, err = r.client.UpdateProjectGroup(ctx, groupID, client.UpdateProjectGroupRequest{RemoveMemberProjects: []string{projectID}})
+	projectUUID, err := parseUUID(state.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddError("Error Removing Project Group Membership", err.Error())
+		return
+	}
+	_, err = patchProjectGroup(ctx, r.client, groupID, openapi.PatchProjectGroup{RemoveMemberProjects: nullableSlice([]uuid.UUID{projectUUID})})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Removing Project Group Membership", err.Error())
 	}

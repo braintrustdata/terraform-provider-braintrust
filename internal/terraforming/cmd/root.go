@@ -46,7 +46,6 @@ Use it to bootstrap Terraform management of an existing Braintrust deployment.`,
 		if err != nil {
 			return fmt.Errorf("failed to create API client: %w", err)
 		}
-		apiClient.Verbose = viper.GetBool("verbose")
 
 		return nil
 	},

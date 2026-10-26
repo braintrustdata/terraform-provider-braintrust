@@ -80,7 +80,7 @@ func testAccCheckProjectGroupDestroy(s *terraform.State) error {
 		if rs.Type != "braintrust_project_group" {
 			continue
 		}
-		if _, err := c.GetProjectGroup(context.Background(), rs.Primary.ID); err == nil {
+		if _, err := c.API.GetProjectGroupIdWithResponse(context.Background(), rs.Primary.ID); err == nil {
 			return fmt.Errorf("project group %s still exists", rs.Primary.ID)
 		} else if !client.IsNotFoundError(err) {
 			return err

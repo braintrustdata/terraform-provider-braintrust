@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
@@ -15,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -273,31 +276,47 @@ func (r *projectAutomationResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	createReq := client.CreateProjectAutomationRequest{
-		ProjectID:   plan.ProjectID.ValueString(),
+	projectID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
+	}
+	createReq := openapi.CreateProjectAutomation{
+		ProjectId:   projectID,
 		Name:        plan.Name.ValueString(),
-		Description: tfStringToPtr(plan.Description),
-		Config:      configJSON,
+		Description: tfStringToNullable(plan.Description),
+	}
+	body, err := client.JSONBody(createReq, map[string]json.RawMessage{"config": configJSON})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Project Automation", err.Error())
+		return
 	}
 
 	tflog.Debug(ctx, "Creating project automation", map[string]any{
-		"project_id": createReq.ProjectID,
+		"project_id": plan.ProjectID.ValueString(),
 		"name":       createReq.Name,
 	})
 
-	automation, err := r.client.CreateProjectAutomation(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostProjectAutomationWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *projectAutomation
+	if err == nil {
+		var createdBody *openapi.ProjectAutomation
+		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project automation")
+		if err == nil {
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
+		}
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Project Automation", err.Error())
 		return
 	}
 
 	// Read back to ensure state is consistent.
-	created := automation
-	automation, err = r.client.GetProjectAutomation(ctx, created.ID)
+	automation, err := getProjectAutomation(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapProjectAutomationToModel(ctx, created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-		resp.Diagnostics.AddError("Error Reading Project Automation After Create", "Automation was created (ID: "+created.ID+") but could not be read: "+err.Error())
+		resp.Diagnostics.AddError("Error Reading Project Automation After Create", "Automation was created (ID: "+created.Value.Id.String()+") but could not be read: "+err.Error())
 		return
 	}
 
@@ -315,7 +334,7 @@ func (r *projectAutomationResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	automation, err := r.client.GetProjectAutomation(ctx, state.ID.ValueString())
+	automation, err := getProjectAutomation(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Project automation not found, removing from state", map[string]any{
@@ -350,10 +369,14 @@ func (r *projectAutomationResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	name := plan.Name.ValueString()
-	updateReq := client.UpdateProjectAutomationRequest{
-		Name:        &name,
-		Description: tfStringToPtr(plan.Description),
-		Config:      configJSON,
+	updateReq := openapi.PatchProjectAutomation{
+		Name:        nullable.NewNullableWithValue(name),
+		Description: tfStringToNullable(plan.Description),
+	}
+	body, err := client.JSONBody(updateReq, map[string]json.RawMessage{"config": configJSON})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Project Automation", err.Error())
+		return
 	}
 
 	tflog.Debug(ctx, "Updating project automation", map[string]any{
@@ -361,7 +384,11 @@ func (r *projectAutomationResource) Update(ctx context.Context, req resource.Upd
 		"name": name,
 	})
 
-	automation, err := r.client.UpdateProjectAutomation(ctx, state.ID.ValueString(), updateReq)
+	updateResp, err := client.Write(r.client.API.PatchProjectAutomationIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var automation *projectAutomation
+	if err == nil {
+		automation, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Project Automation", err.Error())
 		return
@@ -385,7 +412,7 @@ func (r *projectAutomationResource) Delete(ctx context.Context, req resource.Del
 		"id": state.ID.ValueString(),
 	})
 
-	err := r.client.DeleteProjectAutomation(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteProjectAutomationIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil && !client.IsNotFoundError(err) {
 		resp.Diagnostics.AddError("Error Deleting Project Automation", err.Error())
 	}
@@ -399,18 +426,31 @@ func (r *projectAutomationResource) ImportState(ctx context.Context, req resourc
 // Mapping: API response → Terraform model
 // ---------------------------------------------------------------------------
 
-func mapProjectAutomationToModel(ctx context.Context, a *client.ProjectAutomation, model *projectAutomationModel) {
-	model.ID = types.StringValue(a.ID)
-	model.ProjectID = types.StringValue(a.ProjectID)
-	model.Name = types.StringValue(a.Name)
-	model.Description = stringPtrToTFValue(a.Description)
-	model.UserID = stringPtrToTFValue(a.UserID)
-	model.Created = stringPtrToTFValue(a.Created)
+// projectAutomation keeps config as raw JSON, which the resource parses into
+// its own model and builds from plan values.
+type projectAutomation = client.Raw[openapi.ProjectAutomation]
 
-	if len(a.Config) > 0 {
+func getProjectAutomation(ctx context.Context, c *client.Client, id string) (*projectAutomation, error) {
+	resp, err := c.API.GetProjectAutomationIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.DecodeRaw(resp.JSON200, resp.Body)
+}
+
+func mapProjectAutomationToModel(ctx context.Context, raw *projectAutomation, model *projectAutomationModel) {
+	a := raw.Value
+	model.ID = types.StringValue(a.Id.String())
+	model.ProjectID = types.StringValue(a.ProjectId.String())
+	model.Name = types.StringValue(a.Name)
+	model.Description = nullableStringToTF(a.Description)
+	model.UserID = nullableUUIDToTF(a.UserId)
+	model.Created = nullableTimeToTF(a.Created, model.Created)
+
+	if config := raw.Fields["config"]; len(config) > 0 {
 		// Errors here are logged but don't block — state will be partially
 		// populated and a subsequent plan will detect drift.
-		if err := parseConfigToModel(a.Config, model); err != nil {
+		if err := parseConfigToModel(config, model); err != nil {
 			tflog.Warn(ctx, "failed to parse project_automation config", map[string]any{"error": err.Error()})
 		}
 	}

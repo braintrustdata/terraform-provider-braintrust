@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -138,22 +139,22 @@ func (r *aclResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	createReq := client.CreateACLRequest{
-		ObjectType:         plan.ObjectType.ValueString(),
-		ObjectID:           plan.ObjectID.ValueString(),
-		UserID:             tfStringToPtr(plan.UserID),
-		GroupID:            tfStringToPtr(plan.GroupID),
-		Permission:         tfStringToPtr(plan.Permission),
-		RestrictObjectType: tfStringToPtr(plan.RestrictObjectType),
-		RoleID:             tfStringToPtr(plan.RoleID),
+	createReq, err := aclItemFromModel(plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid ACL", err.Error())
+		return
 	}
 
 	tflog.Debug(ctx, "Creating ACL", map[string]any{
 		"object_type": createReq.ObjectType,
-		"object_id":   createReq.ObjectID,
+		"object_id":   plan.ObjectID.ValueString(),
 	})
 
-	created, err := r.client.CreateACL(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostAclWithResponse(ctx, createReq))
+	var created *openapi.Acl
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "ACL")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust ACL",
@@ -163,13 +164,13 @@ func (r *aclResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 
 	// Re-read to get the full state.
-	acl, err := r.client.GetACL(ctx, created.ID)
+	acl, err := getACL(ctx, r.client, created.Id.String())
 	if err != nil {
 		mapACLToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust ACL After Create",
-			"ACL was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"ACL was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -188,7 +189,7 @@ func (r *aclResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		return
 	}
 
-	acl, err := r.client.GetACL(ctx, state.ID.ValueString())
+	acl, err := getACL(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "ACL not found, removing from state", map[string]any{
@@ -227,7 +228,7 @@ func (r *aclResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
-	err := r.client.DeleteACL(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteAclIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

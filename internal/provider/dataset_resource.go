@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -13,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -80,25 +83,42 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	createReq := client.CreateDatasetRequest{
-		ProjectID:   plan.ProjectID.ValueString(),
-		Name:        plan.Name.ValueString(),
-		Description: tfStringToPtr(plan.Description),
-		Tags:        stringListFromModel(plan.Tags),
+	projectID, err := parseUUID(plan.ProjectID, "project_id")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("project_id"), "Invalid Project ID", err.Error())
+		return
 	}
-	var err error
-	createReq.Metadata, err = datasetMetadataInput(plan.MetadataJSON)
+	createReq := openapi.CreateDataset{
+		ProjectId:   projectID,
+		Name:        plan.Name.ValueString(),
+		Description: tfStringToNullable(plan.Description),
+		Tags:        nullableSlice(stringListFromModel(plan.Tags)),
+	}
+	metadata, err := datasetMetadataInput(plan.MetadataJSON)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Dataset Metadata", err.Error())
 		return
 	}
+	body, err := client.JSONBody(createReq, map[string]json.RawMessage{"metadata": metadata})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust Dataset", err.Error())
+		return
+	}
 
 	tflog.Debug(ctx, "Creating dataset", map[string]any{
-		"project_id": createReq.ProjectID,
+		"project_id": plan.ProjectID.ValueString(),
 		"name":       createReq.Name,
 	})
 
-	created, err := r.client.CreateDataset(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostDatasetWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *dataset
+	if err == nil {
+		var createdBody *openapi.Dataset
+		createdBody, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "dataset")
+		if err == nil {
+			created, err = client.WrittenRaw(createdBody, createResp.Body)
+		}
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Dataset",
@@ -108,13 +128,13 @@ func (r *datasetResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Re-read to get the full state -- create responses may omit some fields.
-	dataset, err := r.client.GetDataset(ctx, created.ID)
+	dataset, err := getDataset(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapDatasetToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Dataset After Create",
-			"Dataset was created (ID: "+created.ID+") but could not be read: "+err.Error(),
+			"Dataset was created (ID: "+created.Value.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -133,7 +153,7 @@ func (r *datasetResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	dataset, err := r.client.GetDataset(ctx, state.ID.ValueString())
+	dataset, err := getDataset(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Dataset not found, removing from state", map[string]any{
@@ -168,35 +188,37 @@ func (r *datasetResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	name := plan.Name.ValueString()
-	updateReq := client.UpdateDatasetRequest{
-		Name: &name,
+	updateReq := openapi.PatchDataset{
+		Name:        nullable.NewNullableWithValue(plan.Name.ValueString()),
+		Description: patchString(plan.Description, state.Description),
 	}
 	if !plan.Tags.IsNull() && !plan.Tags.IsUnknown() && !plan.Tags.Equal(state.Tags) {
 		tags := stringListFromModel(plan.Tags)
 		if tags == nil {
 			tags = []string{}
 		}
-		updateReq.Tags = &tags
+		updateReq.Tags = nullable.NewNullableWithValue(tags)
 	}
 	metadata, err := datasetMetadataInput(plan.MetadataJSON)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid Dataset Metadata", err.Error())
 		return
 	}
+	raw := map[string]json.RawMessage{}
 	if metadata != nil && !plan.MetadataJSON.Equal(state.MetadataJSON) {
-		updateReq.Metadata = &metadata
+		raw["metadata"] = metadata
+	}
+	body, err := client.JSONBody(updateReq, raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Braintrust Dataset", err.Error())
+		return
 	}
 
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		desc := plan.Description.ValueString()
-		updateReq.Description = &desc
-	} else if plan.Description.IsNull() && !state.Description.IsNull() {
-		empty := ""
-		updateReq.Description = &empty
+	updateResp, err := client.Write(r.client.API.PatchDatasetIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var dataset *dataset
+	if err == nil {
+		dataset, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
-
-	dataset, err := r.client.UpdateDataset(ctx, state.ID.ValueString(), updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Dataset",
@@ -219,7 +241,7 @@ func (r *datasetResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.DeleteDataset(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteDatasetIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

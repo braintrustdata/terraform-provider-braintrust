@@ -68,7 +68,7 @@ func TestAccViewResource_dashboardAndSavedView(t *testing.T) {
 				if resource.Type != "braintrust_view" {
 					continue
 				}
-				_, err := c.GetView(context.Background(), resource.Primary.ID, resource.Primary.Attributes["object_type"], resource.Primary.Attributes["object_id"])
+				_, err := getView(context.Background(), c, resource.Primary.ID, resource.Primary.Attributes["object_type"], resource.Primary.Attributes["object_id"])
 				if !client.IsNotFoundError(err) {
 					return fmt.Errorf("view %s still exists or could not be checked: %v", resource.Primary.ID, err)
 				}

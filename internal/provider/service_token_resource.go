@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
@@ -101,9 +103,9 @@ func (r *serviceTokenResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	createReq := client.CreateServiceTokenRequest{
+	createReq := openapi.PostServiceTokenJSONRequestBody{
 		Name:             plan.Name.ValueString(),
-		ServiceAccountID: plan.ServiceAccountID.ValueString(),
+		ServiceAccountId: plan.ServiceAccountID.ValueString(),
 	}
 	if !plan.ExpiresInSeconds.IsNull() && !plan.ExpiresInSeconds.IsUnknown() {
 		seconds := plan.ExpiresInSeconds.ValueInt64()
@@ -111,38 +113,42 @@ func (r *serviceTokenResource) Create(ctx context.Context, req resource.CreateRe
 			resp.Diagnostics.AddError("Invalid Service Token Lifetime", "expires_in_seconds must be greater than zero")
 			return
 		}
-		createReq.ExpiresInSeconds = &seconds
+		createReq.ExpiresInSeconds = nullable.NewNullableWithValue(int(seconds))
 	}
 
 	tflog.Debug(ctx, "Creating service token", map[string]any{
 		"name":               createReq.Name,
-		"service_account_id": createReq.ServiceAccountID,
+		"service_account_id": createReq.ServiceAccountId,
 	})
 	// The API exposes the raw token only in the POST response. If that response
 	// is lost, issuing the POST again would mint a second credential. Reserve a
 	// unique name per account and use the list endpoint to reconcile the result.
-	existing, err := r.client.ListServiceTokensByName(ctx, createReq.Name)
+	existing, err := listServiceTokensByName(ctx, r.client, createReq.Name)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Existing Service Tokens", err.Error())
 		return
 	}
 	knownIDs := make(map[string]bool)
 	for _, token := range existing {
-		knownIDs[token.ID] = true
-		if token.Name == createReq.Name && token.ServiceAccountID != nil && *token.ServiceAccountID == createReq.ServiceAccountID {
-			resp.Diagnostics.AddError("Service Token Name Already Used", "A token with this name and service account already exists (ID: "+token.ID+"). Use a unique name or remove that token before creating another. Its raw key cannot be recovered through the API.")
+		knownIDs[token.Id.String()] = true
+		if serviceTokenMatches(token, createReq.Name, createReq.ServiceAccountId) {
+			resp.Diagnostics.AddError("Service Token Name Already Used", "A token with this name and service account already exists (ID: "+token.Id.String()+"). Use a unique name or remove that token before creating another. Its raw key cannot be recovered through the API.")
 			return
 		}
 	}
 
-	output, err := r.client.CreateServiceToken(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostServiceTokenWithResponse(ctx, createReq))
+	var output *openapi.CreateServiceTokenOutput
+	if err == nil {
+		output, err = client.Written(createResp.JSON200)
+	}
 	if err != nil {
 		if client.IsUncertainWriteError(err) {
-			current, listErr := r.client.ListServiceTokensByName(ctx, createReq.Name)
+			current, listErr := listServiceTokensByName(ctx, r.client, createReq.Name)
 			if listErr == nil {
-				var newTokens []client.ServiceToken
+				var newTokens []openapi.ServiceToken
 				for _, token := range current {
-					if !knownIDs[token.ID] && token.Name == createReq.Name && token.ServiceAccountID != nil && *token.ServiceAccountID == createReq.ServiceAccountID {
+					if !knownIDs[token.Id.String()] && serviceTokenMatches(token, createReq.Name, createReq.ServiceAccountId) {
 						newTokens = append(newTokens, token)
 					}
 				}
@@ -150,7 +156,7 @@ func (r *serviceTokenResource) Create(ctx context.Context, req resource.CreateRe
 					mapServiceTokenToModel(&newTokens[0], &plan)
 					plan.Key = types.StringNull()
 					resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-					resp.Diagnostics.AddError("Service Token Created But Key Was Lost", "The POST outcome was uncertain, but a new token (ID: "+newTokens[0].ID+") appeared. Its raw key cannot be recovered. Terraform retained the ID in tainted state and will delete it before recreating the token on the next apply. Original error: "+err.Error())
+					resp.Diagnostics.AddError("Service Token Created But Key Was Lost", "The POST outcome was uncertain, but a new token (ID: "+newTokens[0].Id.String()+") appeared. Its raw key cannot be recovered. Terraform retained the ID in tainted state and will delete it before recreating the token on the next apply. Original error: "+err.Error())
 					return
 				}
 			}
@@ -177,7 +183,7 @@ func (r *serviceTokenResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	token, err := r.client.GetServiceToken(ctx, state.ID.ValueString())
+	token, err := getServiceToken(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Service token not found, removing from state", map[string]any{
@@ -216,7 +222,7 @@ func (r *serviceTokenResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.DeleteServiceToken(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteServiceTokenIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -88,16 +90,20 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	// Build the create request.
-	createReq := client.CreateProjectRequest{
+	createReq := openapi.CreateProject{
 		Name:        plan.Name.ValueString(),
-		Description: tfStringToPtr(plan.Description),
+		Description: tfStringToNullable(plan.Description),
 	}
 
 	tflog.Debug(ctx, "Creating project", map[string]any{
 		"name": createReq.Name,
 	})
 
-	created, err := r.client.CreateProject(ctx, createReq)
+	createResp, err := client.Write(r.client.API.PostProjectWithResponse(ctx, createReq))
+	var created *openapi.Project
+	if err == nil {
+		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "project")
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Braintrust Project",
@@ -106,11 +112,12 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	project, err := r.client.GetProject(ctx, created.ID)
+	createdID := created.Id.String()
+	project, settings, err := getProject(ctx, r.client, createdID)
 	if err != nil {
 		mapProjectToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-		resp.Diagnostics.AddError("Error Reading Braintrust Project After Create", "Project was created (ID: "+created.ID+") but could not be read: "+err.Error())
+		resp.Diagnostics.AddError("Error Reading Braintrust Project After Create", "Project was created (ID: "+createdID+") but could not be read: "+err.Error())
 		return
 	}
 
@@ -119,23 +126,23 @@ func (r *projectResource) Create(ctx context.Context, req resource.CreateRequest
 	comparisonKeySet := !plan.ComparisonKey.IsNull() && !plan.ComparisonKey.IsUnknown()
 	baselineSet := !plan.BaselineExperimentID.IsNull() && !plan.BaselineExperimentID.IsUnknown()
 	if comparisonKeySet || baselineSet {
-		updateReq := client.UpdateProjectRequest{Settings: mergeProjectSettings(project.Settings, &plan, comparisonKeySet, baselineSet)}
+		merged := mergeProjectSettings(settings, &plan, comparisonKeySet, baselineSet)
 
-		_, updateErr := r.client.UpdateProject(ctx, created.ID, updateReq)
+		_, updateErr := updateProject(ctx, r.client, createdID, openapi.PatchProject{}, merged)
 		if updateErr != nil {
 			mapProjectToModel(project, &plan)
 			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 			resp.Diagnostics.AddError(
 				"Error Setting Braintrust Project Settings",
-				"Project was created (ID: "+created.ID+") but settings could not be applied: "+updateErr.Error(),
+				"Project was created (ID: "+createdID+") but settings could not be applied: "+updateErr.Error(),
 			)
 			return
 		}
-		project, err = r.client.GetProject(ctx, created.ID)
+		project, _, err = getProject(ctx, r.client, createdID)
 		if err != nil {
 			mapProjectToModel(created, &plan)
 			resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
-			resp.Diagnostics.AddError("Error Reading Braintrust Project After Settings Update", "Project was created (ID: "+created.ID+") but could not be read: "+err.Error())
+			resp.Diagnostics.AddError("Error Reading Braintrust Project After Settings Update", "Project was created (ID: "+createdID+") but could not be read: "+err.Error())
 			return
 		}
 	}
@@ -164,7 +171,7 @@ func (r *projectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		"id": state.ID.ValueString(),
 	})
 
-	project, err := r.client.GetProject(ctx, state.ID.ValueString())
+	project, _, err := getProject(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Project not found, removing from state", map[string]any{
@@ -205,36 +212,30 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	// Build the update request.
-	name := plan.Name.ValueString()
-	updateReq := client.UpdateProjectRequest{
-		Name: &name,
+	// Description is sent when set and cleared with an empty string when removed.
+	updateReq := openapi.PatchProject{
+		Name:        nullable.NewNullableWithValue(plan.Name.ValueString()),
+		Description: patchString(plan.Description, state.Description),
 	}
 
-	// Handle description: send value if set, send empty string to clear if removed.
-	if !plan.Description.IsNull() && !plan.Description.IsUnknown() {
-		desc := plan.Description.ValueString()
-		updateReq.Description = &desc
-	} else if plan.Description.IsNull() && !state.Description.IsNull() {
-		empty := ""
-		updateReq.Description = &empty
-	}
+	var settings map[string]json.RawMessage
 
 	comparisonChanged := !plan.ComparisonKey.IsUnknown() && !plan.ComparisonKey.Equal(state.ComparisonKey)
 	baselineChanged := !plan.BaselineExperimentID.IsUnknown() && !plan.BaselineExperimentID.Equal(state.BaselineExperimentID)
 	if comparisonChanged || baselineChanged {
-		current, err := r.client.GetProject(ctx, state.ID.ValueString())
+		_, current, err := getProject(ctx, r.client, state.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Error Reading Braintrust Project Settings", "Could not preserve current project settings: "+err.Error())
 			return
 		}
-		updateReq.Settings = mergeProjectSettings(current.Settings, &plan, comparisonChanged, baselineChanged)
+		settings = mergeProjectSettings(current, &plan, comparisonChanged, baselineChanged)
 	}
 
 	tflog.Debug(ctx, "Updating project", map[string]any{
 		"id": state.ID.ValueString(),
 	})
 
-	project, err := r.client.UpdateProject(ctx, state.ID.ValueString(), updateReq)
+	project, err := updateProject(ctx, r.client, state.ID.ValueString(), updateReq, settings)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Braintrust Project",
@@ -253,12 +254,10 @@ func (r *projectResource) Update(ctx context.Context, req resource.UpdateRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
-func mergeProjectSettings(current *client.ProjectSettings, plan *projectModel, comparisonChanged, baselineChanged bool) map[string]json.RawMessage {
-	settings := make(map[string]json.RawMessage)
-	if current != nil {
-		for name, value := range current.Raw {
-			settings[name] = value
-		}
+func mergeProjectSettings(current map[string]json.RawMessage, plan *projectModel, comparisonChanged, baselineChanged bool) map[string]json.RawMessage {
+	settings := make(map[string]json.RawMessage, len(current)+2)
+	for name, value := range current {
+		settings[name] = value
 	}
 	if comparisonChanged {
 		settings["comparison_key"] = projectSettingValue(plan.ComparisonKey.IsNull(), plan.ComparisonKey.ValueString())
@@ -292,7 +291,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		"id": state.ID.ValueString(),
 	})
 
-	err := r.client.DeleteProject(ctx, state.ID.ValueString())
+	_, err := client.Write(r.client.API.DeleteProjectIdWithResponse(ctx, state.ID.ValueString()))
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			return

@@ -159,7 +159,7 @@ type VariableBlock struct {
 // RawExpression is a raw HCL expression string.
 type RawExpression string
 
-// writeFieldsFromSchema writes fields guided by the OpenAPI schema.
+// writeFieldsFromSchema writes fields guided by the provider schema.
 func (w *Writer) writeFieldsFromSchema(body *hclwrite.Body, rs *schema.ResourceSchema, block ResourceBlock) {
 	// Sort fields: required first, then alphabetical.
 	fields := rs.WritableFields()
@@ -319,17 +319,16 @@ func writeArrayValue(body *hclwrite.Body, name string, arr []any) {
 
 	// Check if all elements are strings.
 	allStrings := true
-	for _, item := range arr {
-		if _, ok := item.(string); !ok {
+	vals := make([]cty.Value, len(arr))
+	for i, item := range arr {
+		s, ok := item.(string)
+		if !ok {
 			allStrings = false
 			break
 		}
+		vals[i] = cty.StringVal(s)
 	}
 	if allStrings {
-		vals := make([]cty.Value, len(arr))
-		for i, item := range arr {
-			vals[i] = cty.StringVal(item.(string))
-		}
 		body.SetAttributeValue(name, cty.ListVal(vals))
 		return
 	}
@@ -342,7 +341,6 @@ func writeArrayValue(body *hclwrite.Body, name string, arr []any) {
 		return
 	}
 
-	vals := make([]cty.Value, len(arr))
 	for i, item := range arr {
 		vals[i] = toCtyValue(item)
 	}

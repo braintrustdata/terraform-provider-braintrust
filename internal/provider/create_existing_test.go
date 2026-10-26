@@ -20,7 +20,7 @@ func TestCreateExistingProjectIsNotAdopted(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/project":
 			creates++
 			w.Header().Set("x-bt-found-existing", "true")
-			_, _ = w.Write([]byte(`{"id":"existing-project","name":"existing","org_id":"org"}`))
+			_, _ = w.Write([]byte(`{"id":"00000000-0000-0000-0000-000000000001","name":"existing","org_id":"00000000-0000-0000-0000-000000000002"}`))
 		case r.Method == http.MethodDelete:
 			deletes++
 			w.WriteHeader(http.StatusNoContent)

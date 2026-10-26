@@ -1,9 +1,11 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
+	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -22,18 +24,56 @@ type datasetModel struct {
 	UserID       types.String `tfsdk:"user_id"`
 }
 
-// mapDatasetToModel maps a client.Dataset to the shared Terraform model.
-func mapDatasetToModel(dataset *client.Dataset, model *datasetModel) {
-	model.ID = types.StringValue(dataset.ID)
-	model.ProjectID = types.StringValue(dataset.ProjectID)
-	model.Name = types.StringValue(dataset.Name)
-	model.Description = stringPtrToTFValue(dataset.Description)
-	model.Tags = stringSliceToTFList(dataset.Tags)
-	model.MetadataJSON = jsonState(dataset.Metadata, model.MetadataJSON)
-	model.URLSlug = stringPtrToTFValue(dataset.URLSlug)
-	model.Created = stringPtrToTFValue(dataset.Created)
-	model.DeletedAt = stringPtrToTFValue(dataset.DeletedAt)
-	model.UserID = stringPtrToTFValue(dataset.UserID)
+// dataset keeps metadata as raw JSON: the SDK decodes it into map[string]any,
+// which would round large integers through float64.
+type dataset = client.Raw[openapi.Dataset]
+
+// mapDatasetToModel maps a dataset to the shared Terraform model.
+func mapDatasetToModel(raw *dataset, model *datasetModel) {
+	ds := raw.Value
+	model.ID = types.StringValue(ds.Id.String())
+	model.ProjectID = types.StringValue(ds.ProjectId.String())
+	model.Name = types.StringValue(ds.Name)
+	model.Description = nullableStringToTF(ds.Description)
+	model.Tags = stringSliceToTFList(nullableSliceValue(ds.Tags))
+	model.MetadataJSON = jsonState(raw.Fields["metadata"], model.MetadataJSON)
+	model.URLSlug = types.StringNull()
+	if ds.UrlSlug != "" {
+		model.URLSlug = types.StringValue(ds.UrlSlug)
+	}
+	model.Created = nullableTimeToTF(ds.Created, model.Created)
+	model.DeletedAt = nullableTimeToTF(ds.DeletedAt, model.DeletedAt)
+	model.UserID = nullableUUIDToTF(ds.UserId)
+}
+
+func getDataset(ctx context.Context, c *client.Client, id string) (*dataset, error) {
+	resp, err := c.API.GetDatasetIdWithResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return client.DecodeRaw(resp.JSON200, resp.Body)
+}
+
+// listDatasets lists a project's datasets by name, keeping each object's raw JSON.
+func listDatasets(ctx context.Context, c *client.Client, name, projectID string) ([]dataset, error) {
+	return client.ListAll("/v1/dataset", func(limit int, startingAfter *string) ([]dataset, error) {
+		params := &openapi.GetDatasetParams{Limit: &limit, StartingAfter: startingAfter}
+		if name != "" {
+			params.DatasetName = &name
+		}
+		if projectID != "" {
+			params.ProjectId = &projectID
+		}
+		page, err := c.API.GetDatasetWithResponse(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(ds dataset) string { return ds.Value.Id.String() })
 }
 
 func datasetMetadataInput(value types.String) (json.RawMessage, error) {

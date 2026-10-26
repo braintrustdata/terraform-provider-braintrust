@@ -61,26 +61,26 @@ func (d *functionDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if resp.Diagnostics.HasError() || !requireClient(d.client, &resp.Diagnostics) {
 		return
 	}
-	var function *client.Function
+	var function *function
 	if !config.Name.IsNull() && !config.Name.IsUnknown() {
 		if config.ProjectID.IsNull() || config.ProjectID.IsUnknown() {
 			resp.Diagnostics.AddError("Missing Project ID", "project_id is required when looking up a function by name.")
 			return
 		}
 		name, projectID := config.Name.ValueString(), config.ProjectID.ValueString()
-		functions, err := d.client.ListFunctions(ctx, name, projectID)
+		functions, err := listFunctions(ctx, d.client, name, projectID)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Listing Braintrust Functions", err.Error())
 			return
 		}
 		for i := range functions {
-			candidate := &functions[i]
-			if candidate.Name == name && candidate.ProjectID == projectID {
+			candidate := functions[i].Value
+			if candidate.Name == name && candidate.ProjectId.String() == projectID {
 				if function != nil {
 					resp.Diagnostics.AddError("Ambiguous Function", "Multiple functions have this name in the project. Look up by ID.")
 					return
 				}
-				function = candidate
+				function = &functions[i]
 			}
 		}
 		if function == nil {
@@ -89,12 +89,12 @@ func (d *functionDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 	} else {
 		var err error
-		function, err = d.client.GetFunction(ctx, config.ID.ValueString())
+		function, err = getFunction(ctx, d.client, config.ID.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError("Error Reading Braintrust Function", err.Error())
 			return
 		}
-		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && function.ProjectID != config.ProjectID.ValueString() {
+		if !config.ProjectID.IsNull() && !config.ProjectID.IsUnknown() && function.Value.ProjectId.String() != config.ProjectID.ValueString() {
 			resp.Diagnostics.AddError("Function Project Mismatch", "The function ID does not belong to project_id.")
 			return
 		}
