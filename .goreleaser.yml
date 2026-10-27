@@ -58,9 +58,8 @@ archives:
           - zip
     name_template: "braintrust-terraforming_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 checksum:
-  # SHA256SUMS is consumed by the Terraform Registry, so keep it provider-only.
-  ids:
-    - provider
+  # The Terraform Registry rejects a release unless every attached archive is
+  # listed here, so this one signed file covers the provider and the CLI.
   extra_files:
     - glob: terraform-registry-manifest.json
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
