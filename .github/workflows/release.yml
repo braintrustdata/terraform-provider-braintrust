@@ -99,6 +99,20 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ env.TAG }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
+      - name: Check provider release files
+        run: |
+          assets="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          prefix="terraform-provider-braintrust_${TAG#v}"
+          for f in "${prefix}_SHA256SUMS" "${prefix}_SHA256SUMS.sig" "${prefix}_manifest.json"; do
+            grep -qxF "$f" <<<"$assets" || { echo "::error::$TAG is missing $f"; exit 1; }
+          done
+          if grep -q '^braintrust-terraforming' <<<"$assets"; then
+            echo "::error::$TAG must not include CLI archives"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # The Registry serves any archive in the provider's release whose name ends in
       # _<os>_<arch>, so the CLI gets its own release. "cli-v*" isn't semver, so the
       # Registry ignores it, and --latest=false keeps the provider release as latest.

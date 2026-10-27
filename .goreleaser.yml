@@ -68,7 +68,9 @@ checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
   algorithm: sha256
 signs:
-  - artifacts: checksum
+  # Listed in release.ids below; without that, the signature is not uploaded.
+  - id: registry-signature
+    artifacts: checksum
     args:
       # if you are using this in a GitHub action or some other automated pipeline, you
       # need to pass the batch flag to indicate its not interactive.
@@ -80,9 +82,11 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 release:
-  # The Registry rejects a release with archives missing from SHA256SUMS.
+  # The Registry rejects a release with archives missing from SHA256SUMS, so leave
+  # the CLI archives out. release.yml publishes them in a separate cli-v* release.
   ids:
     - provider
+    - registry-signature
   extra_files:
     - glob: terraform-registry-manifest.json
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
