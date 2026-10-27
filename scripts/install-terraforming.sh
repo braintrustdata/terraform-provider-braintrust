@@ -68,16 +68,18 @@ main() {
     exit 1
   fi
 
+  # The CLI ships in a companion release, cli-<provider tag>, next to each provider release.
+  cli_tag="cli-${version}"
   clean_version="${version#v}"
   artifact="braintrust-terraforming_${clean_version}_${os}_${arch}.tar.gz"
-  url="https://github.com/$REPO/releases/download/${version}/${artifact}"
+  url="https://github.com/$REPO/releases/download/${cli_tag}/${artifact}"
 
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' EXIT INT TERM
 
   echo "Downloading ${url}"
   if use_gh; then
-    gh release download "$version" --repo "$REPO" --pattern "$artifact" --dir "$tmpdir"
+    gh release download "$cli_tag" --repo "$REPO" --pattern "$artifact" --dir "$tmpdir"
   else
     curl -fL "$url" -o "$tmpdir/$artifact"
   fi

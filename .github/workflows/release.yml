@@ -4,6 +4,13 @@ on:
   push:
     tags:
       - "v*"
+  # Releasing from the Actions UI creates the tag on main for you.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. v1.2.3 or 1.2.3"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -13,12 +20,36 @@ jobs:
     name: GoReleaser
     runs-on: ubuntu-24.04
     environment: release
+    concurrency: release
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
-      - name: Require a tag on current main
+      - name: Resolve release tag
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            tag="v${INPUT_VERSION#v}"
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+          # Semantic Versioning 2.0.0 (https://semver.org), with a required "v" prefix.
+          num='(0|[1-9][0-9]*)'
+          ident='(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)'
+          semver="^v$num\.$num\.$num(-$ident(\.$ident)*)?(\+[0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*)?\$"
+          if ! [[ "$tag" =~ $semver ]]; then
+            echo "::error::$tag is not a valid semantic version"
+            exit 1
+          fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag already exists"
+            exit 1
+          fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Require the release commit to be current main
         run: |
           git fetch origin main
           test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
@@ -44,6 +75,13 @@ jobs:
       - name: Verify release source
         run: make check
 
+      # Pushed with GITHUB_TOKEN, so it doesn't trigger this workflow again.
+      - name: Create release tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
         id: import_gpg
@@ -58,4 +96,23 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ env.TAG }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+
+      # The Registry serves any archive in the provider's release whose name ends in
+      # _<os>_<arch>, so the CLI gets its own release. "cli-v*" isn't semver, so the
+      # Registry ignores it, and --latest=false keeps the provider release as latest.
+      - name: Publish CLI release
+        working-directory: dist
+        run: |
+          checksums="braintrust-terraforming_${TAG#v}_checksums.txt"
+          sha256sum braintrust-terraforming_*.tar.gz braintrust-terraforming_*.zip > "$checksums"
+          gh release create "cli-$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --latest=false \
+            --title "braintrust-terraforming $TAG" \
+            --notes "braintrust-terraforming CLI built from $TAG." \
+            braintrust-terraforming_*.tar.gz braintrust-terraforming_*.zip "$checksums"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

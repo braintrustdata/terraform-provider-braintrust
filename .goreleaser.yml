@@ -58,8 +58,10 @@ archives:
           - zip
     name_template: "braintrust-terraforming_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 checksum:
-  # The Terraform Registry rejects a release unless every attached archive is
-  # listed here, so this one signed file covers the provider and the CLI.
+  # The Terraform Registry maps every archive listed here to a platform by file
+  # name, so keep it provider-only. The CLI ships in its own release (release.yml).
+  ids:
+    - provider
   extra_files:
     - glob: terraform-registry-manifest.json
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
@@ -78,6 +80,9 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 release:
+  # The Registry rejects a release with archives missing from SHA256SUMS.
+  ids:
+    - provider
   extra_files:
     - glob: terraform-registry-manifest.json
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
