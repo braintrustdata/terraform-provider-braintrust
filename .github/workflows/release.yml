@@ -11,7 +11,8 @@ permissions:
 jobs:
   goreleaser:
     name: GoReleaser
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    environment: release
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -33,17 +34,15 @@ jobs:
           unzip -q /tmp/terraform_1.15.8_linux_amd64.zip terraform -d /tmp
           sudo mv /tmp/terraform /usr/local/bin/terraform
 
-      # Tests include tests/offline, which runs the exporter's output through Terraform.
-      - name: Verify release source
-        run: |
-          go build -mod=readonly ./...
-          go vet -mod=readonly ./...
-          go test -mod=readonly -count=1 ./...
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+          install-only: true
 
-      - name: Verify generated documentation
-        run: |
-          go generate ./...
-          test -z "$(git status --porcelain -- docs/)"
+      # Same checks CI runs on pull requests, including tests/offline.
+      - name: Verify release source
+        run: make check
 
       - name: Import GPG key
         uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0

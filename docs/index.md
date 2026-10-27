@@ -23,8 +23,8 @@ User API keys must be created in Braintrust settings; the public API does not pe
 terraform {
   required_providers {
     braintrust = {
-      source  = "braintrustdata/braintrust"
-      version = "~> 0.1"
+      source = "braintrustdata/braintrust"
+      # version = "x.y.z" # pin a specific version
     }
   }
 }

@@ -31,17 +31,34 @@ check-docs: doc
 check-versions:
 	./scripts/check-tool-versions.sh
 
+check-fmt:
+	@test -z "$$(gofmt -l .)" || (gofmt -l .; echo "Go files are not formatted; run make fmt"; exit 1)
+	terraform fmt -check -diff -recursive
+
+check-tidy:
+	go mod tidy -diff
+
+vet:
+	go vet -mod=readonly ./...
+
+# Everything CI and releases verify. Reports problems instead of fixing them.
+check: check-versions check-fmt check-tidy vet lint check-docs
+	go build -mod=readonly ./...
+	go test -mod=readonly -count=1 ./...
+
 deps:
 	go mod tidy
 
 fmt:
 	gofmt -w .
+	terraform fmt -recursive
 
 lint:
 	golangci-lint run ./...
 
 lint-fix:
 	gofmt -w .
+	terraform fmt -recursive
 	golangci-lint run --fix ./...
 
 # Install a git pre-commit hook that runs formatting and lint checks.
@@ -67,4 +84,4 @@ install-hooks:
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
 
-.PHONY: default build build-terraforming install doc test test-acceptance test-acceptance-local check-docs check-versions deps fmt lint lint-fix install-hooks
+.PHONY: default build build-terraforming install doc test test-acceptance test-acceptance-local check-docs check-versions check-fmt check-tidy vet check deps fmt lint lint-fix install-hooks

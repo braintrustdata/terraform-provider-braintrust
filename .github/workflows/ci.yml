@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     name: Build & Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -20,70 +20,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: Build
-        run: go build ./...
-
-      - name: Vet
-        run: go vet ./...
 
       - name: Install Terraform 1.15.8
         run: |
           curl -fsSLO https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip
           unzip -q terraform_1.15.8_linux_amd64.zip terraform
           sudo mv terraform /usr/local/bin/terraform
+          rm terraform_1.15.8_linux_amd64.zip
 
-      - name: Unit Tests
-        run: go test -mod=readonly -count=1 ./...
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Tool versions match mise.toml
-        run: ./scripts/check-tool-versions.sh
-
-      - name: Go formatting
-        run: test -z "$(gofmt -l .)"
-
-      - name: golangci-lint
+      - name: Install golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.14.0
-          args: --timeout=5m
+          install-only: true
 
-  docs:
-    name: Documentation Freshness
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install Terraform 1.15.8
-        run: |
-          curl -fsSLO https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip
-          unzip -q terraform_1.15.8_linux_amd64.zip terraform
-          sudo mv terraform /usr/local/bin/terraform
-
-      - name: Generate docs
-        run: go generate ./...
-
-      - name: Check for uncommitted doc changes
-        run: |
-          # status (not diff) so newly generated, uncommitted files also fail.
-          if [ -n "$(git status --porcelain -- docs/)" ]; then
-            git status --short -- docs/
-            echo "::error::Documentation is out of date. Run 'make doc' and commit the changes."
-            exit 1
-          fi
+      # Same checks the release workflow runs before publishing.
+      - name: make check
+        run: make check

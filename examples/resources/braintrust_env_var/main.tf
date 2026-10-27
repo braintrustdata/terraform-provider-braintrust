@@ -14,7 +14,7 @@ resource "braintrust_env_var" "project_openai" {
   object_id   = braintrust_project.my_project.id
   name        = "OpenAI"
   secret_type = "openai"
-  value       = var.openai_api_key  # use a sensitive variable
+  value       = var.openai_api_key # use a sensitive variable
 }
 
 # For organization-level AI providers, use braintrust_ai_secret instead.
