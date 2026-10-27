@@ -40,18 +40,18 @@ func (r *projectGroupResource) Schema(_ context.Context, _ resource.SchemaReques
 		MarkdownDescription: "Manages a Braintrust project group. A project may belong to multiple project groups.\n\n" +
 			"For projects also managed by Terraform, leave `member_projects` unset and manage each relationship with `braintrust_project_group_membership`. " +
 			"This ensures Terraform removes membership before destroying the project or group. Inline `member_projects` requires removing membership in a separate apply before destroying a project; do not use both ownership styles for one group.\n\n" +
-			"Adding projects requires `create_acls` on them, and removing projects or deleting a populated group requires `delete_acls`. Import with the project group ID.",
+			"Adding projects requires `create_acls` on them, and removing projects or deleting a populated group requires `delete_acls`.",
 		Attributes: map[string]schema.Attribute{
-			"id": computedStringAttribute("Project group ID."),
+			"id": computedStringAttribute("Unique identifier for the project group (UUID)."),
 			"org_id": schema.StringAttribute{
 				Required: true, Description: "Organization ID for this project group.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"name":        schema.StringAttribute{Required: true, Description: "Name, unique within the organization.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
-			"description": optionalComputedStringAttribute("Description of the project group."),
-			"created":     computedStringAttribute("Creation timestamp."),
-			"deleted_at":  computedStringAttribute("Deletion timestamp, or null."),
-			"user_id":     computedStringAttribute("Creating user ID."),
+			"name":        schema.StringAttribute{Required: true, Description: "Name of the project group. Must be unique within the organization.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
+			"description": optionalComputedStringAttribute("Textual description of the project group."),
+			"created":     computedStringAttribute("Date of project group creation."),
+			"deleted_at":  computedStringAttribute("Date of project group deletion, or null if the project group is still active."),
+			"user_id":     computedStringAttribute("Identifies the user who created the project group."),
 			"member_projects": schema.SetAttribute{
 				Optional: true, Computed: true, ElementType: types.StringType,
 				Description:   "Project IDs managed inline. Use separate membership resources for safe simultaneous project deletion.",

@@ -10,7 +10,7 @@ import (
 )
 
 // Generate the Terraform provider documentation using `tfplugindocs`:
-//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name=braintrust
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name=braintrust --examples-dir=examples/snippets
 
 // version is set by the goreleaser configuration to appropriate values
 // for the compiled binary.

@@ -45,14 +45,15 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"\"Project AI providers\"), set `secret_type` to the provider name (e.g. `\"openai\"`, " +
 			"`\"anthropic\"`). The API will automatically categorize it as an AI provider.\n\n" +
 			"For **organization-level** AI provider credentials (visible under Organization > " +
-			"\"AI providers\"), use [`braintrust_ai_secret`](ai_secret) instead.\n\n" +
-			"**Note:** The `value` attribute is write-only. Terraform stores it in state but the API " +
-			"never returns it, so it cannot be imported.",
+			"\"AI providers\"), use `braintrust_ai_secret` instead.\n\n" +
+			"**Note:** The API never returns `value`, so Terraform keeps the configured value in state " +
+			"and cannot detect changes made outside Terraform. Importing works, but keep `value` set in " +
+			"configuration; the next apply writes it.",
 		Attributes: map[string]schema.Attribute{
 			"id": computedStringAttribute("Unique identifier for the environment variable (UUID)."),
 			"object_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of the object the environment variable is scoped for.",
+				Description: "The type of the object the environment variable is scoped for. " + oneOfDescription("organization", "project", "function"),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -77,7 +78,7 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"value": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The value of the environment variable. Encrypted at rest. Write-only: the API never returns this value.",
+				Description: "The value of the environment variable. Encrypted at rest. The API never returns this value; Terraform stores the configured value in state.",
 			},
 			"created":     computedStringAttribute("Date of environment variable creation."),
 			"used":        computedStringAttribute("Date the environment variable was last used."),

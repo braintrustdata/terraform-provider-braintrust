@@ -39,7 +39,7 @@ func (r *groupMembershipResource) Metadata(_ context.Context, req resource.Metad
 func (r *groupMembershipResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	resp.Schema = schema.Schema{
-		Description: "Manages one user's membership in a Braintrust permission group without managing the group's other members. Use for built-in groups or leave member_users unset on a managed group. Import with group_id/user_id.",
+		Description: "Manages one user's membership in a Braintrust permission group without managing the group's other members. Use it for built-in groups or groups managed outside Terraform. Do not combine it with `member_users` on the same `braintrust_group`.",
 		Attributes: map[string]schema.Attribute{
 			"id":       computedStringAttribute("Composite ID in group_id/user_id form."),
 			"group_id": schema.StringAttribute{Required: true, PlanModifiers: replace, Description: "Permission group ID."},

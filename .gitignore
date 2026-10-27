@@ -43,6 +43,7 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+.example-state/
 
 # Environment variables (secrets)
 .env

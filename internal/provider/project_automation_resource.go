@@ -124,7 +124,7 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 			"logs_config": schema.SingleNestedAttribute{
 				Optional: true,
 				Description: "Alert when log events match a BTQL filter. " +
-					"Exactly one of webhook_action or slack_action must be specified.",
+					"Exactly one of `webhook_action` or `slack_action` must be specified.",
 				Validators: []validator.Object{
 					objectvalidator.ExactlyOneOf(
 						path.MatchRoot("export_config"),
@@ -159,14 +159,14 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"export_type": schema.StringAttribute{
 						Required:    true,
-						Description: "What to export: \"log_traces\", \"log_spans\", or \"btql_query\".",
+						Description: "What to export. " + oneOfDescription("log_traces", "log_spans", "btql_query"),
 						Validators: []validator.String{
 							stringvalidator.OneOf("log_traces", "log_spans", "btql_query"),
 						},
 					},
 					"btql_query": schema.StringAttribute{
 						Optional:    true,
-						Description: "The BTQL query to export. Required when export_type is \"btql_query\".",
+						Description: "The BTQL query to export. Required when `export_type` is `btql_query`.",
 					},
 					"export_path": schema.StringAttribute{
 						Required:    true,
@@ -174,7 +174,7 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 					},
 					"format": schema.StringAttribute{
 						Required:    true,
-						Description: "Export format: \"jsonl\" or \"parquet\".",
+						Description: "Export format. " + oneOfDescription("jsonl", "parquet"),
 						Validators: []validator.String{
 							stringvalidator.OneOf("jsonl", "parquet"),
 						},
@@ -216,7 +216,7 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 				Attributes: map[string]schema.Attribute{
 					"object_type": schema.StringAttribute{
 						Required:    true,
-						Description: "The type of data to apply retention to: \"project_logs\", \"experiment\", or \"dataset\".",
+						Description: "The type of data to apply retention to. " + oneOfDescription("project_logs", "experiment", "dataset"),
 						Validators: []validator.String{
 							stringvalidator.OneOf("project_logs", "experiment", "dataset"),
 						},
@@ -237,7 +237,7 @@ func (r *projectAutomationResource) Schema(_ context.Context, _ resource.SchemaR
 			"environment_update_config": schema.SingleNestedAttribute{
 				Optional: true,
 				Description: "Notify when an environment is updated. " +
-					"Exactly one of webhook_action or slack_action must be specified.",
+					"Exactly one of `webhook_action` or `slack_action` must be specified.",
 				Attributes: map[string]schema.Attribute{
 					"environment_filter": schema.ListAttribute{
 						Optional:    true,

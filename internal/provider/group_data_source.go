@@ -31,8 +31,8 @@ func (d *groupDataSource) Metadata(_ context.Context, req datasource.MetadataReq
 
 func (d *groupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "Look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (Owners, Engineers, Viewers, All AI Provider Access).",
-		MarkdownDescription: "Look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (`Owners`, `Engineers`, `Viewers`, `All AI Provider Access`).",
+		Description:         "Use this data source to look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (Owners, Engineers, Viewers, All AI Provider Access).",
+		MarkdownDescription: "Use this data source to look up a Braintrust group by name and optional organization ID. Useful for referencing built-in groups (`Owners`, `Engineers`, `Viewers`, `All AI Provider Access`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,

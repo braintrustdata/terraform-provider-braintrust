@@ -41,13 +41,11 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"(e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI " +
 			"under Organization > \"AI providers\" and are available to all projects.\n\n" +
 			"For **project-level** AI provider credentials (visible under Project Settings > " +
-			"\"Project AI providers\"), use [`braintrust_env_var`](env_var) with " +
+			"\"Project AI providers\"), use `braintrust_env_var` with " +
 			"`secret_type` set to the provider name instead.\n\n" +
-			"The `secret` attribute is write-only. Terraform sends it during create/update but the API " +
-			"never returns it. A masked `preview_secret` is available for verification.\n\n" +
-			"**Tip:** Use Terraform variables with `sensitive = true` for the secret value:\n\n" +
-			"```hcl\nvariable \"openai_api_key\" {\n  type      = string\n  sensitive = true\n}\n\n" +
-			"resource \"braintrust_ai_secret\" \"openai\" {\n  name   = \"OpenAI\"\n  type   = \"openai\"\n  secret = var.openai_api_key\n}\n```",
+			"The API never returns `secret`, so Terraform keeps the configured value in state and cannot " +
+			"detect changes made outside Terraform. A masked `preview_secret` is available for verification. " +
+			"Pass the secret through a variable with `sensitive = true`.",
 		Attributes: map[string]schema.Attribute{
 			"id":         computedStringAttribute("Unique identifier for the AI secret (UUID)."),
 			"org_id":     computedStringAttribute("Unique identifier for the organization."),
@@ -67,7 +65,7 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"secret": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The secret value (e.g. API key). Write-only: the API never returns this value.",
+				Description: "The secret value (e.g. API key). The API never returns this value; Terraform stores the configured value in state.",
 			},
 			"type": schema.StringAttribute{
 				Optional:    true,

@@ -80,7 +80,7 @@ func (r *projectScoreResource) Schema(_ context.Context, _ resource.SchemaReques
 			"description": optionalComputedStringAttribute("Textual description of the project score."),
 			"score_type": schema.StringAttribute{
 				Required:    true,
-				Description: "The type of the configured score. Changing it replaces the score and assigns a new ID.",
+				Description: "The type of the configured score. Changing it replaces the score and assigns a new ID. " + oneOfDescription(projectScoreTypes...),
 				// PATCH validates the full type-specific score shape, and an
 				// in-place type change can invalidate existing category/config data.
 				PlanModifiers: []planmodifier.String{

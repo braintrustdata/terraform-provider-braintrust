@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -24,6 +25,11 @@ var aclObjectTypes = []string{
 var permissionTypes = []string{
 	"create", "read", "update", "delete",
 	"create_acls", "read_acls", "update_acls", "delete_acls",
+}
+
+// oneOfDescription lists the allowed values for an attribute's description.
+func oneOfDescription(values ...string) string {
+	return "One of: `" + strings.Join(values, "`, `") + "`."
 }
 
 // clientFromProviderData extracts the *client.Client from provider data.

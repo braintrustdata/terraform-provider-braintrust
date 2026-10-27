@@ -16,7 +16,7 @@ This repo contains two programs in one Go module:
 ## Adding a resource type
 
 1. `internal/provider`: add `<name>_resource.go`, `<name>_common.go`, and tests; register it in `Resources()` in `provider.go` (and `DataSources()` if there's a data source).
-2. `examples/resources/braintrust_<name>/`: add `resource.tf` (and `import.sh` if importable), then run `make doc`.
+2. `examples/snippets/resources/braintrust_<name>/`: add `resource.tf` (and `import.sh` if importable), then run `make doc`.
 3. To export it from the CLI: add a lister in `internal/terraforming/api/resources.go`, a `build<Name>Blocks` function in `internal/terraforming/cmd/generate.go`, and the type to `AllResourceTypes` in `internal/terraforming/cmd/root.go`.
 
 ## Commands
@@ -29,6 +29,7 @@ Tool versions come from `mise.toml` (run `mise install`). `scripts/check-tool-ve
 - `make check`: runs everything except acceptance tests.
 - `make test-acceptance-local`: acceptance tests against a local Braintrust at `http://localhost:8000`. Prefer this. Enterprise-only tests fail against a local stack; that's expected.
 - `make test-acceptance`: the same via `scripts/test-acceptance.sh` against `BRAINTRUST_API_URL` (default production) with `BRAINTRUST_API_KEY`; looks up the test org, a user, and (for service-token keys) the service account from the key. Only run against a dedicated test org, never a shared environment.
+- `make run-example [MODE=plan|apply|destroy|apply-then-destroy] examples/<name>...`: run `examples/<name>` configs (default `plan`; state in `.example-state/`) against `BRAINTRUST_API_URL` (default production; prefer `http://localhost:8000`). Same test-org rule as acceptance tests.
 
 ## Conventions
 
