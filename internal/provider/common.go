@@ -215,3 +215,15 @@ func diffMemberPermissions(current, desired []memberPermission) (add, remove []m
 	}
 	return add, remove
 }
+
+// rejectPreexisting fails a create whose response is an object that existed
+// before the request. Some POST endpoints return an existing match without
+// x-bt-found-existing, so callers list matches first and compare IDs.
+func rejectPreexisting[T any](created *T, before []T, idOf func(T) string, resourceType string) error {
+	for _, existing := range before {
+		if idOf(existing) == idOf(*created) {
+			return client.AlreadyExistsError(resourceType)
+		}
+	}
+	return nil
+}

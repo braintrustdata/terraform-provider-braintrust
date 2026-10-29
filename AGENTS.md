@@ -35,4 +35,5 @@ Tool versions come from `mise.toml` (run `mise install`). `scripts/check-tool-ve
 
 - Don't edit generated files (`docs/`) by hand.
 - Writes that may have committed on the server but returned an error surface as `client.UncertainWriteError`; keep that behavior when adding resources.
+- Create must fail, not adopt, when the object already exists, or two states end up managing (and deleting) the same object. `client.Created` handles endpoints that send `x-bt-found-existing`. For an endpoint that doesn't, list matches before POST and use `rejectPreexisting`; if POST overwrites (as functions do), refuse before sending. Check new endpoints against a local API and add a case to `create_existing_test.go`.
 - Don't cut releases; maintainers do that through the [release workflow](https://github.com/braintrustdata/terraform-provider-braintrust/actions/workflows/release.yml).

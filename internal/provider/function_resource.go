@@ -120,6 +120,16 @@ func (r *functionResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Creating Braintrust Function", err.Error())
 		return
 	}
+	// POST overwrites an existing function with the same project and slug.
+	existing, err := listFunctionsBySlug(ctx, r.client, projectID.String(), createReq.Slug)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Existing Functions", err.Error())
+		return
+	}
+	if len(existing) > 0 {
+		resp.Diagnostics.AddError("Error Creating Braintrust Function", client.AlreadyExistsError("function").Error())
+		return
+	}
 	createResp, err := client.Write(r.client.API.PostFunctionWithBodyWithResponse(ctx, client.JSONContentType, body))
 	var created *function
 	if err == nil {

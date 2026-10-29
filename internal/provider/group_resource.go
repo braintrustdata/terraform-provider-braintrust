@@ -110,10 +110,19 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	tflog.Debug(ctx, "Creating group", map[string]any{"name": createReq.Name})
 
+	// POST returns an existing same-name group without x-bt-found-existing.
+	existing, err := listGroups(ctx, r.client, createReq.Name, "")
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Existing Groups", err.Error())
+		return
+	}
 	createResp, err := client.Write(r.client.API.PostGroupWithResponse(ctx, createReq))
 	var created *openapi.Group
 	if err == nil {
 		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "group")
+	}
+	if err == nil {
+		err = rejectPreexisting(created, existing, func(g openapi.Group) string { return g.Id.String() }, "group")
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

@@ -80,6 +80,22 @@ func getRole(ctx context.Context, c *client.Client, id string) (*openapi.Role, e
 }
 
 // memberPermissionsFromModel converts the TF model to SDK structs.
+// listRoles lists roles by name across every organization the key can see,
+// including system roles.
+func listRoles(ctx context.Context, c *client.Client, name string) ([]openapi.Role, error) {
+	return client.ListObjects("/v1/role", func(limit int, startingAfter *string) (*client.Page[openapi.Role], error) {
+		page, err := c.API.GetRoleWithResponse(ctx, &openapi.GetRoleParams{
+			Limit:         &limit,
+			StartingAfter: startingAfter,
+			RoleName:      &name,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return page.JSON200, nil
+	}, func(role openapi.Role) string { return role.Id.String() })
+}
+
 func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]memberPermission, diag.Diagnostics) {
 	if value.IsNull() || value.IsUnknown() {
 		return nil, nil

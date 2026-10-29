@@ -203,9 +203,15 @@ func isClassified(err error) bool {
 // later destroy delete infrastructure this configuration did not create.
 func RejectExisting(resp *http.Response, resourceType string) error {
 	if resp != nil && resp.Header.Get("x-bt-found-existing") != "" {
-		return fmt.Errorf("%s already exists; import the existing resource instead of creating it", resourceType)
+		return AlreadyExistsError(resourceType)
 	}
 	return nil
+}
+
+// AlreadyExistsError is the error for a create that would adopt an existing
+// object instead of creating one.
+func AlreadyExistsError(resourceType string) error {
+	return fmt.Errorf("%s already exists; import the existing resource instead of creating it", resourceType)
 }
 
 const listPageSize = 100

@@ -83,6 +83,19 @@ func listFunctions(ctx context.Context, c *client.Client, name, projectID string
 	}, func(fn function) string { return fn.Value.Id.String() })
 }
 
+// listFunctionsBySlug lists the functions in a project with the given slug.
+func listFunctionsBySlug(ctx context.Context, c *client.Client, projectID, slug string) ([]openapi.Function, error) {
+	return client.ListObjects("/v1/function", func(limit int, startingAfter *string) (*client.Page[openapi.Function], error) {
+		page, err := c.API.GetFunctionWithResponse(ctx, &openapi.GetFunctionParams{
+			Limit: &limit, StartingAfter: startingAfter, ProjectId: &projectID, Slug: &slug,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return page.JSON200, nil
+	}, func(fn openapi.Function) string { return fn.Id.String() })
+}
+
 func optionalFunctionJSONState(raw json.RawMessage, existing types.String) types.String {
 	if len(raw) == 0 || string(raw) == "null" {
 		return types.StringNull()
