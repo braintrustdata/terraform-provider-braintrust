@@ -128,10 +128,19 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	tflog.Debug(ctx, "Creating role", map[string]any{"name": createReq.Name})
 
+	// POST returns an existing same-name role without x-bt-found-existing.
+	existing, err := listRoles(ctx, r.client, createReq.Name)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Existing Roles", err.Error())
+		return
+	}
 	createResp, err := client.Write(r.client.API.PostRoleWithResponse(ctx, createReq))
 	var created *openapi.Role
 	if err == nil {
 		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "role")
+	}
+	if err == nil {
+		err = rejectPreexisting(created, existing, func(role openapi.Role) string { return role.Id.String() }, "role")
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

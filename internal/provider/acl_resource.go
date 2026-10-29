@@ -151,10 +151,19 @@ func (r *aclResource) Create(ctx context.Context, req resource.CreateRequest, re
 		"object_id":   plan.ObjectID.ValueString(),
 	})
 
+	// POST returns an existing identical ACL without x-bt-found-existing.
+	existing, err := listACLs(ctx, r.client, plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Existing ACLs", err.Error())
+		return
+	}
 	createResp, err := client.Write(r.client.API.PostAclWithResponse(ctx, createReq))
 	var created *openapi.Acl
 	if err == nil {
 		created, err = client.Created(createResp.HTTPResponse, createResp.JSON200, "ACL")
+	}
+	if err == nil {
+		err = rejectPreexisting(created, existing, func(acl openapi.Acl) string { return acl.Id.String() }, "ACL")
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(

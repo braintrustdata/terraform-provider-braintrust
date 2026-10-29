@@ -44,6 +44,26 @@ func getACL(ctx context.Context, c *client.Client, id string) (*openapi.Acl, err
 	return client.JSON(resp.JSON200)
 }
 
+// listACLs lists the ACLs on plan's object that grant plan's permission or
+// role to plan's user or group. The API cannot filter on a null
+// restrict_object_type, so results may differ in that field.
+func listACLs(ctx context.Context, c *client.Client, plan aclModel) ([]openapi.Acl, error) {
+	return client.ListObjects("/v1/acl", func(limit int, startingAfter *string) (*client.Page[openapi.Acl], error) {
+		page, err := c.API.GetAclWithResponse(ctx, &openapi.GetAclParams{
+			Limit: &limit, StartingAfter: startingAfter,
+			ObjectType: openapi.AclObjectType(plan.ObjectType.ValueString()), ObjectId: plan.ObjectID.ValueString(),
+			UserId: plan.UserID.ValueStringPointer(), GroupId: plan.GroupID.ValueStringPointer(),
+			Permission:         tfStringToEnum[openapi.AclListPermission](plan.Permission),
+			RestrictObjectType: tfStringToEnum[openapi.AclListRestrictObjectType](plan.RestrictObjectType),
+			RoleId:             plan.RoleID.ValueStringPointer(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return page.JSON200, nil
+	}, func(acl openapi.Acl) string { return acl.Id.String() })
+}
+
 // aclItemFromModel builds the SDK request for an ACL, validating its IDs.
 func aclItemFromModel(plan aclModel) (openapi.AclItem, error) {
 	item := openapi.AclItem{
