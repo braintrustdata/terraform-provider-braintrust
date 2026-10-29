@@ -45,7 +45,9 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"`secret_type` set to the provider name instead.\n\n" +
 			"The API never returns `secret`, so Terraform keeps the configured value in state and cannot " +
 			"detect changes made outside Terraform. A masked `preview_secret` is available for verification. " +
-			"Pass the secret through a variable with `sensitive = true`.",
+			"Pass the secret through a variable with `sensitive = true`.\n\n" +
+			"Creating a secret whose name already exists in Braintrust **overwrites** it. " +
+			"Import existing secrets before managing them.",
 		Attributes: map[string]schema.Attribute{
 			"id":         computedStringAttribute("Unique identifier for the AI secret (UUID)."),
 			"org_id":     computedStringAttribute("Unique identifier for the organization."),

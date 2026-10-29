@@ -42,7 +42,8 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Description: "Manages a Braintrust ACL (access control list) entry.",
 		MarkdownDescription: "Manages a Braintrust ACL (access control list) entry. ACLs grant a permission or " +
 			"role to a user or group on a specific object.\n\n" +
-			"ACLs are **immutable** — any attribute change requires destroying and recreating the ACL. " +
+			"ACLs are **immutable** — any attribute change requires destroying and recreating the ACL, " +
+			"so the permission is briefly revoked during the replacement. " +
 			"ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

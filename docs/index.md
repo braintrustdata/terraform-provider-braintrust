@@ -7,106 +7,60 @@ description: |-
 
 # Braintrust Provider
 
-The Braintrust provider allows you to manage [Braintrust](https://www.braintrust.dev/) resources such as projects, datasets, functions, access control, and automations.
+A provider for managing [Braintrust](https://www.braintrust.dev/) resources as code.
 
-## Authentication
+## Quickstart
 
-The provider accepts a Braintrust user API key or service token for authentication. You can create a user API key or service token in the Braintrust [organization settings page](https://www.braintrust.dev/app/settings).
-
-The API key or service token can be provided in the provider configuration block or via the `BRAINTRUST_API_KEY` environment variable.
-
-User API keys can't be created through this provider; create them in Braintrust settings. Creating a `braintrust_service_token` requires an organization-owner service token. If the rest of your configuration uses a user API key, add a provider alias that authenticates with the owner token and use it for service tokens:
-
-```terraform
-provider "braintrust" {
-  alias   = "owner"
-  api_key = var.owner_service_token
-}
-
-resource "braintrust_service_token" "ci" {
-  provider           = braintrust.owner
-  name               = "ci-pipeline"
-  service_account_id = braintrust_service_account.ci.id
-}
-```
-
-## Example Usage
+- create a Braintrust org
+- in your org, set up a Braintrust service token: `Settings → Service tokens, click + Service token`
+- set `BRAINTRUST_API_KEY` to the token
+- set up an initial terraform file, review with `terraform plan` and create with `terraform apply`
 
 ```terraform
 terraform {
   required_providers {
     braintrust = {
       source = "braintrustdata/braintrust"
-      # version = "x.y.z" # pin a specific version
+      # version = "x.y.z" <--- pin to latest version
     }
   }
 }
 
-# Configure the Braintrust provider.
-# The API key can also be set via the BRAINTRUST_API_KEY environment variable.
 provider "braintrust" {
-  # api_key = "your-api-key-here"
-  # api_url = "https://api.braintrust.dev"  # optional, defaults to this
+  # can be configured with envars:
+  #  BRAINTRUST_API_URL
+  #  BRAINTRUST_API_KEY
+  # *or* use these settings (settings win over envars)
+  api_url = "https://api.braintrust.dev" # <-- the default
+  # api_key = "sk-..." <-- recommended to use envar instead
+}
+
+resource "braintrust_project" "hello" {
+  name        = "hello-terraform"
+  description = "Created by the Braintrust Terraform provider"
+}
+
+output "project_id" {
+  value = braintrust_project.hello.id
 }
 ```
 
-## State and Security
+Terraform state contains secrets such as service token keys and AI provider credentials, so store it in an encrypted remote backend and never commit it to version control.
 
-Terraform state may contain sensitive values in plaintext. Keep these considerations in mind when using this provider:
+## Examples
 
-### Sensitive Values in State
+[`examples`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples) has full configurations to copy from:
 
-The following resource attributes are stored in the Terraform state file:
+- [`hello-world`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/hello-world): a basic project.
+- [`kitchen-sink`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/kitchen-sink): a complex project with many resources.
+- [`ci-pipeline`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/ci-pipeline): per-environment projects, CI service tokens, and regression alerts.
+- [`access-control`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/access-control): roles, groups, and ACLs for a multi-team org.
 
-- `braintrust_service_token` — the `key` attribute contains the raw service token
-- `braintrust_ai_secret` — the `secret` attribute contains the AI provider credential
-- `braintrust_env_var` — the `value` attribute contains the environment variable value
+See [What to Manage in Terraform](guides/what-to-manage) for which Braintrust objects fit Terraform best.
 
-**Always use an encrypted remote backend** such as [S3 with server-side encryption](https://developer.hashicorp.com/terraform/language/backend/s3), [Google Cloud Storage](https://developer.hashicorp.com/terraform/language/backend/gcs), or [HCP Terraform](https://developer.hashicorp.com/terraform/cloud-docs) to store state securely. Never commit state files to version control.
+## Adopting Existing Orgs
 
-### State Locking
-
-If multiple team members run `terraform apply` against the same state simultaneously, state can become corrupted. Use a backend that supports [state locking](https://developer.hashicorp.com/terraform/language/state/locking) (e.g., S3 with `use_lockfile = true`, GCS, or HCP Terraform).
-
-### Non-Recoverable Secrets
-
-`braintrust_service_token` exposes its raw secret only at creation time. It **cannot be imported** — if state is lost, delete the old credential and create a new one.
-
-### Upsert Behavior on Env Vars and AI Secrets
-
-`braintrust_env_var` and `braintrust_ai_secret` use upsert (PUT) semantics. If a resource with the same name and scope already exists in Braintrust (created outside of Terraform), the provider will **overwrite** it on `terraform apply`. If you are adopting Terraform for an existing organization, use [`terraform import`](https://developer.hashicorp.com/terraform/cli/import) to bring existing resources under management first.
-
-The [`braintrust-terraforming` CLI](https://github.com/braintrustdata/terraform-provider-braintrust#adopting-existing-orgs) automates this: it exports an existing organization as Terraform configuration with matching `import` blocks.
-
-### ACL Replacement
-
-All attributes on `braintrust_acl` are immutable. Changing any attribute causes Terraform to destroy the existing ACL and create a new one. During the brief window between delete and create, the permission is revoked. Plan accordingly when modifying production access controls.
-
-## What To Manage In Terraform
-
-Terraform works best for stable control-plane state, not high-churn application content.
-
-### Good Terraform Fits
-
-- Access and identity controls: groups, roles, ACLs, service accounts, service tokens.
-- Environment scaffolding: projects, score definitions, tags, baseline datasets (container objects).
-- Organization policy/configuration: secrets wiring, automations, retention policy.
-
-### Better Managed In Code Pipelines
-
-- High-churn product logic (for example: frequently changing prompts/functions).
-- Data payloads and runtime events (dataset rows, logs, experiment events).
-- Artifacts that ship with application releases and should follow app deployment cadence.
-
-### Decision Rule
-
-Use Terraform when the object should be centrally governed, low-frequency, and shared across teams/environments.
-Use an application CI/CD pipeline when the object is product code, changes frequently, and is owned by a single app team.
-
-### Practical Split (Recommended)
-
-- Terraform owns platform guardrails and shared infrastructure.
-- App repos own fast-moving prompt/function code and runtime content.
+If you already have a Braintrust organization, the [`braintrust-terraforming` CLI](https://github.com/braintrustdata/terraform-provider-braintrust#adopting-existing-orgs) exports it as Terraform config, along with `import` blocks so Terraform adopts the existing resources instead of creating new ones.
 
 <!-- schema generated by tfplugindocs -->
 ## Schema

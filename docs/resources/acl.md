@@ -4,14 +4,14 @@ page_title: "braintrust_acl Resource - braintrust"
 subcategory: ""
 description: |-
   Manages a Braintrust ACL (access control list) entry. ACLs grant a permission or role to a user or group on a specific object.
-  ACLs are immutable — any attribute change requires destroying and recreating the ACL. ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).
+  ACLs are immutable — any attribute change requires destroying and recreating the ACL, so the permission is briefly revoked during the replacement. ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).
 ---
 
 # braintrust_acl (Resource)
 
 Manages a Braintrust ACL (access control list) entry. ACLs grant a permission or role to a user or group on a specific object.
 
-ACLs are **immutable** — any attribute change requires destroying and recreating the ACL. ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).
+ACLs are **immutable** — any attribute change requires destroying and recreating the ACL, so the permission is briefly revoked during the replacement. ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).
 
 ## Example Usage
 

@@ -48,7 +48,9 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"\"AI providers\"), use `braintrust_ai_secret` instead.\n\n" +
 			"**Note:** The API never returns `value`, so Terraform keeps the configured value in state " +
 			"and cannot detect changes made outside Terraform. Importing works, but keep `value` set in " +
-			"configuration; the next apply writes it.",
+			"configuration; the next apply writes it.\n\n" +
+			"Creating an environment variable whose name and scope already exist in Braintrust **overwrites** it. " +
+			"Import existing variables before managing them.",
 		Attributes: map[string]schema.Attribute{
 			"id": computedStringAttribute("Unique identifier for the environment variable (UUID)."),
 			"object_type": schema.StringAttribute{

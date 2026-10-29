@@ -7,6 +7,7 @@ description: |-
   This resource also manages project-level AI provider credentials. To configure a project-scoped AI provider key (visible in the Braintrust UI under Project Settings > "Project AI providers"), set secret_type to the provider name (e.g. "openai", "anthropic"). The API will automatically categorize it as an AI provider.
   For organization-level AI provider credentials (visible under Organization > "AI providers"), use braintrust_ai_secret instead.
   Note: The API never returns value, so Terraform keeps the configured value in state and cannot detect changes made outside Terraform. Importing works, but keep value set in configuration; the next apply writes it.
+  Creating an environment variable whose name and scope already exist in Braintrust overwrites it. Import existing variables before managing them.
 ---
 
 # braintrust_env_var (Resource)
@@ -18,6 +19,8 @@ This resource also manages **project-level AI provider credentials**. To configu
 For **organization-level** AI provider credentials (visible under Organization > "AI providers"), use `braintrust_ai_secret` instead.
 
 **Note:** The API never returns `value`, so Terraform keeps the configured value in state and cannot detect changes made outside Terraform. Importing works, but keep `value` set in configuration; the next apply writes it.
+
+Creating an environment variable whose name and scope already exist in Braintrust **overwrites** it. Import existing variables before managing them.
 
 ## Example Usage
 
