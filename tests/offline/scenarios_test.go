@@ -156,6 +156,14 @@ var scenarios = []scenario{
 		r.failIfNot(r.matches(`object_id\s*=\s*braintrust_project\.`), "project env var still points to a source-org project ID")
 		r.failIfNot(r.reported("required sensitive variable(s)"), "required secret variables were not reported")
 	}},
+	{name: "secret_metadata_adoption", command: "genimport", types: "braintrust_project,braintrust_ai_secret,braintrust_env_var", plan: true, setup: func(a *fakeAPI) {
+		a.fixtures["/v1/ai_secret"][0]["type"] = "azure"
+		a.fixtures["/v1/ai_secret"][0]["metadata"] = obj{"api_base": "https://example.openai.azure.com", "deployment": "org-deployment", "future": obj{"enabled": true}}
+		a.fixtures["/v1/env_var"][0]["secret_type"] = "azure"
+		a.fixtures["/v1/env_var"][0]["metadata"] = obj{"api_base": "https://example.openai.azure.com", "deployment": "project-deployment", "future": obj{"models": []string{"custom-model"}}}
+	}, check: func(r *result) {
+		r.failIfNot(r.matches(`metadata\s*=`) && r.has("org-deployment") && r.has("project-deployment") && r.has("custom-model"), "AI provider metadata was omitted from exported configuration")
+	}},
 	{name: "ai_secret_adoption", command: "genimport", types: "braintrust_ai_secret", check: func(r *result) {
 		r.failIf(r.has(`variable "`) || r.matches(`secret\s*=\s*var\.`), "import configuration would rotate an unknown write-only value")
 	}},

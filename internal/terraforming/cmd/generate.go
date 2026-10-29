@@ -1395,7 +1395,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 	var vars []hcl.VariableBlock
 	seen := make(map[string]bool)
 
-	projectEnvVars, err := fetchProjectResources(ctx, projects, "env vars", func(ctx context.Context, projectID string) ([]openapi.EnvVar, error) {
+	projectEnvVars, err := fetchProjectResources(ctx, projects, "env vars", func(ctx context.Context, projectID string) ([]api.EnvVar, error) {
 		return apiClient.ListEnvVars(ctx, "project", projectID)
 	})
 	if err != nil {
@@ -1403,7 +1403,8 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 	}
 	for _, envVars := range projectEnvVars {
 		for i := range envVars {
-			ev := &envVars[i]
+			raw := &envVars[i]
+			ev := raw.Value
 			id, objectID := ev.Id.String(), ev.ObjectId.String()
 			if seen[id] {
 				continue
@@ -1415,6 +1416,9 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 				"name":        ev.Name,
 				"object_type": string(ev.ObjectType),
 				"object_id":   objectID,
+			}
+			if err := exportSecretMetadata(fields, raw.Fields["metadata"]); err != nil {
+				return nil, nil, fmt.Errorf("env var %s metadata: %w", id, err)
 			}
 			linked := make(map[string]string)
 			if ref := resolver.Resolve("object_id", objectID); ref != "" {
@@ -1448,7 +1452,8 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 			return nil, nil, fmt.Errorf("list env vars for organization %s: %w", orgID, err)
 		}
 		for i := range orgVars {
-			ev := &orgVars[i]
+			raw := &orgVars[i]
+			ev := raw.Value
 			id, objectID := ev.Id.String(), ev.ObjectId.String()
 			if seen[id] {
 				continue
@@ -1460,6 +1465,9 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 				"name":        ev.Name,
 				"object_type": string(ev.ObjectType),
 				"object_id":   objectID,
+			}
+			if err := exportSecretMetadata(fields, raw.Fields["metadata"]); err != nil {
+				return nil, nil, fmt.Errorf("env var %s metadata: %w", id, err)
 			}
 			linked := make(map[string]string)
 
@@ -1520,13 +1528,17 @@ func buildAISecretBlocks(ctx context.Context, orgID string, resolver *hcl.Refere
 	var blocks []hcl.ResourceBlock
 	var vars []hcl.VariableBlock
 
-	for _, s := range secrets {
+	for _, raw := range secrets {
+		s := raw.Value
 		if s.OrgId.String() != orgID {
 			continue
 		}
 		id := s.Id.String()
 		name := hcl.ResourceNameFromIDAndLabel(id, s.Name)
 		fields := map[string]any{"name": s.Name}
+		if err := exportSecretMetadata(fields, raw.Fields["metadata"]); err != nil {
+			return nil, nil, fmt.Errorf("AI secret %s metadata: %w", id, err)
+		}
 		linked := make(map[string]string)
 
 		if secretType, ok := client.Optional(s.Type); ok {
@@ -1626,4 +1638,17 @@ func filterProjects(projects []openapi.Project, filter []string) ([]openapi.Proj
 		return nil, fmt.Errorf("project selector(s) not found in selected organization: %s", strings.Join(missing, ", "))
 	}
 	return filtered, nil
+}
+
+// Metadata is a JSON string in the provider schema, not a Terraform map.
+func exportSecretMetadata(fields map[string]any, raw json.RawMessage) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	canonical, err := canonicalJSON(raw)
+	if err != nil {
+		return err
+	}
+	fields["metadata"] = canonical
+	return nil
 }

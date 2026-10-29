@@ -39,3 +39,25 @@ resource "braintrust_env_var" "project_openai" {
 }
 
 # For organization-level AI providers, use braintrust_ai_secret instead.
+
+variable "azure_api_key" {
+  type      = string
+  sensitive = true
+}
+
+# Project-scoped Azure settings use the same metadata shape as org AI secrets.
+# Requires a Braintrust API with env-var metadata write support.
+resource "braintrust_env_var" "project_azure" {
+  object_type = "project"
+  object_id   = braintrust_project.my_project.id
+  name        = "Azure OpenAI"
+  secret_type = "azure"
+  value       = var.azure_api_key
+  metadata = jsonencode({
+    api_base    = "https://example.openai.azure.com"
+    api_version = "2024-10-21"
+    deployment  = "my-gpt-deployment"
+  })
+}
+
+# Removing metadata from this env var clears it on the server.

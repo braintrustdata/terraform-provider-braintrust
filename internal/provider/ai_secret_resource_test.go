@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
@@ -82,4 +83,24 @@ resource "braintrust_ai_secret" "test" {
   secret = %[3]q
 }
 `, name, secretType, secret)
+}
+
+func TestAccAISecretResource_metadata(t *testing.T) {
+	name := "tf-acc-metadata-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	config := func(deployment string) string {
+		return secretMetadataConfig("ai_secret", name, "", fmt.Sprintf(`metadata = jsonencode({ api_base = "https://example.openai.azure.com", api_version = "2024-10-21", deployment = %q })`, deployment))
+	}
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAISecretDestroy,
+		Steps: []resource.TestStep{
+			{Config: config("first"), Check: resource.TestCheckResourceAttr("braintrust_ai_secret.test", "metadata", `{"api_base":"https://example.openai.azure.com","api_version":"2024-10-21","deployment":"first"}`)},
+			{ResourceName: "braintrust_ai_secret.test", ImportState: true, ImportStateVerify: true, ImportStateVerifyIgnore: []string{"secret"}},
+			{Config: config("second"), Check: resource.TestCheckResourceAttr("braintrust_ai_secret.test", "metadata", `{"api_base":"https://example.openai.azure.com","api_version":"2024-10-21","deployment":"second"}`)},
+			{Config: config("second"), PlanOnly: true},
+			{Config: secretMetadataConfig("ai_secret", name, "", ""), ExpectError: regexp.MustCompile("Cannot Remove AI Secret Metadata")},
+			{Config: config("second"), PlanOnly: true},
+		},
+	})
 }

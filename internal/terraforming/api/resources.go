@@ -14,6 +14,8 @@ import (
 // Exported objects whose JSON-encoded attributes are emitted verbatim keep
 // those fields as raw JSON instead of round-tripping them through SDK models.
 type (
+	AISecret          = client.Raw[openapi.AISecret]
+	EnvVar            = client.Raw[openapi.EnvVar]
 	Dataset           = client.Raw[openapi.Dataset]
 	Function          = client.Raw[openapi.Function]
 	ProjectScore      = client.Raw[openapi.ProjectScore]
@@ -158,7 +160,7 @@ func (c *Client) GetACL(ctx context.Context, id string) (*openapi.Acl, error) {
 // ListEnvVars lists the env vars in one scope. Unlike the other list
 // endpoints, /v1/env_var rejects limit and cursor parameters; its response
 // contains the full set for the requested scope.
-func (c *Client) ListEnvVars(ctx context.Context, objectType, objectID string) ([]openapi.EnvVar, error) {
+func (c *Client) ListEnvVars(ctx context.Context, objectType, objectID string) ([]EnvVar, error) {
 	params := &openapi.GetEnvVarParams{}
 	if objectType != "" {
 		t := openapi.EnvVarObjectType(objectType)
@@ -175,7 +177,7 @@ func (c *Client) ListEnvVars(ctx context.Context, objectType, objectID string) (
 	if err != nil {
 		return nil, err
 	}
-	return body.Objects, nil
+	return client.RawObjects(body.Objects, resp.Body)
 }
 
 func (c *Client) ListProjectTags(ctx context.Context) ([]openapi.ProjectTag, error) {
@@ -253,14 +255,18 @@ func (c *Client) ListServiceTokens(ctx context.Context) ([]openapi.ServiceToken,
 	}, func(t openapi.ServiceToken) string { return t.Id.String() })
 }
 
-func (c *Client) ListAISecrets(ctx context.Context) ([]openapi.AISecret, error) {
-	return client.ListObjects("/v1/ai_secret", func(limit int, startingAfter *string) (*client.Page[openapi.AISecret], error) {
+func (c *Client) ListAISecrets(ctx context.Context) ([]AISecret, error) {
+	return client.ListAll("/v1/ai_secret", func(limit int, startingAfter *string) ([]AISecret, error) {
 		page, err := c.sdk.API.GetAiSecretWithResponse(ctx, &openapi.GetAiSecretParams{Limit: &limit, StartingAfter: startingAfter})
 		if err != nil {
 			return nil, err
 		}
-		return page.JSON200, nil
-	}, func(s openapi.AISecret) string { return s.Id.String() })
+		body, err := client.JSON(page.JSON200)
+		if err != nil {
+			return nil, err
+		}
+		return client.RawObjects(body.Objects, page.Body)
+	}, func(s AISecret) string { return s.Value.Id.String() })
 }
 
 // ListProjectAutomations lists every visible project automation; the list

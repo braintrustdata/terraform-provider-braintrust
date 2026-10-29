@@ -8,8 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type envVar = client.Raw[openapi.EnvVar]
+
 // envVarModel is the Terraform data model for the env var resource.
 type envVarModel struct {
+	Metadata       types.String `tfsdk:"metadata"`
 	ID             types.String `tfsdk:"id"`
 	ObjectType     types.String `tfsdk:"object_type"`
 	ObjectID       types.String `tfsdk:"object_id"`
@@ -24,7 +27,9 @@ type envVarModel struct {
 // mapEnvVarToModel maps an SDK env var to the Terraform model.
 // Note: value is write-only and never returned by the API, so we
 // leave model.Value unchanged (preserving whatever Terraform has in state).
-func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
+func mapEnvVarToModel(raw *envVar, model *envVarModel) {
+	envVar := raw.Value
+	model.Metadata = optionalFunctionJSONState(raw.Fields["metadata"], model.Metadata)
 	model.ID = types.StringValue(envVar.Id.String())
 	model.ObjectType = types.StringValue(string(envVar.ObjectType))
 	model.ObjectID = types.StringValue(envVar.ObjectId.String())
@@ -40,10 +45,10 @@ func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
 	// model.Value is intentionally NOT set here -- see doc comment.
 }
 
-func getEnvVar(ctx context.Context, c *client.Client, id string) (*openapi.EnvVar, error) {
+func getEnvVar(ctx context.Context, c *client.Client, id string) (*envVar, error) {
 	resp, err := c.API.GetEnvVarIdWithResponse(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return client.JSON(resp.JSON200)
+	return client.DecodeRaw(resp.JSON200, resp.Body)
 }

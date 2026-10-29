@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
@@ -90,4 +91,28 @@ resource "braintrust_env_var" "test" {
   value       = %[3]q
 }
 `, projectName, envVarName, envVarValue)
+}
+
+func TestAccEnvVarResource_metadata(t *testing.T) {
+	name := "tf-acc-metadata-" + acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum)
+	config := func(metadata string) string {
+		return fmt.Sprintf(`resource "braintrust_project" "metadata" { name = %q }
+`, name) + strings.ReplaceAll(secretMetadataConfig("env_var", name, "PROJECT_ID", metadata), `"PROJECT_ID"`, "braintrust_project.metadata.id")
+	}
+	initial := `metadata = jsonencode({ api_base = "https://example.openai.azure.com", api_version = "2024-10-21", deployment = "first" })`
+	updated := `metadata = jsonencode({ api_base = "https://example.openai.azure.com", deployment = "second" })`
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckEnvVarDestroy,
+		Steps: []resource.TestStep{
+			{Config: config(initial), Check: resource.TestCheckResourceAttr("braintrust_env_var.test", "metadata", `{"api_base":"https://example.openai.azure.com","api_version":"2024-10-21","deployment":"first"}`)},
+			{ResourceName: "braintrust_env_var.test", ImportState: true, ImportStateVerify: true, ImportStateVerifyIgnore: []string{"value"}},
+			{Config: config(updated), Check: resource.TestCheckResourceAttr("braintrust_env_var.test", "metadata", `{"api_base":"https://example.openai.azure.com","deployment":"second"}`)},
+			{Config: config(updated), PlanOnly: true},
+			{Config: config("metadata = jsonencode({})"), Check: resource.TestCheckResourceAttr("braintrust_env_var.test", "metadata", "{}")},
+			{Config: config(""), Check: resource.TestCheckNoResourceAttr("braintrust_env_var.test", "metadata")},
+			{Config: config(""), PlanOnly: true},
+		},
+	})
 }

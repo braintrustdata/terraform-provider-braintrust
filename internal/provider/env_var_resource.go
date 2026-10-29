@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
@@ -52,7 +53,8 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"Creating an environment variable whose name and scope already exist in Braintrust **overwrites** it. " +
 			"Import existing variables before managing them.",
 		Attributes: map[string]schema.Attribute{
-			"id": computedStringAttribute("Unique identifier for the environment variable (UUID)."),
+			"metadata": schema.StringAttribute{Optional: true, Description: "Provider-specific metadata as a JSON object; use jsonencode({...}). Removing this attribute clears metadata on the server. Requires an API version supporting env-var metadata writes."},
+			"id":       computedStringAttribute("Unique identifier for the environment variable (UUID)."),
 			"object_type": schema.StringAttribute{
 				Required:    true,
 				Description: "The type of the object the environment variable is scoped for. " + oneOfDescription("organization", "project", "function"),
@@ -110,6 +112,12 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	metadata, err := functionJSONObject(plan.Metadata, "metadata")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
+		return
+	}
+
 	// Use PUT (replace) so that if an env var with this name already exists
 	// in the same scope, we update it rather than silently returning the old one.
 	objectID, err := parseUUID(plan.ObjectID, "object_id")
@@ -131,10 +139,15 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 		"name":        replaceReq.Name,
 	})
 
-	replaceResp, err := client.Write(r.client.API.PutEnvVarWithResponse(ctx, replaceReq))
-	var created *openapi.EnvVar
+	body, err := client.JSONBody(replaceReq, map[string]json.RawMessage{"metadata": metadata})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust Env Var", err.Error())
+		return
+	}
+	replaceResp, err := client.Write(r.client.API.PutEnvVarWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *envVar
 	if err == nil {
-		created, err = client.Written(replaceResp.JSON200)
+		created, err = client.WrittenRaw(replaceResp.JSON200, replaceResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -145,13 +158,13 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	// Re-read to get full state.
-	envVar, err := getEnvVar(ctx, r.client, created.Id.String())
+	envVar, err := getEnvVar(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapEnvVarToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Env Var After Create",
-			"Env var was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
+			"Env var was created (ID: "+created.Value.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
@@ -205,6 +218,19 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	metadata, err := functionJSONObject(plan.Metadata, "metadata")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
+		return
+	}
+	if metadata == nil && !state.Metadata.IsNull() {
+		metadata = json.RawMessage("null")
+	}
+
+	if scoreJSONEqual(plan.Metadata, state.Metadata) {
+		metadata = nil
+	}
+
 	// Value and secret_type are sent when set and cleared when removed from config.
 	updateReq := openapi.PatchEnvVarIdJSONRequestBody{
 		Name:       plan.Name.ValueString(),
@@ -214,10 +240,15 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	tflog.Debug(ctx, "Updating env var", map[string]any{"id": state.ID.ValueString()})
 
-	updateResp, err := client.Write(r.client.API.PatchEnvVarIdWithResponse(ctx, state.ID.ValueString(), updateReq))
-	var envVar *openapi.EnvVar
+	body, err := client.JSONBody(updateReq, map[string]json.RawMessage{"metadata": metadata})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Braintrust Env Var", err.Error())
+		return
+	}
+	updateResp, err := client.Write(r.client.API.PatchEnvVarIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var envVar *envVar
 	if err == nil {
-		envVar, err = client.Written(updateResp.JSON200)
+		envVar, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
