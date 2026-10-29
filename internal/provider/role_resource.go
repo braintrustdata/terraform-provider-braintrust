@@ -66,12 +66,9 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					Attributes: map[string]schema.Attribute{
 						"permission": schema.StringAttribute{
 							Required:    true,
-							Description: "The permission type (create, read, update, delete, create_acls, read_acls, update_acls, delete_acls).",
+							Description: "The permission type. " + oneOfDescription(permissionTypes...),
 							Validators: []validator.String{
-								stringvalidator.OneOf(
-									"create", "read", "update", "delete",
-									"create_acls", "read_acls", "update_acls", "delete_acls",
-								),
+								stringvalidator.OneOf(permissionTypes...),
 							},
 						},
 						"restrict_object_type": schema.StringAttribute{

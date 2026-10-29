@@ -15,25 +15,21 @@ cd "$(dirname "$0")/.."
 : "${BRAINTRUST_API_KEY:?BRAINTRUST_API_KEY must be set}"
 : "${BRAINTRUST_API_URL:=https://api.braintrust.dev}"
 
-api() {
-  curl -fsS --max-time 30 -H "Authorization: Bearer $BRAINTRUST_API_KEY" "$BRAINTRUST_API_URL$1"
-}
+. scripts/braintrust-key.sh
 
 if [ -z "${BRAINTRUST_TEST_ORG_ID:-}" ]; then
-  BRAINTRUST_TEST_ORG_ID=$(api '/v1/organization?limit=100' |
-    jq -er 'if (.objects | length) == 1 then .objects[0].id else error("key can access \(.objects | length) orgs; set BRAINTRUST_TEST_ORG_ID") end')
+  BRAINTRUST_TEST_ORG_ID=$(key_org_id "set BRAINTRUST_TEST_ORG_ID")
 fi
 
 if [ -z "${BRAINTRUST_TEST_USER_ID:-}" ] || [ -z "${BRAINTRUST_TEST_USER_EMAIL:-}" ]; then
-  # /v1/user lists human members only, so this works for service-token keys too.
-  user=$(api '/v1/user?limit=1' | jq -ec '.objects[0]')
+  user=$(key_first_user)
   : "${BRAINTRUST_TEST_USER_ID:=$(echo "$user" | jq -er .id)}"
   : "${BRAINTRUST_TEST_USER_EMAIL:=$(echo "$user" | jq -er .email)}"
 fi
 
 # A service-token key's own user is its service account.
 if [ -z "${BRAINTRUST_SERVICE_ACCOUNT_ID:-}" ]; then
-  BRAINTRUST_SERVICE_ACCOUNT_ID=$(api /api/self/me | jq -r 'if (.email | startswith("bt::sp::")) then .id else "" end')
+  BRAINTRUST_SERVICE_ACCOUNT_ID=$(key_service_account_id)
 fi
 
 export BRAINTRUST_API_URL BRAINTRUST_TEST_ORG_ID BRAINTRUST_TEST_USER_ID BRAINTRUST_TEST_USER_EMAIL BRAINTRUST_SERVICE_ACCOUNT_ID

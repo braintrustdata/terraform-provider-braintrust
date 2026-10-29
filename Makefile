@@ -25,6 +25,18 @@ test-acceptance: deps
 test-acceptance-local: deps
 	BRAINTRUST_API_URL=http://localhost:8000 ./scripts/test-acceptance.sh
 
+# Usage: make run-example [MODE=plan|apply|destroy|apply-then-destroy] examples/<name>...
+# Words after run-example are example directories, not targets.
+ifeq (run-example,$(firstword $(MAKECMDGOALS)))
+  EXAMPLES := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  .PHONY: $(EXAMPLES)
+  $(eval $(EXAMPLES):;@:)
+endif
+
+run-example:
+	@test -n "$(EXAMPLES)" || { echo "usage: make run-example [MODE=plan|apply|destroy|apply-then-destroy] examples/<name>..." >&2; exit 2; }
+	@for example in $(EXAMPLES); do ./scripts/run-example.sh $$example $(MODE) || exit 1; done
+
 check-docs: doc
 	@test -z "$$(git status --porcelain -- docs)" || (git status --short -- docs; echo "docs/ is out of date; commit the regenerated files"; exit 1)
 
@@ -84,4 +96,4 @@ install-hooks:
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
 
-.PHONY: default build build-terraforming install doc test test-acceptance test-acceptance-local check-docs check-versions check-fmt check-tidy vet check deps fmt lint lint-fix install-hooks
+.PHONY: default build build-terraforming install doc test test-acceptance test-acceptance-local run-example check-docs check-versions check-fmt check-tidy vet check deps fmt lint lint-fix install-hooks

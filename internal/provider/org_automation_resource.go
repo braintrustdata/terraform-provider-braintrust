@@ -55,13 +55,13 @@ func (r *orgAutomationResource) Schema(_ context.Context, _ resource.SchemaReque
 				Attributes: map[string]schema.Attribute{
 					"object_type": schema.StringAttribute{
 						Required:      true,
-						Description:   "The retained object type: project_logs, experiment, or dataset.",
+						Description:   "The retained object type. " + oneOfDescription("project_logs", "experiment", "dataset"),
 						Validators:    []validator.String{stringvalidator.OneOf("project_logs", "experiment", "dataset")},
 						PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 					},
 					"retention_days": schema.Int64Attribute{
 						Required:    true,
-						Description: "Number of days to retain the object; zero is permitted by the API.",
+						Description: "Number of days to retain data. 0 means delete immediately.",
 						Validators:  []validator.Int64{int64validator.AtLeast(0)},
 					},
 				},

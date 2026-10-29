@@ -35,14 +35,14 @@ func (r *functionResource) Metadata(_ context.Context, req resource.MetadataRequ
 func (r *functionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "Manages a Braintrust function, such as a scorer, preprocessor, tool, or task.",
-		MarkdownDescription: "Manages a Braintrust function through `/v1/function`. `function_data_json` is the API's tagged function-data object. This includes prompts, scorers, preprocessors, tools, and other supported function types.",
+		MarkdownDescription: "Manages a Braintrust function: a prompt, scorer, preprocessor, tool, or other callable stored in a project. `function_data_json` describes the implementation (for example inline code), and `prompt_data_json` holds the prompt and model options for LLM-backed functions. See the examples below for each shape.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the function (UUID)."),
 			"xact_id": schema.StringAttribute{Computed: true, Description: "Transaction ID of the function version."},
-			"org_id":  computedStringAttribute("Organization ID."),
-			"created": computedStringAttribute("Creation time."),
+			"org_id":  computedStringAttribute("Unique identifier for the organization."),
+			"created": computedStringAttribute("Date of function creation."),
 			"project_id": schema.StringAttribute{
-				Required: true, Description: "Project containing the function.",
+				Required: true, Description: "Unique identifier for the project that the function belongs to.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
@@ -50,7 +50,7 @@ func (r *functionResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"slug": schema.StringAttribute{
-				Required: true, Description: "Unique identifier within the project.",
+				Required: true, Description: "Unique identifier for the function within the project.",
 				Validators:    []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
@@ -69,8 +69,8 @@ func (r *functionResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description:   "Optional JSON schema for function parameters and return value. Changes replace the function because PATCH does not accept this field.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
-			"description":   optionalComputedStringAttribute("Textual description."),
-			"tags":          schema.ListAttribute{Optional: true, Computed: true, ElementType: types.StringType, Description: "Tags for the function."},
+			"description":   optionalComputedStringAttribute("Textual description of the function."),
+			"tags":          schema.ListAttribute{Optional: true, Computed: true, ElementType: types.StringType, Description: "Function tags."},
 			"metadata_json": schema.StringAttribute{Computed: true, Description: "Metadata object returned by the API as JSON."},
 		},
 	}

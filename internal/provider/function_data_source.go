@@ -27,25 +27,25 @@ func (d *functionDataSource) Metadata(_ context.Context, req datasource.Metadata
 
 func (d *functionDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Reads an existing Braintrust function by ID or name and project.",
+		Description: "Use this data source to get information about an existing Braintrust function. Look up by `id` or by `name` + `project_id`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Optional: true, Computed: true,
-				Description: "Function ID. Provide either id or name with project_id.",
+				Description: "Unique identifier for the function (UUID). Provide either `id` or `name` (with `project_id`).",
 				Validators:  []validator.String{stringvalidator.ExactlyOneOf(path.MatchRoot("name"))},
 			},
-			"project_id":           schema.StringAttribute{Optional: true, Computed: true, Description: "Project ID, required for name lookup."},
+			"project_id":           schema.StringAttribute{Optional: true, Computed: true, Description: "The project the function belongs to. Required when looking up by `name`."},
 			"name":                 schema.StringAttribute{Optional: true, Computed: true, Description: "Display name of the function."},
-			"slug":                 schema.StringAttribute{Computed: true, Description: "Unique function slug."},
-			"description":          schema.StringAttribute{Computed: true, Description: "Textual description."},
-			"created":              schema.StringAttribute{Computed: true, Description: "Creation time."},
+			"slug":                 schema.StringAttribute{Computed: true, Description: "Unique identifier for the function within the project."},
+			"description":          schema.StringAttribute{Computed: true, Description: "Textual description of the function."},
+			"created":              schema.StringAttribute{Computed: true, Description: "Date of function creation."},
 			"xact_id":              schema.StringAttribute{Computed: true, Description: "Transaction ID of the function version."},
-			"org_id":               schema.StringAttribute{Computed: true, Description: "Organization ID."},
-			"function_type":        schema.StringAttribute{Computed: true, Description: "Function type."},
-			"function_data_json":   schema.StringAttribute{Computed: true, Description: "Function implementation as JSON."},
-			"prompt_data_json":     schema.StringAttribute{Computed: true, Description: "Optional prompt configuration as JSON."},
-			"function_schema_json": schema.StringAttribute{Computed: true, Description: "Optional parameter and return schema as JSON."},
-			"metadata_json":        schema.StringAttribute{Computed: true, Description: "Metadata as JSON."},
+			"org_id":               schema.StringAttribute{Computed: true, Description: "Unique identifier for the organization."},
+			"function_type":        schema.StringAttribute{Computed: true, Description: "Function type, for example scorer, preprocessor, tool, task, or llm."},
+			"function_data_json":   schema.StringAttribute{Computed: true, Description: "JSON object describing the function implementation."},
+			"prompt_data_json":     schema.StringAttribute{Computed: true, Description: "JSON prompt configuration for LLM-backed functions, or null."},
+			"function_schema_json": schema.StringAttribute{Computed: true, Description: "JSON schema for function parameters and return value, or null."},
+			"metadata_json":        schema.StringAttribute{Computed: true, Description: "Function metadata as JSON."},
 			"tags":                 schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Function tags."},
 		},
 	}

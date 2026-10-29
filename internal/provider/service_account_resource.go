@@ -40,8 +40,8 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Description: "Manages a Braintrust service account.",
 		MarkdownDescription: "Manages a Braintrust service account.\n\n" +
 			"Service accounts are organization members intended for non-human, programmatic use. " +
-			"Use `braintrust_service_token` to mint tokens for this service account. " +
-			"The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift.",
+			"Use `braintrust_service_token` to mint tokens for this service account.\n\n" +
+			"~> **Note:** The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift. Import is not supported for the same reason.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the service account (UUID)."),
 			"email":   computedStringAttribute("The service account email (not routable)."),

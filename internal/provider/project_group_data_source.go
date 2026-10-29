@@ -25,16 +25,16 @@ func (d *projectGroupDataSource) Metadata(_ context.Context, req datasource.Meta
 
 func (d *projectGroupDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Looks up a Braintrust project group by organization ID and name.",
+		Description: "Use this data source to look up a Braintrust project group by organization ID and name.",
 		Attributes: map[string]schema.Attribute{
-			"id":              schema.StringAttribute{Computed: true},
-			"org_id":          schema.StringAttribute{Required: true},
-			"name":            schema.StringAttribute{Required: true},
-			"description":     schema.StringAttribute{Computed: true},
-			"created":         schema.StringAttribute{Computed: true},
-			"deleted_at":      schema.StringAttribute{Computed: true},
-			"user_id":         schema.StringAttribute{Computed: true},
-			"member_projects": schema.SetAttribute{Computed: true, ElementType: types.StringType},
+			"id":              schema.StringAttribute{Computed: true, Description: "Unique identifier for the project group (UUID)."},
+			"org_id":          schema.StringAttribute{Required: true, Description: "Organization the project group belongs to."},
+			"name":            schema.StringAttribute{Required: true, Description: "Name of the project group to look up."},
+			"description":     schema.StringAttribute{Computed: true, Description: "Textual description of the project group."},
+			"created":         schema.StringAttribute{Computed: true, Description: "Date of project group creation."},
+			"deleted_at":      schema.StringAttribute{Computed: true, Description: "Date of project group deletion, or null if the project group is still active."},
+			"user_id":         schema.StringAttribute{Computed: true, Description: "Identifies the user who created the project group."},
+			"member_projects": schema.SetAttribute{Computed: true, ElementType: types.StringType, Description: "IDs of projects in this project group."},
 		},
 	}
 }

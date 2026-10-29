@@ -7,15 +7,28 @@ description: |-
 
 # Braintrust Provider
 
-The Braintrust provider allows you to manage [Braintrust](https://www.braintrustdata.com/) resources such as projects, experiments, datasets, and more.
+The Braintrust provider allows you to manage [Braintrust](https://www.braintrust.dev/) resources such as projects, datasets, functions, access control, and automations.
 
 ## Authentication
 
-The provider accepts a Braintrust user API key or service token for authentication. You can create a user API key in the Braintrust [organization settings page](https://www.braintrustdata.com/app/settings?subroute=api-keys).
+The provider accepts a Braintrust user API key or service token for authentication. You can create a user API key or service token in the Braintrust [organization settings page](https://www.braintrust.dev/app/settings).
 
-The API key can be provided in the provider configuration block or via the `BRAINTRUST_API_KEY` environment variable.
+The API key or service token can be provided in the provider configuration block or via the `BRAINTRUST_API_KEY` environment variable.
 
-User API keys must be created in Braintrust settings; the public API does not permit creating them through this provider. Creating `braintrust_service_token` requires an organization-owner service token. Configure a provider alias with that credential when managing service tokens alongside resources authenticated by a user API key.
+User API keys can't be created through this provider; create them in Braintrust settings. Creating a `braintrust_service_token` requires an organization-owner service token. If the rest of your configuration uses a user API key, add a provider alias that authenticates with the owner token and use it for service tokens:
+
+```terraform
+provider "braintrust" {
+  alias   = "owner"
+  api_key = var.owner_service_token
+}
+
+resource "braintrust_service_token" "ci" {
+  provider           = braintrust.owner
+  name               = "ci-pipeline"
+  service_account_id = braintrust_service_account.ci.id
+}
+```
 
 ## Example Usage
 
@@ -47,12 +60,13 @@ The following resource attributes are stored in the Terraform state file:
 
 - `braintrust_service_token` — the `key` attribute contains the raw service token
 - `braintrust_ai_secret` — the `secret` attribute contains the AI provider credential
+- `braintrust_env_var` — the `value` attribute contains the environment variable value
 
 **Always use an encrypted remote backend** such as [S3 with server-side encryption](https://developer.hashicorp.com/terraform/language/backend/s3), [Google Cloud Storage](https://developer.hashicorp.com/terraform/language/backend/gcs), or [HCP Terraform](https://developer.hashicorp.com/terraform/cloud-docs) to store state securely. Never commit state files to version control.
 
 ### State Locking
 
-If multiple team members run `terraform apply` against the same state simultaneously, state can become corrupted. Use a backend that supports [state locking](https://developer.hashicorp.com/terraform/language/state/locking) (e.g., S3 with DynamoDB, GCS, or HCP Terraform).
+If multiple team members run `terraform apply` against the same state simultaneously, state can become corrupted. Use a backend that supports [state locking](https://developer.hashicorp.com/terraform/language/state/locking) (e.g., S3 with `use_lockfile = true`, GCS, or HCP Terraform).
 
 ### Non-Recoverable Secrets
 
@@ -61,6 +75,8 @@ If multiple team members run `terraform apply` against the same state simultaneo
 ### Upsert Behavior on Env Vars and AI Secrets
 
 `braintrust_env_var` and `braintrust_ai_secret` use upsert (PUT) semantics. If a resource with the same name and scope already exists in Braintrust (created outside of Terraform), the provider will **overwrite** it on `terraform apply`. If you are adopting Terraform for an existing organization, use [`terraform import`](https://developer.hashicorp.com/terraform/cli/import) to bring existing resources under management first.
+
+The [`braintrust-terraforming` CLI](https://github.com/braintrustdata/terraform-provider-braintrust#adopting-existing-orgs) automates this: it exports an existing organization as Terraform configuration with matching `import` blocks.
 
 ### ACL Replacement
 

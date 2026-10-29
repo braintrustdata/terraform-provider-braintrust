@@ -48,7 +48,7 @@ func (p *braintrustProvider) Metadata(_ context.Context, _ provider.MetadataRequ
 func (p *braintrustProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "The Braintrust provider allows you to manage Braintrust resources.",
-		MarkdownDescription: "The Braintrust provider allows you to manage [Braintrust](https://www.braintrustdata.com/) resources such as projects, experiments, datasets, and more.",
+		MarkdownDescription: "The Braintrust provider allows you to manage [Braintrust](https://www.braintrust.dev/) resources such as projects, datasets, functions, access control, and automations.",
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
 				Optional:            true,

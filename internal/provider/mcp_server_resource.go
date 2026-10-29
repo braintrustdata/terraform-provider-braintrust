@@ -45,9 +45,9 @@ func (r *mcpServerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Description: "Manages a project-scoped MCP server connection in Braintrust.",
 		Attributes: map[string]schema.Attribute{
-			"id": computedStringAttribute("Unique identifier for the MCP server."),
+			"id": computedStringAttribute("Unique identifier for the MCP server (UUID)."),
 			"project_id": schema.StringAttribute{
-				Required: true, Description: "Project that uses this MCP server.",
+				Required: true, Description: "Unique identifier for the project that the MCP server belongs to.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"name": schema.StringAttribute{
@@ -58,10 +58,10 @@ func (r *mcpServerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Required: true, Description: "URL of the MCP server endpoint.",
 				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
-			"description": schema.StringAttribute{Optional: true, Description: "Optional description of the MCP server."},
-			"user_id":     computedStringAttribute("User who created the MCP server."),
-			"created":     computedStringAttribute("Date of creation."),
-			"deleted_at":  computedStringAttribute("Date of deletion, or null while active."),
+			"description": schema.StringAttribute{Optional: true, Description: "Textual description of the MCP server."},
+			"user_id":     computedStringAttribute("Identifies the user who created the MCP server."),
+			"created":     computedStringAttribute("Date of MCP server creation."),
+			"deleted_at":  computedStringAttribute("Date of MCP server deletion, or null if the MCP server is still active."),
 		},
 	}
 }

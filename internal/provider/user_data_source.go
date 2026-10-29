@@ -45,11 +45,9 @@ func (d *userDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 
 func (d *userDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Use this data source to look up a Braintrust user by email address.",
-		MarkdownDescription: "Use this data source to look up a Braintrust user by email address. " +
-			"This is useful for referencing users when managing group membership or ACLs.\n\n" +
-			"```hcl\ndata \"braintrust_user\" \"alice\" {\n  email = \"alice@company.com\"\n}\n\n" +
-			"resource \"braintrust_group\" \"team\" {\n  name         = \"My Team\"\n  member_users = [data.braintrust_user.alice.id]\n}\n```",
+		Description: "Use this data source to look up a Braintrust user by email address or ID.",
+		MarkdownDescription: "Use this data source to look up a Braintrust user by email address or ID. " +
+			"This is useful for referencing users when managing group membership or ACLs.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Optional:    true,

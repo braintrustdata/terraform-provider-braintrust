@@ -34,19 +34,19 @@ func (d *roleDataSource) Metadata(_ context.Context, req datasource.MetadataRequ
 
 func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "Look up a Braintrust role by ID or name. A name lookup fails if multiple roles match; set org_id for a custom role or use the ID of a system role.",
-		MarkdownDescription: "Look up a Braintrust role by ID or name. A name lookup fails if multiple roles match; set `org_id` for a custom role or use the ID of a system role.",
+		Description:         "Use this data source to look up a Braintrust role by ID or name. A name lookup fails if multiple roles match; set org_id for a custom role or use the ID of a system role.",
+		MarkdownDescription: "Use this data source to look up a Braintrust role by ID or name. A name lookup fails if multiple roles match; set `org_id` for a custom role or use the ID of a system role.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Unique identifier for the role (UUID). Provide either id or name.",
+				Description: "Unique identifier for the role (UUID). Provide either `id` or `name`.",
 				Validators:  []validator.String{stringvalidator.ExactlyOneOf(path.MatchRoot("name"))},
 			},
 			"name": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Name of the role to look up. Provide either name or id.",
+				Description: "Name of the role to look up. Provide either `name` or `id`.",
 			},
 			"org_id": schema.StringAttribute{
 				Optional:    true,
