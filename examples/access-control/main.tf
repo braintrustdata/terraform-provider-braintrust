@@ -71,13 +71,22 @@ locals {
     var.contractor_emails,
     flatten([for t in values(var.teams) : concat(t.leads, t.engineers)]),
   ))
-  user_ids = { for email, u in data.braintrust_user.all : email => u.id }
+  user_ids = { for u in data.braintrust_users.all.users : u.email => u.id }
   org_id   = braintrust_group.admins.org_id
 }
 
-data "braintrust_user" "all" {
-  for_each = local.all_emails
-  email    = each.value
+# One lookup for every email. Emails without a Braintrust account are left out
+# of `users`; the postcondition turns that into an error since every email here
+# is expected to belong to a user.
+data "braintrust_users" "all" {
+  emails = local.all_emails
+
+  lifecycle {
+    postcondition {
+      condition     = length(self.users) == length(local.all_emails)
+      error_message = "No Braintrust user for: ${join(", ", setsubtract(local.all_emails, self.users[*].email))}"
+    }
+  }
 }
 
 # =============================================================================
