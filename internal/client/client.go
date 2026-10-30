@@ -46,6 +46,8 @@ type Client struct {
 	// API is the generated Braintrust SDK client. Its transport returns an
 	// error for every non-2xx response, so a nil error means success.
 	API *openapi.ClientWithResponses
+
+	baseURL string
 }
 
 // NewClient creates a new Braintrust API client.
@@ -70,7 +72,7 @@ func NewClient(baseURL, apiKey, userAgent string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Braintrust API client: %w", err)
 	}
-	return &Client{API: api}, nil
+	return &Client{API: api, baseURL: baseURL}, nil
 }
 
 // APIError represents an error returned by the Braintrust API.

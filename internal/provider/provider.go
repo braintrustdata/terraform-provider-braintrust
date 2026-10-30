@@ -104,6 +104,12 @@ func (p *braintrustProvider) Configure(ctx context.Context, req provider.Configu
 		return
 	}
 
+	// Fail during plan, before any write, if the org lives on another data plane.
+	if err := c.CheckDataPlane(ctx); err != nil {
+		resp.Diagnostics.AddError("Wrong Braintrust Data Plane", err.Error())
+		return
+	}
+
 	// Make the client available to data sources and resources.
 	resp.DataSourceData = c
 	resp.ResourceData = c
