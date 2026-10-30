@@ -3,12 +3,12 @@
 page_title: "braintrust_project Data Source - braintrust"
 subcategory: ""
 description: |-
-  Use this data source to get information about an existing Braintrust project https://www.braintrust.dev/docs/admin/projects. Look up by id or name.
+  Use this data source to get information about an existing Braintrust project https://docs.braintrust.dev/admin/projects. Look up by id or name.
 ---
 
 # braintrust_project (Data Source)
 
-Use this data source to get information about an existing Braintrust [project](https://www.braintrust.dev/docs/admin/projects). Look up by `id` or `name`.
+Use this data source to get information about an existing Braintrust [project](https://docs.braintrust.dev/admin/projects). Look up by `id` or `name`.
 
 ## Example Usage
 

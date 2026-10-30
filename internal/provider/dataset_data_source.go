@@ -34,7 +34,7 @@ func (d *datasetDataSource) Metadata(_ context.Context, req datasource.MetadataR
 func (d *datasetDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description:         "Use this data source to get information about an existing Braintrust dataset.",
-		MarkdownDescription: "Use this data source to get information about an existing Braintrust [dataset](https://www.braintrust.dev/docs/annotate/datasets). Look up by `id` or by `name` + `project_id`.",
+		MarkdownDescription: "Use this data source to get information about an existing Braintrust [dataset](https://docs.braintrust.dev/annotate/datasets). Look up by `id` or by `name` + `project_id`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Optional:    true,

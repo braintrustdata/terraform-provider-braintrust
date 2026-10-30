@@ -3,12 +3,12 @@
 page_title: "braintrust_project Resource - braintrust"
 subcategory: ""
 description: |-
-  Manages a Braintrust project https://www.braintrust.dev/docs/admin/projects. Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.
+  Manages a Braintrust project https://docs.braintrust.dev/admin/projects. Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.
 ---
 
 # braintrust_project (Resource)
 
-Manages a Braintrust [project](https://www.braintrust.dev/docs/admin/projects). Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.
+Manages a Braintrust [project](https://docs.braintrust.dev/admin/projects). Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.
 
 ## Example Usage
 

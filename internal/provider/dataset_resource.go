@@ -41,7 +41,7 @@ func (r *datasetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Version:             0,
 		Description:         "Manages a Braintrust dataset.",
-		MarkdownDescription: "Manages a Braintrust [dataset](https://www.braintrust.dev/docs/annotate/datasets). Datasets belong to a project and store evaluation data.",
+		MarkdownDescription: "Manages a Braintrust [dataset](https://docs.braintrust.dev/annotate/datasets). Datasets belong to a project and store evaluation data.",
 		Attributes: map[string]schema.Attribute{
 			"id":         computedStringAttribute("Unique identifier for the dataset (UUID)."),
 			"created":    computedStringAttribute("Date of dataset creation."),
