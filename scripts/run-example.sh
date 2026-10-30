@@ -11,8 +11,8 @@
 #   destroy             destroy resources left by apply
 #   apply-then-destroy  apply, check that a second plan is empty, then destroy
 #
-# State is kept in .example-state/<name>/ (gitignored) between runs, along with
-# the API URL it belongs to; runs against a different URL are refused.
+# State is kept per API URL in .example-state/<host>/<name>/ (gitignored) between
+# runs, so the same example can be run against several environments.
 #
 # Example variables are filled from the key: emails resolve to the org's first
 # human member, and owner_service_token reuses the key when it is a service
@@ -37,11 +37,9 @@ case "$mode" in plan | apply | destroy | apply-then-destroy) ;; *) echo "$usage"
 : "${BRAINTRUST_API_URL:=https://api.braintrust.dev}"
 export BRAINTRUST_API_URL
 
-state=".example-state/$name"
-if [ -f "$state/api_url" ] && [ "$(cat "$state/api_url")" != "$BRAINTRUST_API_URL" ]; then
-  echo "$state belongs to $(cat "$state/api_url"), not $BRAINTRUST_API_URL" >&2
-  exit 1
-fi
+# e.g. http://localhost:8000 -> .example-state/localhost_8000
+env_dir=".example-state/$(printf '%s' "$BRAINTRUST_API_URL" | sed -e 's#^[A-Za-z]*://##' -e 's#/*$##' -e 's#[^A-Za-z0-9.-]#_#g')"
+state="$env_dir/$name"
 if [ "$mode" = destroy ] && [ ! -f "$state/terraform.tfstate" ]; then
   echo "nothing to destroy: no state in $state" >&2
   exit 1
@@ -98,7 +96,7 @@ cleanup() {
   if [ -d "$state" ] && [ ! -f "$state/terraform.tfstate" ]; then
     rm -rf "$state"
   fi
-  rmdir .example-state 2>/dev/null || true
+  rmdir "$env_dir" .example-state 2>/dev/null || true
   [ -z "$bin" ] || rm -rf "$bin"
   exit "$status"
 }
@@ -107,7 +105,6 @@ trap 'exit 130' INT TERM
 
 # The state dir doubles as the Terraform working dir; refresh its config.
 mkdir -p "$state"
-echo "$BRAINTRUST_API_URL" >"$state/api_url"
 rm -f "$state"/*.tf
 cp "$src"/*.tf "$state/"
 
