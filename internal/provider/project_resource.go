@@ -44,7 +44,7 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Version:             0,
 		Description:         "Manages a Braintrust project.",
-		MarkdownDescription: "Manages a Braintrust [project](https://www.braintrust.dev/docs/admin/projects). Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.",
+		MarkdownDescription: "Manages a Braintrust [project](https://docs.braintrust.dev/admin/projects). Projects are the top-level organizational unit in Braintrust, containing experiments, datasets, prompts, and more.",
 		Attributes: map[string]schema.Attribute{
 			"id":         computedStringAttribute("Unique identifier for the project (UUID)."),
 			"org_id":     computedStringAttribute("Unique identifier for the organization that the project belongs to."),

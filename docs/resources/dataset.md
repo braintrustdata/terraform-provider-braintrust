@@ -3,12 +3,12 @@
 page_title: "braintrust_dataset Resource - braintrust"
 subcategory: ""
 description: |-
-  Manages a Braintrust dataset https://www.braintrust.dev/docs/annotate/datasets. Datasets belong to a project and store evaluation data.
+  Manages a Braintrust dataset https://docs.braintrust.dev/annotate/datasets. Datasets belong to a project and store evaluation data.
 ---
 
 # braintrust_dataset (Resource)
 
-Manages a Braintrust [dataset](https://www.braintrust.dev/docs/annotate/datasets). Datasets belong to a project and store evaluation data.
+Manages a Braintrust [dataset](https://docs.braintrust.dev/annotate/datasets). Datasets belong to a project and store evaluation data.
 
 ## Example Usage
 

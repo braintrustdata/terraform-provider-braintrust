@@ -3,12 +3,12 @@
 page_title: "braintrust_dataset Data Source - braintrust"
 subcategory: ""
 description: |-
-  Use this data source to get information about an existing Braintrust dataset https://www.braintrust.dev/docs/annotate/datasets. Look up by id or by name + project_id.
+  Use this data source to get information about an existing Braintrust dataset https://docs.braintrust.dev/annotate/datasets. Look up by id or by name + project_id.
 ---
 
 # braintrust_dataset (Data Source)
 
-Use this data source to get information about an existing Braintrust [dataset](https://www.braintrust.dev/docs/annotate/datasets). Look up by `id` or by `name` + `project_id`.
+Use this data source to get information about an existing Braintrust [dataset](https://docs.braintrust.dev/annotate/datasets). Look up by `id` or by `name` + `project_id`.
 
 ## Example Usage
 

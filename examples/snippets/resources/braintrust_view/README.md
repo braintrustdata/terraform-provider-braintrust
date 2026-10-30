@@ -2,7 +2,7 @@
 
 [`resource.tf`](resource.tf) defines two SQL charts inside `braintrust_view.view_data_json.custom_charts`: a big-number span count and a time series grouped by model. Each chart has a stable key in `charts`; the same key appears in `layout.order`. `chartSql` is the query shown in Braintrust's chart editor, while `viz` selects the rendering and unit.
 
-For query syntax and the chart editor's behavior, see the official [Braintrust SQL charts documentation](https://www.braintrust.dev/docs/observe/dashboards/sql-charts#sql-charts).
+For query syntax and the chart editor's behavior, see the official [Braintrust SQL charts documentation](https://docs.braintrust.dev/observe/dashboards/sql-charts#sql-charts).
 
 The project-scoped dashboard supplies its project to `project_logs()`. For a time series, write the aggregate and `GROUP BY` for every non-aggregate output column. Braintrust supplies the time bucket and applies the dashboard's time range, so the saved `chartSql` does not need its own time column, date filter, ordering, or limit. Replace `metadata.model` with a field your project actually logs.
 
