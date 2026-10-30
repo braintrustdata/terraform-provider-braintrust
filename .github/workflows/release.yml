@@ -13,20 +13,21 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  goreleaser:
-    name: GoReleaser
+  verify:
+    name: Verify
     runs-on: ubuntu-24.04
-    environment: release
-    concurrency: release
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
       - name: Resolve release tag
+        id: tag
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
@@ -47,7 +48,7 @@ jobs:
             echo "::error::Tag $tag already exists"
             exit 1
           fi
-          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Require the release commit to be current main
         run: |
@@ -74,6 +75,32 @@ jobs:
       # Same checks CI runs on pull requests, including tests/offline.
       - name: Verify release source
         run: make check
+
+  acceptance:
+    name: Acceptance Tests
+    needs: verify
+    uses: ./.github/workflows/acceptance.yml
+    secrets: inherit
+
+  goreleaser:
+    name: GoReleaser
+    needs: [verify, acceptance]
+    runs-on: ubuntu-24.04
+    environment: release
+    concurrency: release
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: true
 
       # Pushed with GITHUB_TOKEN, so it doesn't trigger this workflow again.
       - name: Create release tag
