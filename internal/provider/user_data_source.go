@@ -159,16 +159,20 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	user := &matches[0]
-	var state userDataSourceModel
-	state.ID = types.StringValue(user.Id.String())
-	state.Email = nullableStringToTF(user.Email)
-	state.GivenName = nullableStringToTF(user.GivenName)
-	state.FamilyName = nullableStringToTF(user.FamilyName)
-	state.AvatarURL = nullableStringToTF(user.AvatarUrl)
-	state.Created = nullableTimeToTF(user.Created, types.StringNull())
-
+	state := userToModel(&matches[0])
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// userToModel maps an SDK user to the user data source model.
+func userToModel(user *openapi.User) userDataSourceModel {
+	return userDataSourceModel{
+		ID:         types.StringValue(user.Id.String()),
+		Email:      nullableStringToTF(user.Email),
+		GivenName:  nullableStringToTF(user.GivenName),
+		FamilyName: nullableStringToTF(user.FamilyName),
+		AvatarURL:  nullableStringToTF(user.AvatarUrl),
+		Created:    nullableTimeToTF(user.Created, types.StringNull()),
+	}
 }
 
 // listUsers lists users matching the filters in params, across all pages.
