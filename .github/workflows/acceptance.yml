@@ -3,6 +3,8 @@ name: Acceptance Tests
 on:
   pull_request:
     types: [labeled, synchronize, opened, reopened]
+  # release.yml runs these before publishing.
+  workflow_call:
 
 permissions:
   contents: read
@@ -12,7 +14,9 @@ jobs:
     name: Acceptance Tests
     runs-on: ubuntu-24.04
     # Never expose the sandbox credential to code from forked pull requests.
-    if: contains(github.event.pull_request.labels.*.name, 'run-acc-tests') && github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'run-acc-tests') && github.event.pull_request.head.repo.full_name == github.repository)
     concurrency:
       group: braintrust-acceptance-sandbox
       cancel-in-progress: false

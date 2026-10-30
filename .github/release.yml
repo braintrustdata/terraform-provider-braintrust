@@ -1,0 +1,5 @@
+changelog:
+  # Leave Dependabot bumps out of release notes.
+  exclude:
+    labels: [dependencies]
+    authors: [dependabot]
