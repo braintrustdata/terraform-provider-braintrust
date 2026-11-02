@@ -13,6 +13,10 @@ Use this data source to look up a Braintrust group by name and optional organiza
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up the built-in Engineers group
 data "braintrust_group" "engineers" {
   name = "Engineers"

@@ -13,6 +13,10 @@ Use this data source to look up a Braintrust project group by organization ID an
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 variable "org_id" {
   type = string
 }

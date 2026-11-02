@@ -16,6 +16,10 @@ Exactly one of `logs_config`, `export_config`, `retention_config`, `environment_
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "my_project" {
   name = "my-project"
 }

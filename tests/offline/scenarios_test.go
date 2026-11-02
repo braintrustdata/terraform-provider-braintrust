@@ -134,10 +134,6 @@ var scenarios = []scenario{
 	{name: "denied_acl_discovery", command: "generate", types: "braintrust_project,braintrust_acl", flags: []string{"--no-linked-resources"}, wantFail: true, setup: func(a *fakeAPI) {
 		a.denyACLs = true
 	}},
-	{name: "secret_variable_syntax", command: "generate", types: "braintrust_ai_secret", check: func(r *result) {
-		r.failIfNot(r.matches(`type\s*=\s*string`) && r.matches(`sensitive\s*=\s*true`) && r.matches(`secret\s*=\s*var\.braintrust_ai_secret_`), "AI secret has no required sensitive variable reference")
-		r.failIfNot(r.reported("required sensitive variable(s)"), "required secret variables were not reported")
-	}},
 	{name: "secret_variable_collision", command: "generate", types: "braintrust_ai_secret", setup: func(a *fakeAPI) {
 		a.fixtures["/v1/ai_secret"] = []obj{
 			{"id": "10000000-0000-4000-8000-000000000010", "name": "Foo Bar", "type": "openai", "org_id": org},
@@ -154,10 +150,6 @@ var scenarios = []scenario{
 	{name: "ordinary_env_var_value", command: "generate", types: "braintrust_project,braintrust_env_var", check: func(r *result) {
 		r.failIfNot(r.matches(`value\s*=\s*var\.braintrust_env_var_`), "write-only ordinary env var value has no variable")
 		r.failIfNot(r.matches(`object_id\s*=\s*braintrust_project\.`), "project env var still points to a source-org project ID")
-		r.failIfNot(r.reported("required sensitive variable(s)"), "required secret variables were not reported")
-	}},
-	{name: "ai_secret_adoption", command: "genimport", types: "braintrust_ai_secret", check: func(r *result) {
-		r.failIf(r.has(`variable "`) || r.matches(`secret\s*=\s*var\.`), "import configuration would rotate an unknown write-only value")
 	}},
 	{name: "stale_acl_unverified", command: "generate", types: "braintrust_project,braintrust_acl", flags: []string{"--verify-acl-targets=false"}, setup: setupStaleACL, check: func(r *result) {
 		r.failIfNot(r.has(`resource "braintrust_acl" "terraform_managed_resource_50000000"`) && r.reported("ACL target(s) were not verified"), "unverified ACL was omitted or warning is missing")

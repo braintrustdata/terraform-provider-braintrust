@@ -16,6 +16,10 @@ ACLs are **immutable** — any attribute change requires destroying and recreati
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "my_project" {
   name = "my-project"
 }

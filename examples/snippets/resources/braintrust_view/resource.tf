@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # A saved project-log view and a dashboard with SQL charts share the same API resource.
 resource "braintrust_project" "app" {
   name = "my-ml-project"

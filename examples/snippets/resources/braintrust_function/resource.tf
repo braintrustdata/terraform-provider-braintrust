@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "example" {
   name = "functions-example"
 }

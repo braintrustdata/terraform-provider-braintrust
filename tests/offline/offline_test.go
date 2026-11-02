@@ -87,11 +87,18 @@ func baseFixtures() fixtures {
 
 // fakeAPI serves fixtures and records every request URI.
 type fakeAPI struct {
-	mu         sync.Mutex
-	fixtures   fixtures
-	denyACLs   bool
-	staleACLID string
-	requests   []string
+	mu                 sync.Mutex
+	fixtures           fixtures
+	denyACLs           bool
+	staleACLID         string
+	requests           []string
+	secretValues       map[string]any
+	secretWrites       int
+	failSecretWrites   bool
+	tokenCreations     []obj
+	tokenDeletes       []string
+	tokenDeleteStatus  int
+	tokenMissingStatus int
 }
 
 func (a *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -105,11 +112,27 @@ func (a *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (a *fakeAPI) handle(r *http.Request) (int, any) {
 	path := r.URL.Path
+	if path == "/v1/service_token" || strings.HasPrefix(path, "/v1/service_token/") {
+		a.requests = append(a.requests, r.URL.RequestURI())
+		return a.serviceToken(r)
+	}
+	if path == "/v1/ai_secret" || path == "/v1/env_var" ||
+		strings.HasPrefix(path, "/v1/ai_secret/") || strings.HasPrefix(path, "/v1/env_var/") {
+		if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+			return a.writeSecret(r)
+		}
+		if r.Method == http.MethodGet && strings.Count(path, "/") == 3 {
+			list := path[:strings.LastIndex(path, "/")]
+			return a.get(list, path, "Secret does not exist")
+		}
+	}
 	if r.Method == http.MethodPatch {
 		return a.patchGroup(r)
 	}
 	a.requests = append(a.requests, r.URL.RequestURI())
 	switch {
+	case path == "/api/self/me":
+		return http.StatusOK, obj{"id": serviceUser, "email": "bt::sp::offline"}
 	case a.denyACLs && path == "/v1/acl/list_org":
 		return http.StatusForbidden, obj{"error": "fixture: missing read_acls permission"}
 	case strings.HasPrefix(path, "/v1/acl/") && path != "/v1/acl/list_org":

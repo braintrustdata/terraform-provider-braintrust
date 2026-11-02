@@ -1,0 +1,30 @@
+---
+page_title: "braintrust_service_token Ephemeral Resource - terraform-provider-braintrust"
+subcategory: ""
+description: |-
+  Generates a Braintrust service token without storing its data in Terraform plans or state.
+---
+
+# braintrust_service_token (Ephemeral Resource)
+
+{{ .Description | trimspace }}
+
+## Example: dependency-light local secret store
+
+This demonstration needs Terraform 1.11.1+, an existing service account, an organization-owner service token, a POSIX shell, `curl`, `jq`, and standard utilities. No AWS account, Vault server, or additional provider is required. Use a dedicated test org.
+
+The token uses a fixed name with `nonce = timestamp()`. The nonce is unknown during planning, which defers generation until apply. File-existence checks prevent repeat issuance. Persistent `terraform_data` resources own delivery and cleanup: destroy revokes the token before removing the key. Cleanup is separate from delivery so a tainted delivery resource does not skip revocation.
+
+{{ tffile "examples/ephemeral-service-token/main.tf" }}
+
+Place the following `store.sh` beside the Terraform file:
+
+{{ codefile "sh" "examples/ephemeral-service-token/store.sh" }}
+
+**Demo only:** `.secrets/service-token` is plaintext, with the token ID on its first line and key on its second. `.service-token-id` is a non-secret receipt written before delivery, allowing cleanup after a lost key or failed delivery. Keep both files out of version control. The script uses owner-only permissions and refuses to overwrite an existing entry. Existence does not prove validity or expiry. Run only one writer and re-plan if files change between plan and apply.
+
+**Cleanup:** Keep `BRAINTRUST_API_KEY` available for destroy. Revocation failure preserves the entry, receipt, and ownership state for retry. If both files are lost, reconcile tokens in Braintrust before applying again. Keep these Terraform blocks and the script present until destroy finishes. This example's destroy provisioner implements revocation; the ephemeral resource itself does not revoke on close. See the [runnable example, upgrade, and recovery instructions](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/ephemeral-service-token).
+
+For a production secret store, replace local delivery with your chosen provider's write-only argument and use an ephemeral read if Terraform needs to retrieve the key. Do not use ordinary data sources or `local_sensitive_file.content` for the raw key, as they can persist it in state. Adapt the missing-entry check and lifecycle to the store rather than assuming every store supports a nullable lookup.
+
+{{ .SchemaMarkdown | trimspace }}

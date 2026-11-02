@@ -5,6 +5,7 @@ import (
 
 	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,9 +16,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &aiSecretResource{}
-	_ resource.ResourceWithConfigure   = &aiSecretResource{}
-	_ resource.ResourceWithImportState = &aiSecretResource{}
+	_ resource.Resource                 = &aiSecretResource{}
+	_ resource.ResourceWithConfigure    = &aiSecretResource{}
+	_ resource.ResourceWithImportState  = &aiSecretResource{}
+	_ resource.ResourceWithUpgradeState = &aiSecretResource{}
 )
 
 // NewAISecretResource returns a new AI secret resource.
@@ -35,7 +37,7 @@ func (r *aiSecretResource) Metadata(_ context.Context, req resource.MetadataRequ
 
 func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:     0,
+		Version:     1,
 		Description: "Manages a Braintrust AI provider secret.",
 		MarkdownDescription: "Manages a Braintrust **organization-level** AI provider secret " +
 			"(e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI " +
@@ -43,9 +45,18 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"For **project-level** AI provider credentials (visible under Project Settings > " +
 			"\"Project AI providers\"), use `braintrust_env_var` with " +
 			"`secret_type` set to the provider name instead.\n\n" +
-			"The API never returns `secret`, so Terraform keeps the configured value in state and cannot " +
-			"detect changes made outside Terraform. A masked `preview_secret` is available for verification. " +
-			"Pass the secret through a variable with `sensitive = true`.\n\n" +
+			"`secret` is write-only and is never stored in the " +
+			"resource's plan or state. Pass it through a variable with both `ephemeral = true` and " +
+			"`sensitive = true` to keep the input out of saved plans as well. `secret_version` must " +
+			"be a non-ephemeral positive integer and is stored in state.\n\n" +
+			"Set both `secret` and `secret_version` when supplying a key. Change the version to rotate it; " +
+			"changing only the secret does nothing. Metadata-only updates and removing the version do not " +
+			"resend or clear the remote key. The API cannot clear AI secrets, and Terraform cannot detect " +
+			"changes to their values made outside Terraform.\n\n" +
+			"After import, omit both fields to manage metadata without rotation. Configuring a version " +
+			"then writes the supplied secret. Upgrading older state discards its stored secret and starts " +
+			"with no version, without changing the remote key. Historical state snapshots and backups " +
+			"may still contain plaintext and must be protected. A masked `preview_secret` is available.\n\n" +
 			"Creating a secret whose name already exists in Braintrust **overwrites** it. " +
 			"Import existing secrets before managing them.",
 		Attributes: map[string]schema.Attribute{
@@ -67,7 +78,19 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"secret": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The secret value (e.g. API key). The API never returns this value; Terraform stores the configured value in state.",
+				WriteOnly:   true,
+				Description: "Write-only AI provider key. Requires secret_version. Use an ephemeral, sensitive input variable; changing this value alone does not rotate the key.",
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("secret_version")),
+				},
+			},
+			"secret_version": schema.Int64Attribute{
+				Optional:    true,
+				Description: "Non-sensitive, non-ephemeral positive version stored in state. Requires secret. Change this version to write the configured secret; omit both fields after import to leave the key untouched.",
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.AlsoRequires(path.MatchRoot("secret")),
+				},
 			},
 			"type": schema.StringAttribute{
 				Optional:    true,
@@ -77,6 +100,10 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 	}
 }
 
+func (r *aiSecretResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{0: aiSecretWriteOnly.stateUpgrader()}
+}
+
 func (r *aiSecretResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	r.client = clientFromProviderData(req.ProviderData, &resp.Diagnostics)
 }
@@ -84,6 +111,12 @@ func (r *aiSecretResource) Configure(_ context.Context, req resource.ConfigureRe
 func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan aiSecretModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	var config aiSecretModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	aiSecretWriteOnly.validate(config.Secret, plan.SecretVersion, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -95,7 +128,7 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 	// we update it rather than silently returning the old one.
 	createReq := openapi.CreateAISecret{
 		Name:   plan.Name.ValueString(),
-		Secret: tfStringToNullable(plan.Secret),
+		Secret: tfStringToNullable(config.Secret),
 		Type:   tfStringToNullable(plan.Type),
 	}
 
@@ -159,7 +192,6 @@ func (r *aiSecretResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	// mapAISecretToModel preserves the existing state.Secret (write-only).
 	mapAISecretToModel(secret, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -172,6 +204,12 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 	var state aiSecretModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	var config aiSecretModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	aiSecretWriteOnly.validate(config.Secret, plan.SecretVersion, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -182,11 +220,11 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 	updateReq := openapi.PatchAISecret{
 		// Always send name (it may have changed).
 		Name: nullable.NewNullableWithValue(plan.Name.ValueString()),
-		// The API doesn't support clearing secrets (no "set to empty"
-		// semantic), so the secret is only sent if set.
-		Secret: tfStringToNullable(plan.Secret),
 		// Type is sent if set and cleared if removed.
 		Type: patchString(plan.Type, state.Type),
+	}
+	if aiSecretWriteOnly.versionChanged(plan.SecretVersion, state.SecretVersion) {
+		updateReq.Secret = tfStringToNullable(config.Secret)
 	}
 
 	tflog.Debug(ctx, "Updating AI secret", map[string]any{"id": state.ID.ValueString()})

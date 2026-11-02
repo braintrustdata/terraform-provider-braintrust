@@ -13,6 +13,10 @@ Manages one user's membership in a Braintrust permission group without managing 
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 variable "org_id" {
   type = string
 }

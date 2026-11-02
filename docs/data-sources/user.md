@@ -13,6 +13,10 @@ Use this data source to look up a Braintrust user by email address or ID. This i
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up a user by email.
 data "braintrust_user" "alice" {
   email = "alice@example.com"

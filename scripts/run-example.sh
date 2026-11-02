@@ -7,17 +7,18 @@
 #
 # MODE is one of:
 #   plan                show what apply would change (default)
-#   apply               apply, check that a second plan is empty, keep the resources
+#   apply               apply, check that a final plan is empty, keep the resources
 #   destroy             destroy resources left by apply
-#   apply-then-destroy  apply, check that a second plan is empty, then destroy
+#   apply-then-destroy  apply, check that a final plan is empty, then destroy
 #
 # State is kept per API URL in .example-state/<host>/<name>/ (gitignored) between
 # runs, so the same example can be run against several environments.
 #
 # Example variables are filled from the key: emails resolve to the org's first
 # human member, and owner_service_token reuses the key when it is a service
-# token (set BRAINTRUST_OWNER_SERVICE_TOKEN otherwise). Any TF_VAR_* already in
-# the environment wins. Examples use fixed resource names and overwrite AI
+# token (set BRAINTRUST_OWNER_SERVICE_TOKEN otherwise). service_account_id
+# defaults to the key's service account. Any TF_VAR_* already in the
+# environment wins. Examples use fixed resource names and overwrite AI
 # secrets and env vars of the same name, so only use a dedicated test org.
 
 set -eu
@@ -50,7 +51,8 @@ fi
 # The provider uses the key's org, so the emails below must come from it too.
 key_org_id "use a key for a single test org" >/dev/null
 email=$(key_first_user | jq -er .email)
-if [ -z "${BRAINTRUST_OWNER_SERVICE_TOKEN:-}" ] && [ -n "$(key_service_account_id)" ]; then
+service_account_id=$(key_service_account_id)
+if [ -z "${BRAINTRUST_OWNER_SERVICE_TOKEN:-}" ] && [ -n "$service_account_id" ]; then
   BRAINTRUST_OWNER_SERVICE_TOKEN=$BRAINTRUST_API_KEY
 fi
 if grep -q 'variable "owner_service_token"' "$src/main.tf" &&
@@ -69,10 +71,27 @@ fi
 : "${TF_VAR_openai_api_key:=sk-example-not-a-real-key}"
 : "${TF_VAR_alert_webhook_url:=https://example.com/braintrust-alerts}"
 : "${TF_VAR_owner_service_token:=${BRAINTRUST_OWNER_SERVICE_TOKEN:-}}"
+: "${TF_VAR_service_account_id:=$service_account_id}"
+: "${TF_VAR_api_url:=$BRAINTRUST_API_URL}"
+if [ "$name" = ephemeral-service-token ] && [ -z "$TF_VAR_service_account_id" ]; then
+  echo "set TF_VAR_service_account_id to an existing test service account; BRAINTRUST_API_KEY must be an org-owner service token" >&2
+  exit 1
+fi
 export TF_VAR_my_email TF_VAR_admin_emails TF_VAR_auditor_emails TF_VAR_contractor_emails TF_VAR_teams \
-  TF_VAR_openai_api_key TF_VAR_alert_webhook_url TF_VAR_owner_service_token
+  TF_VAR_openai_api_key TF_VAR_alert_webhook_url TF_VAR_owner_service_token TF_VAR_service_account_id TF_VAR_api_url
 
 tf() { terraform -chdir="$state" "$@" -input=false; }
+
+# Preserve unexpected/recovery files rather than discard credentials when
+# creation or cleanup was interrupted.
+remove_workspace() {
+  if [ -e "$state/.secrets" ] || [ -L "$state/.secrets" ] ||
+    [ -e "$state/.service-token-id" ] || [ -L "$state/.service-token-id" ]; then
+    echo "Recovery files kept in $state; reconcile the token in Braintrust before deleting them."
+  else
+    rm -rf "$state"
+  fi
+}
 
 destroy() {
   echo "Destroying $name"
@@ -80,7 +99,7 @@ destroy() {
     echo "destroy failed; state kept in $state" >&2
     return 1
   fi
-  rm -rf "$state"
+  remove_workspace
 }
 
 # Remove the provider build, destroy after apply-then-destroy even if apply
@@ -94,7 +113,7 @@ cleanup() {
     destroy || status=1
   fi
   if [ -d "$state" ] && [ ! -f "$state/terraform.tfstate" ]; then
-    rm -rf "$state"
+    remove_workspace
   fi
   rmdir "$env_dir" .example-state 2>/dev/null || true
   [ -z "$bin" ] || rm -rf "$bin"
@@ -107,6 +126,10 @@ trap 'exit 130' INT TERM
 mkdir -p "$state"
 rm -f "$state"/*.tf
 cp "$src"/*.tf "$state/"
+for script in "$src"/*.sh; do
+  [ -f "$script" ] || continue
+  cp "$script" "$state/"
+done
 
 bin=$(mktemp -d "${TMPDIR:-/tmp}/bt-example-bin.XXXXXX")
 go build -o "$bin/terraform-provider-braintrust" .

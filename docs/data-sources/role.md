@@ -13,6 +13,10 @@ Use this data source to look up a Braintrust role by ID or name. A name lookup f
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up the built-in system roles
 data "braintrust_role" "viewer" {
   name = "Viewer"

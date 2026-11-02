@@ -104,7 +104,7 @@ func (w *Writer) WriteResources(blocks []ResourceBlock) []byte {
 	return hclwrite.Format(f.Bytes())
 }
 
-// WriteImports writes Terraform 1.5+ import blocks.
+// WriteImports writes Terraform import blocks.
 func (w *Writer) WriteImports(blocks []ResourceBlock) []byte {
 	f := hclwrite.NewEmptyFile()
 	body := f.Body()
@@ -145,6 +145,7 @@ func (w *Writer) WriteVariables(vars []VariableBlock) []byte {
 		}
 		varBody.SetAttributeRaw("type", hclRawExpr("string"))
 		varBody.SetAttributeValue("sensitive", cty.BoolVal(true))
+		varBody.SetAttributeValue("ephemeral", cty.BoolVal(true))
 	}
 
 	return hclwrite.Format(f.Bytes())

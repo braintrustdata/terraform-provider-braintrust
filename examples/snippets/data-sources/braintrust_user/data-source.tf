@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up a user by email.
 data "braintrust_user" "alice" {
   email = "alice@example.com"

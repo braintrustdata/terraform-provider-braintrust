@@ -13,7 +13,7 @@ import (
 var importCmd = &cobra.Command{
 	Use:   "import",
 	Short: "Generate Terraform import blocks for existing Braintrust resources",
-	Long: `Fetches resources from the Braintrust API and generates Terraform 1.5+
+	Long: `Fetches resources from the Braintrust API and generates Terraform
 import blocks. These can be placed in a .tf file alongside the generated
 resource configuration to import existing state.`,
 	RunE: runImport,

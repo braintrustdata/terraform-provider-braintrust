@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up users by email so we do not hardcode UUIDs.
 data "braintrust_user" "alice" {
   email = "alice@example.com"

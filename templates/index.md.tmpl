@@ -9,6 +9,8 @@ description: |-
 
 A provider for managing [Braintrust](https://www.braintrust.dev/) resources as code.
 
+Requires Terraform **1.11.1 or later**. Terraform 1.11.0 has a serialization bug affecting sensitive ephemeral values, fixed in 1.11.1.
+
 ## Quickstart
 
 - create a Braintrust org
@@ -18,7 +20,7 @@ A provider for managing [Braintrust](https://www.braintrust.dev/) resources as c
 
 {{ tffile "examples/snippets/provider/main.tf" }}
 
-Terraform state contains secrets such as service token keys and AI provider credentials, so store it in an encrypted remote backend and never commit it to version control.
+Managed service-token keys persist in Terraform state, so use an encrypted remote backend and never commit state to version control. AI-secret and environment-variable inputs are write-only; use ephemeral input variables to keep them out of saved plans as well. For state-free token generation, see the [ephemeral service-token resource](ephemeral-resources/service_token), whose delivery and revocation are caller-owned.
 
 ## Examples
 
@@ -28,6 +30,7 @@ Terraform state contains secrets such as service token keys and AI provider cred
 - [`kitchen-sink`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/kitchen-sink): a complex project with many resources.
 - [`ci-pipeline`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/ci-pipeline): per-environment projects, CI service tokens, and regression alerts.
 - [`access-control`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/access-control): roles, groups, and ACLs for a multi-team org.
+- [`ephemeral-service-token`](https://github.com/braintrustdata/terraform-provider-braintrust/tree/main/examples/ephemeral-service-token): state-free token delivery to a demo local file store, with apply-only generation and explicit caller-owned cleanup.
 
 See [What to Manage in Terraform](guides/what-to-manage) for which Braintrust objects fit Terraform best.
 

@@ -19,6 +19,10 @@ Adding projects requires `create_acls` on them, and removing projects or deletin
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 variable "org_id" {
   type = string
 }

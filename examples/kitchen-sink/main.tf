@@ -13,6 +13,8 @@
 # =============================================================================
 
 terraform {
+  required_version = ">= 1.11.1"
+
   required_providers {
     braintrust = {
       source = "braintrustdata/braintrust"
@@ -37,6 +39,7 @@ variable "my_email" {
 variable "openai_api_key" {
   type      = string
   sensitive = true
+  ephemeral = true
 }
 
 variable "owner_service_token" {
@@ -227,19 +230,24 @@ resource "braintrust_view" "health" {
 # =============================================================================
 
 # Org-wide AI provider credential.
+# Increment secret_version to rotate the key. Changing only the key does nothing.
+# Keep counters non-ephemeral; the key itself is ephemeral and sensitive.
 resource "braintrust_ai_secret" "openai" {
-  name   = "kitchen-sink-openai"
-  type   = "openai"
-  secret = var.openai_api_key
+  name           = "kitchen-sink-openai"
+  type           = "openai"
+  secret         = var.openai_api_key
+  secret_version = 1
 }
 
 # A plain project environment variable. Set secret_type to make it a
 # project-level AI provider credential instead.
+# Increment value_version whenever changing value.
 resource "braintrust_env_var" "api_base_url" {
-  object_type = "project"
-  object_id   = braintrust_project.app.id
-  name        = "API_BASE_URL"
-  value       = "https://api.example.com"
+  object_type   = "project"
+  object_id     = braintrust_project.app.id
+  name          = "API_BASE_URL"
+  value         = "https://api.example.com"
+  value_version = 1
 }
 
 # =============================================================================

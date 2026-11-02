@@ -22,34 +22,40 @@ func TestAccEnvVarResource_basic(t *testing.T) {
 		CheckDestroy:             testAccCheckEnvVarDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET", "secret-value-1"),
+				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET", "secret-value-1", 1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", "MY_SECRET"),
 					resource.TestCheckResourceAttr(resourceName, "object_type", "project"),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
 					resource.TestCheckResourceAttrSet(resourceName, "object_id"),
+					resource.TestCheckNoResourceAttr(resourceName, "value"),
+					resource.TestCheckResourceAttr(resourceName, "value_version", "1"),
 				),
 			},
-			// ImportState (value is write-only so it won't be verified).
+			// Import has no version until a value is explicitly configured.
 			{
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"value"},
+				ImportStateVerifyIgnore: []string{"value_version"},
 			},
 			// Update the value.
 			{
-				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET", "secret-value-2"),
+				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET", "secret-value-2", 2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", "MY_SECRET"),
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
+					resource.TestCheckNoResourceAttr(resourceName, "value"),
+					resource.TestCheckResourceAttr(resourceName, "value_version", "2"),
 				),
 			},
 			// Update the name (forces PATCH with new name).
 			{
-				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET_RENAMED", "secret-value-2"),
+				Config: testAccEnvVarResourceConfig(rName, "MY_SECRET_RENAMED", "secret-value-2", 2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", "MY_SECRET_RENAMED"),
+					resource.TestCheckNoResourceAttr(resourceName, "value"),
+					resource.TestCheckResourceAttr(resourceName, "value_version", "2"),
 				),
 			},
 		},
@@ -77,17 +83,18 @@ func testAccCheckEnvVarDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccEnvVarResourceConfig(projectName, envVarName, envVarValue string) string {
+func testAccEnvVarResourceConfig(projectName, envVarName, envVarValue string, version int) string {
 	return fmt.Sprintf(`
 resource "braintrust_project" "test" {
   name = %[1]q
 }
 
 resource "braintrust_env_var" "test" {
-  object_type = "project"
-  object_id   = braintrust_project.test.id
-  name        = %[2]q
-  value       = %[3]q
+  object_type   = "project"
+  object_id     = braintrust_project.test.id
+  name          = %[2]q
+  value         = %[3]q
+  value_version = %[4]d
 }
-`, projectName, envVarName, envVarValue)
+`, projectName, envVarName, envVarValue, version)
 }

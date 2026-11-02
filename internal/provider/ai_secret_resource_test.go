@@ -24,29 +24,33 @@ func TestAccAISecretResource_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Step 1: Create with name, type, and secret.
 			{
-				Config: testAccAISecretResourceConfig(rName, "openai", "sk-test-secret-value-1"),
+				Config: testAccAISecretResourceConfig(rName, "openai", "sk-test-secret-value-1", 1),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet(resourceName, "id"),
 					resource.TestCheckResourceAttr(resourceName, "name", rName),
 					resource.TestCheckResourceAttr(resourceName, "type", "openai"),
 					resource.TestCheckResourceAttrSet(resourceName, "org_id"),
 					resource.TestCheckResourceAttrSet(resourceName, "created"),
+					resource.TestCheckNoResourceAttr(resourceName, "secret"),
+					resource.TestCheckResourceAttr(resourceName, "secret_version", "1"),
 				),
 			},
-			// Step 2: Import (secret is write-only, so ignore it).
+			// Import has no version until a value is explicitly configured.
 			{
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"secret"},
+				ImportStateVerifyIgnore: []string{"secret_version"},
 			},
 			// Step 3: Update name and rotate the secret.
 			{
-				Config: testAccAISecretResourceConfig(rNameUpdated, "openai", "sk-test-secret-value-2"),
+				Config: testAccAISecretResourceConfig(rNameUpdated, "openai", "sk-test-secret-value-2", 2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", rNameUpdated),
 					resource.TestCheckResourceAttr(resourceName, "type", "openai"),
 					resource.TestCheckResourceAttrSet(resourceName, "updated_at"),
+					resource.TestCheckNoResourceAttr(resourceName, "secret"),
+					resource.TestCheckResourceAttr(resourceName, "secret_version", "2"),
 				),
 			},
 		},
@@ -74,12 +78,13 @@ func testAccCheckAISecretDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccAISecretResourceConfig(name, secretType, secret string) string {
+func testAccAISecretResourceConfig(name, secretType, secret string, version int) string {
 	return fmt.Sprintf(`
 resource "braintrust_ai_secret" "test" {
-  name   = %[1]q
-  type   = %[2]q
-  secret = %[3]q
+  name           = %[1]q
+  type           = %[2]q
+  secret         = %[3]q
+  secret_version = %[4]d
 }
-`, name, secretType, secret)
+`, name, secretType, secret, version)
 }

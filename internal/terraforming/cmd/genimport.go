@@ -46,14 +46,15 @@ func runGenImport(cmd *cobra.Command, args []string) error {
 		switch blocks[i].Type {
 		case "braintrust_env_var":
 			delete(blocks[i].LinkedFields, "value")
+			delete(blocks[i].Fields, "value_version")
 		case "braintrust_ai_secret":
 			delete(blocks[i].LinkedFields, "secret")
+			delete(blocks[i].Fields, "secret_version")
 		}
 	}
 	if len(vars) > 0 {
-		fmt.Fprintln(os.Stderr, "Warning: omitted write-only values from adoption configuration; supply them explicitly when rotating or recreating secrets")
+		fmt.Fprintln(os.Stderr, "Warning: omitted write-only values and versions from adoption configuration; to rotate later, supply an ephemeral sensitive value and set its secret_version or value_version to a new positive integer")
 	}
-	vars = nil
 
 	writer := hcl.NewWriter(registry)
 	output, shouldClose, err := getOutput()
@@ -79,14 +80,6 @@ func runGenImport(cmd *cobra.Command, args []string) error {
 	data := writer.WriteResources(blocks)
 	if _, err := output.Write(data); err != nil {
 		return fmt.Errorf("failed to write resources: %w", err)
-	}
-
-	// Write variable blocks.
-	if len(vars) > 0 {
-		varData := writer.WriteVariables(vars)
-		if _, err := output.Write(varData); err != nil {
-			return fmt.Errorf("failed to write variables: %w", err)
-		}
 	}
 
 	// Separator.
