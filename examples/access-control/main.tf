@@ -71,13 +71,18 @@ locals {
     var.contractor_emails,
     flatten([for t in values(var.teams) : concat(t.leads, t.engineers)]),
   ))
-  user_ids = { for email, u in data.braintrust_user.all : email => u.id }
+  user_ids = { for u in data.braintrust_users.all.users : u.email => u.id }
   org_id   = braintrust_group.admins.org_id
 }
 
-data "braintrust_user" "all" {
-  for_each = local.all_emails
-  email    = each.value
+# One lookup for every email. Fails if any email has no Braintrust account.
+data "braintrust_users" "all" {
+  emails = local.all_emails
+
+  # Uncomment to skip emails without a Braintrust account (for example, people
+  # who haven't signed up yet) instead of failing. Skipped emails are listed in
+  # `data.braintrust_users.all.missing_emails` and left out of every group.
+  # ignore_missing = true
 }
 
 # =============================================================================
