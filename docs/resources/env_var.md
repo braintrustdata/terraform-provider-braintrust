@@ -6,7 +6,9 @@ description: |-
   Manages a Braintrust environment variable. Environment variables can be scoped to an organization, project, or function. Values are encrypted at rest.
   This resource also manages project-level AI provider credentials. To configure a project-scoped AI provider key (visible in the Braintrust UI under Project Settings > "Project AI providers"), set secret_type to the provider name (e.g. "openai", "anthropic"). The API will automatically categorize it as an AI provider.
   For organization-level AI provider credentials (visible under Organization > "AI providers"), use braintrust_ai_secret instead.
-  Note: The API never returns value, so Terraform keeps the configured value in state and cannot detect changes made outside Terraform. Importing works, but keep value set in configuration; the next apply writes it.
+  value is write-only and is never stored in the resource's plan or state. Pass it through a variable with both ephemeral = true and sensitive = true to keep the input out of saved plans as well. value_version must be a non-ephemeral positive integer and is stored in state.
+  A configured value requires value_version. Change the version to write a new value; changing only the value does nothing. To explicitly clear the remote value on update, change the version and set value = null or omit value. Metadata-only updates and removing the version leave the remote value untouched. External value changes cannot be detected.
+  After import, omit both fields to manage metadata without rotation. Configuring a version then writes or clears the value. Upgrading older state discards its stored value and starts with no version, without changing the remote value. Historical state snapshots and backups may still contain plaintext and must be protected.
   Creating an environment variable whose name and scope already exist in Braintrust overwrites it. Import existing variables before managing them.
 ---
 
@@ -18,13 +20,26 @@ This resource also manages **project-level AI provider credentials**. To configu
 
 For **organization-level** AI provider credentials (visible under Organization > "AI providers"), use `braintrust_ai_secret` instead.
 
-**Note:** The API never returns `value`, so Terraform keeps the configured value in state and cannot detect changes made outside Terraform. Importing works, but keep `value` set in configuration; the next apply writes it.
+`value` is write-only and is never stored in the resource's plan or state. Pass it through a variable with both `ephemeral = true` and `sensitive = true` to keep the input out of saved plans as well. `value_version` must be a non-ephemeral positive integer and is stored in state.
+
+A configured value requires `value_version`. Change the version to write a new value; changing only the value does nothing. To explicitly clear the remote value on update, change the version and set `value = null` or omit `value`. Metadata-only updates and removing the version leave the remote value untouched. External value changes cannot be detected.
+
+After import, omit both fields to manage metadata without rotation. Configuring a version then writes or clears the value. Upgrading older state discards its stored value and starts with no version, without changing the remote value. Historical state snapshots and backups may still contain plaintext and must be protected.
 
 Creating an environment variable whose name and scope already exist in Braintrust **overwrites** it. Import existing variables before managing them.
 
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
+# Increment value_version whenever you change value; changing only value does
+# nothing. Version counters are non-ephemeral. A new version with a null or
+# omitted value explicitly clears it; omitting both leaves it untouched on update.
+# Ephemeral sensitive variables keep inputs out of plans and state.
+
 variable "org_id" {
   type = string
 }
@@ -36,33 +51,37 @@ resource "braintrust_project" "my_project" {
 variable "openai_api_key" {
   type      = string
   sensitive = true
+  ephemeral = true
 }
 
 # A regular environment variable scoped to a project.
 resource "braintrust_env_var" "api_base_url" {
-  object_type = "project"
-  object_id   = braintrust_project.my_project.id
-  name        = "API_BASE_URL"
-  value       = "https://api.example.com"
+  object_type   = "project"
+  object_id     = braintrust_project.my_project.id
+  name          = "API_BASE_URL"
+  value         = "https://api.example.com"
+  value_version = 1
 }
 
 # An environment variable available to every project in the organization.
 resource "braintrust_env_var" "log_level" {
-  object_type = "organization"
-  object_id   = var.org_id
-  name        = "LOG_LEVEL"
-  value       = "info"
+  object_type   = "organization"
+  object_id     = var.org_id
+  name          = "LOG_LEVEL"
+  value         = "info"
+  value_version = 1
 }
 
 # A project-level AI provider credential.
 # Setting secret_type to the provider name (e.g. "openai") causes this
 # to appear under "Project AI providers" in the Braintrust UI.
 resource "braintrust_env_var" "project_openai" {
-  object_type = "project"
-  object_id   = braintrust_project.my_project.id
-  name        = "OpenAI"
-  secret_type = "openai"
-  value       = var.openai_api_key
+  object_type   = "project"
+  object_id     = braintrust_project.my_project.id
+  name          = "OpenAI"
+  secret_type   = "openai"
+  value         = var.openai_api_key
+  value_version = 1
 }
 
 # For organization-level AI providers, use braintrust_ai_secret instead.
@@ -79,8 +98,11 @@ resource "braintrust_env_var" "project_openai" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `secret_type` (String) The AI provider name (e.g. "openai", "anthropic"). When set, the env var appears under "Project AI providers" in the Braintrust UI.
-- `value` (String, Sensitive) The value of the environment variable. Encrypted at rest. The API never returns this value; Terraform stores the configured value in state.
+- `value` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only environment variable value. Requires value_version when non-null. Use an ephemeral, sensitive input variable; changing this value alone does not update it.
+- `value_version` (Number) Non-sensitive, non-ephemeral positive version stored in state. Change it to write value, or to explicitly clear the remote value on update when value is null or omitted. Omitting this version leaves the remote value untouched on update.
 
 ### Read-Only
 
@@ -96,6 +118,9 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
-# Import by the env var ID. The API never returns `value`, so keep it set in config.
+# Import by the env var ID. Omit both value and value_version to adopt without rotation.
+# To update later, supply value through an ephemeral sensitive variable and set
+# value_version to a new positive integer. Changing value alone does nothing.
+# A new value_version with value omitted or null explicitly clears the remote value.
 terraform import braintrust_env_var.example 00000000-0000-0000-0000-000000000000
 ```

@@ -15,6 +15,7 @@ type envVarModel struct {
 	ObjectID       types.String `tfsdk:"object_id"`
 	Name           types.String `tfsdk:"name"`
 	Value          types.String `tfsdk:"value"`
+	ValueVersion   types.Int64  `tfsdk:"value_version"`
 	Created        types.String `tfsdk:"created"`
 	Used           types.String `tfsdk:"used"`
 	SecretType     types.String `tfsdk:"secret_type"`
@@ -22,8 +23,7 @@ type envVarModel struct {
 }
 
 // mapEnvVarToModel maps an SDK env var to the Terraform model.
-// Note: value is write-only and never returned by the API, so we
-// leave model.Value unchanged (preserving whatever Terraform has in state).
+// The write-only value is always cleared before returning state.
 func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
 	model.ID = types.StringValue(envVar.Id.String())
 	model.ObjectType = types.StringValue(string(envVar.ObjectType))
@@ -37,7 +37,7 @@ func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
 	} else {
 		model.SecretCategory = types.StringNull()
 	}
-	// model.Value is intentionally NOT set here -- see doc comment.
+	model.Value = types.StringNull()
 }
 
 func getEnvVar(ctx context.Context, c *client.Client, id string) (*openapi.EnvVar, error) {

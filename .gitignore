@@ -44,6 +44,9 @@ override.tf.json
 .terraformrc
 terraform.rc
 .example-state/
+# Plaintext store used by the ephemeral-token demo
+/examples/ephemeral-service-token/.secrets/
+/examples/ephemeral-service-token/.service-token-id
 
 # Environment variables (secrets)
 .env
@@ -51,4 +54,3 @@ terraform.rc
 
 # GoReleaser
 dist/
-

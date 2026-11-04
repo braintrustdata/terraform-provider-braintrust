@@ -13,6 +13,10 @@ Use this data source to get information about an existing Braintrust function. L
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 data "braintrust_function" "existing" {
   project_id = "00000000-0000-0000-0000-000000000000" # replace with your project UUID
   name       = "Pass scorer"

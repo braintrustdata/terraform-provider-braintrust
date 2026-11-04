@@ -13,6 +13,10 @@ Manages a project-scoped MCP server connection in Braintrust.
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "tools" {
   name = "agent-tools"
 }

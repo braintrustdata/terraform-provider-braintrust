@@ -13,6 +13,10 @@ Manages an organization-wide Braintrust retention policy. Available only on plan
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 variable "org_id" {
   type = string
 }

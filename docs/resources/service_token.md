@@ -25,6 +25,10 @@ Service tokens are **immutable** — any attribute change requires destroying an
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Creating service tokens requires an organization-owner service token. If the
 # rest of the configuration uses a user API key, add an aliased provider.
 variable "owner_service_token" {

@@ -13,6 +13,10 @@ Manages one project membership in a Braintrust project group. Reference both the
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 variable "org_id" {
   type = string
 }

@@ -80,7 +80,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		if _, err := output.Write(varData); err != nil {
 			return fmt.Errorf("failed to write variables: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "Generated %d required sensitive variable(s) for write-only values; supply them before applying (for example, with TF_VAR_<variable_name>). See variable blocks in the output.\n", len(vars))
+		fmt.Fprintf(os.Stderr, "Generated %d required ephemeral sensitive variable(s) for write-only values; supply them before applying (for example, with TF_VAR_<variable_name>). Increment the corresponding secret_version or value_version to rotate a value; changing only the value does nothing.\n", len(vars))
 	}
 
 	if shouldClose {
@@ -1428,6 +1428,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 			// The API does not return values for either ordinary or typed env vars.
 			varName := "braintrust_env_var_" + api.SanitizeName(ev.Name) + "_" + api.SanitizeName(id) + "_value"
 			linked["value"] = "var." + varName
+			fields["value_version"] = 1
 			vars = append(vars, hcl.VariableBlock{Name: varName, Description: fmt.Sprintf("Value for env var %q", ev.Name)})
 
 			blocks = append(blocks, hcl.ResourceBlock{
@@ -1468,6 +1469,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 			}
 			varName := "braintrust_env_var_" + api.SanitizeName(ev.Name) + "_" + api.SanitizeName(id) + "_value"
 			linked["value"] = "var." + varName
+			fields["value_version"] = 1
 			vars = append(vars, hcl.VariableBlock{Name: varName, Description: fmt.Sprintf("Value for env var %q", ev.Name)})
 
 			blocks = append(blocks, hcl.ResourceBlock{
@@ -1536,6 +1538,7 @@ func buildAISecretBlocks(ctx context.Context, orgID string, resolver *hcl.Refere
 		// Secret value is write-only — use a variable reference.
 		varName := "braintrust_ai_secret_" + api.SanitizeName(s.Name) + "_" + api.SanitizeName(id) + "_secret"
 		linked["secret"] = "var." + varName
+		fields["secret_version"] = 1
 		vars = append(vars, hcl.VariableBlock{
 			Name:        varName,
 			Description: fmt.Sprintf("API key/secret for AI provider %q", s.Name),

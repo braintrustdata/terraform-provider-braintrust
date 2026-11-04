@@ -13,6 +13,10 @@ Manages a Braintrust project tag. Tags are user-configured labels for tracking a
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "my_project" {
   name = "my-project"
 }

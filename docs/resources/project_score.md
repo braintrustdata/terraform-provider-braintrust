@@ -13,6 +13,10 @@ Manages a Braintrust project score. Scores are user-configured metrics that can 
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "my_project" {
   name = "my-project"
 }

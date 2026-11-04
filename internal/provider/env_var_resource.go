@@ -5,6 +5,7 @@ import (
 
 	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,12 +14,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/oapi-codegen/nullable"
 )
 
 var (
-	_ resource.Resource                = &envVarResource{}
-	_ resource.ResourceWithConfigure   = &envVarResource{}
-	_ resource.ResourceWithImportState = &envVarResource{}
+	_ resource.Resource                 = &envVarResource{}
+	_ resource.ResourceWithConfigure    = &envVarResource{}
+	_ resource.ResourceWithImportState  = &envVarResource{}
+	_ resource.ResourceWithUpgradeState = &envVarResource{}
 )
 
 // NewEnvVarResource returns a new env var resource.
@@ -36,7 +39,7 @@ func (r *envVarResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:     0,
+		Version:     1,
 		Description: "Manages a Braintrust environment variable.",
 		MarkdownDescription: "Manages a Braintrust environment variable. Environment variables can be scoped " +
 			"to an organization, project, or function. Values are encrypted at rest.\n\n" +
@@ -46,9 +49,18 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"`\"anthropic\"`). The API will automatically categorize it as an AI provider.\n\n" +
 			"For **organization-level** AI provider credentials (visible under Organization > " +
 			"\"AI providers\"), use `braintrust_ai_secret` instead.\n\n" +
-			"**Note:** The API never returns `value`, so Terraform keeps the configured value in state " +
-			"and cannot detect changes made outside Terraform. Importing works, but keep `value` set in " +
-			"configuration; the next apply writes it.\n\n" +
+			"`value` is write-only and is never stored in the " +
+			"resource's plan or state. Pass it through a variable with both `ephemeral = true` and " +
+			"`sensitive = true` to keep the input out of saved plans as well. `value_version` must " +
+			"be a non-ephemeral positive integer and is stored in state.\n\n" +
+			"A configured value requires `value_version`. Change the version to write a new value; " +
+			"changing only the value does nothing. To explicitly clear the remote value on update, " +
+			"change the version and set `value = null` or omit `value`. Metadata-only updates and " +
+			"removing the version leave the remote value untouched. External value changes cannot be detected.\n\n" +
+			"After import, omit both fields to manage metadata without rotation. Configuring a version " +
+			"then writes or clears the value. Upgrading older state discards its stored value and starts " +
+			"with no version, without changing the remote value. Historical state snapshots and backups " +
+			"may still contain plaintext and must be protected.\n\n" +
 			"Creating an environment variable whose name and scope already exist in Braintrust **overwrites** it. " +
 			"Import existing variables before managing them.",
 		Attributes: map[string]schema.Attribute{
@@ -80,7 +92,16 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"value": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The value of the environment variable. Encrypted at rest. The API never returns this value; Terraform stores the configured value in state.",
+				WriteOnly:   true,
+				Description: "Write-only environment variable value. Requires value_version when non-null. Use an ephemeral, sensitive input variable; changing this value alone does not update it.",
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.MatchRoot("value_version")),
+				},
+			},
+			"value_version": schema.Int64Attribute{
+				Optional:    true,
+				Description: "Non-sensitive, non-ephemeral positive version stored in state. Change it to write value, or to explicitly clear the remote value on update when value is null or omitted. Omitting this version leaves the remote value untouched on update.",
+				Validators:  []validator.Int64{int64validator.AtLeast(1)},
 			},
 			"created":     computedStringAttribute("Date of environment variable creation."),
 			"used":        computedStringAttribute("Date the environment variable was last used."),
@@ -96,6 +117,10 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	}
 }
 
+func (r *envVarResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{0: envVarWriteOnly.stateUpgrader()}
+}
+
 func (r *envVarResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	r.client = clientFromProviderData(req.ProviderData, &resp.Diagnostics)
 }
@@ -103,6 +128,12 @@ func (r *envVarResource) Configure(_ context.Context, req resource.ConfigureRequ
 func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan envVarModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	var config envVarModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	envVarWriteOnly.validate(config.Value, plan.ValueVersion, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -121,7 +152,7 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 		ObjectType: openapi.PutEnvVarJSONBodyObjectType(plan.ObjectType.ValueString()),
 		ObjectId:   objectID,
 		Name:       plan.Name.ValueString(),
-		Value:      tfStringToNullable(plan.Value),
+		Value:      tfStringToNullable(config.Value),
 		SecretType: tfStringToNullable(plan.SecretType),
 	}
 
@@ -198,6 +229,12 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	var state envVarModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	var config envVarModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	envVarWriteOnly.validate(config.Value, plan.ValueVersion, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -205,11 +242,17 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Value and secret_type are sent when set and cleared when removed from config.
+	// Metadata updates do not resend the write-only value.
 	updateReq := openapi.PatchEnvVarIdJSONRequestBody{
 		Name:       plan.Name.ValueString(),
-		Value:      patchString(plan.Value, state.Value),
 		SecretType: patchString(plan.SecretType, state.SecretType),
+	}
+	if envVarWriteOnly.versionChanged(plan.ValueVersion, state.ValueVersion) {
+		if config.Value.IsNull() {
+			updateReq.Value = nullable.NewNullNullable[string]()
+		} else {
+			updateReq.Value = tfStringToNullable(config.Value)
+		}
 	}
 
 	tflog.Debug(ctx, "Updating env var", map[string]any{"id": state.ID.ValueString()})

@@ -13,6 +13,7 @@ type aiSecretModel struct {
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Secret        types.String `tfsdk:"secret"`
+	SecretVersion types.Int64  `tfsdk:"secret_version"`
 	Type          types.String `tfsdk:"type"`
 	OrgID         types.String `tfsdk:"org_id"`
 	PreviewSecret types.String `tfsdk:"preview_secret"`
@@ -21,8 +22,7 @@ type aiSecretModel struct {
 }
 
 // mapAISecretToModel maps an SDK AI secret (GET response) to the Terraform model.
-// Note: Secret is NOT set here because the GET response doesn't include it.
-// The raw secret is only sent during create/update, never returned.
+// The write-only secret is always cleared before returning state.
 func mapAISecretToModel(secret *openapi.AISecret, model *aiSecretModel) {
 	model.ID = types.StringValue(secret.Id.String())
 	model.Name = types.StringValue(secret.Name)
@@ -31,7 +31,7 @@ func mapAISecretToModel(secret *openapi.AISecret, model *aiSecretModel) {
 	model.PreviewSecret = nullableStringToTF(secret.PreviewSecret)
 	model.Created = nullableTimeToTF(secret.Created, model.Created)
 	model.UpdatedAt = nullableTimeToTF(secret.UpdatedAt, model.UpdatedAt)
-	// model.Secret is intentionally NOT set -- write-only field.
+	model.Secret = types.StringNull()
 }
 
 func getAISecret(ctx context.Context, c *client.Client, id string) (*openapi.AISecret, error) {

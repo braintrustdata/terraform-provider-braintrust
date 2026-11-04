@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up the built-in system roles
 data "braintrust_role" "viewer" {
   name = "Viewer"

@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Create a basic Braintrust project
 resource "braintrust_project" "example" {
   name        = "my-ml-project"

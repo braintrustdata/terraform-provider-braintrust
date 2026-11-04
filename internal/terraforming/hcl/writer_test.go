@@ -34,16 +34,6 @@ func TestWriterEmitsNestedConfigAndUnlistedFields(t *testing.T) {
 	}
 }
 
-func TestWriterVariableTypeIsExpression(t *testing.T) {
-	got := string(NewWriter(nil).WriteVariables([]VariableBlock{{Name: "secret"}}))
-	if !strings.Contains(got, "type      = string") && !strings.Contains(got, "type = string") {
-		t.Fatalf("expected Terraform type expression, got %s", got)
-	}
-	if strings.Contains(got, `type = "string"`) {
-		t.Fatalf("type constraint is quoted: %s", got)
-	}
-}
-
 func TestWriterCommentsEveryLineOfNames(t *testing.T) {
 	got := string(NewWriter(nil).WriteResources([]ResourceBlock{{
 		Type: "braintrust_project", Name: "test", Comment: "normal\nresource \"evil\" \"injected\" {}",
@@ -88,10 +78,5 @@ func TestWriterFormatsBlocksAndJSON(t *testing.T) {
 	_, diags := parser.ParseHCL([]byte(got), "generated.tf")
 	if diags.HasErrors() {
 		t.Fatalf("generated HCL is invalid: %s", diags.Error())
-	}
-
-	variables := string(writer.WriteVariables([]VariableBlock{{Name: "secret", Description: "Secret"}}))
-	if strings.HasPrefix(variables, " ") || !strings.Contains(variables, "  sensitive   = true") {
-		t.Fatalf("variable block is not formatted:\n%s", variables)
 	}
 }

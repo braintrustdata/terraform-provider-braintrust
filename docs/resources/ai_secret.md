@@ -5,7 +5,9 @@ subcategory: ""
 description: |-
   Manages a Braintrust organization-level AI provider secret (e.g. OpenAI, Anthropic, Azure API keys). These are visible in the Braintrust UI under Organization > "AI providers" and are available to all projects.
   For project-level AI provider credentials (visible under Project Settings > "Project AI providers"), use braintrust_env_var with secret_type set to the provider name instead.
-  The API never returns secret, so Terraform keeps the configured value in state and cannot detect changes made outside Terraform. A masked preview_secret is available for verification. Pass the secret through a variable with sensitive = true.
+  secret is write-only and is never stored in the resource's plan or state. Pass it through a variable with both ephemeral = true and sensitive = true to keep the input out of saved plans as well. secret_version must be a non-ephemeral positive integer and is stored in state.
+  Set both secret and secret_version when supplying a key. Change the version to rotate it; changing only the secret does nothing. Metadata-only updates and removing the version do not resend or clear the remote key. The API cannot clear AI secrets, and Terraform cannot detect changes to their values made outside Terraform.
+  After import, omit both fields to manage metadata without rotation. Configuring a version then writes the supplied secret. Upgrading older state discards its stored secret and starts with no version, without changing the remote key. Historical state snapshots and backups may still contain plaintext and must be protected. A masked preview_secret is available.
   Creating a secret whose name already exists in Braintrust overwrites it. Import existing secrets before managing them.
 ---
 
@@ -15,48 +17,64 @@ Manages a Braintrust **organization-level** AI provider secret (e.g. OpenAI, Ant
 
 For **project-level** AI provider credentials (visible under Project Settings > "Project AI providers"), use `braintrust_env_var` with `secret_type` set to the provider name instead.
 
-The API never returns `secret`, so Terraform keeps the configured value in state and cannot detect changes made outside Terraform. A masked `preview_secret` is available for verification. Pass the secret through a variable with `sensitive = true`.
+`secret` is write-only and is never stored in the resource's plan or state. Pass it through a variable with both `ephemeral = true` and `sensitive = true` to keep the input out of saved plans as well. `secret_version` must be a non-ephemeral positive integer and is stored in state.
+
+Set both `secret` and `secret_version` when supplying a key. Change the version to rotate it; changing only the secret does nothing. Metadata-only updates and removing the version do not resend or clear the remote key. The API cannot clear AI secrets, and Terraform cannot detect changes to their values made outside Terraform.
+
+After import, omit both fields to manage metadata without rotation. Configuring a version then writes the supplied secret. Upgrading older state discards its stored secret and starts with no version, without changing the remote key. Historical state snapshots and backups may still contain plaintext and must be protected. A masked `preview_secret` is available.
 
 Creating a secret whose name already exists in Braintrust **overwrites** it. Import existing secrets before managing them.
 
 ## Example Usage
 
 ```terraform
-# Use Terraform variables to safely manage sensitive API keys.
+# Ephemeral sensitive variables keep inputs out of plans and state;
+# older state histories may still contain them.
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 variable "openai_api_key" {
   type      = string
   sensitive = true
+  ephemeral = true
 }
 
 variable "anthropic_api_key" {
   type      = string
   sensitive = true
+  ephemeral = true
 }
 
 # Organization-level AI provider credentials.
 # These appear under Organization > "AI providers" in the Braintrust UI
 # and are available to all projects in the org.
+# Increment secret_version whenever you change its secret; changing only the
+# secret does nothing. Keep version counters non-ephemeral.
 resource "braintrust_ai_secret" "openai" {
-  name   = "OpenAI"
-  type   = "openai"
-  secret = var.openai_api_key
+  name           = "OpenAI"
+  type           = "openai"
+  secret         = var.openai_api_key
+  secret_version = 1
 }
 
 resource "braintrust_ai_secret" "anthropic" {
-  name   = "Anthropic"
-  type   = "anthropic"
-  secret = var.anthropic_api_key
+  name           = "Anthropic"
+  type           = "anthropic"
+  secret         = var.anthropic_api_key
+  secret_version = 1
 }
 
 # For project-level AI provider credentials (visible under Project Settings >
 # "Project AI providers"), use braintrust_env_var with secret_type instead:
 #
 # resource "braintrust_env_var" "project_openai" {
-#   object_type = "project"
-#   object_id   = braintrust_project.my_project.id
-#   name        = "OpenAI"
-#   secret_type = "openai"
-#   value       = var.openai_api_key
+#   object_type   = "project"
+#   object_id     = braintrust_project.my_project.id
+#   name          = "OpenAI"
+#   secret_type   = "openai"
+#   value         = var.openai_api_key
+#   value_version = 1
 # }
 ```
 
@@ -69,7 +87,10 @@ resource "braintrust_ai_secret" "anthropic" {
 
 ### Optional
 
-- `secret` (String, Sensitive) The secret value (e.g. API key). The API never returns this value; Terraform stores the configured value in state.
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `secret` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only AI provider key. Requires secret_version. Use an ephemeral, sensitive input variable; changing this value alone does not rotate the key.
+- `secret_version` (Number) Non-sensitive, non-ephemeral positive version stored in state. Requires secret. Change this version to write the configured secret; omit both fields after import to leave the key untouched.
 - `type` (String) The AI provider type (e.g. "openai", "anthropic", "azure", "google").
 
 ### Read-Only
@@ -87,6 +108,8 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
-# Import by the AI secret ID. The API never returns `secret`, so keep it set in config.
+# Import by the AI secret ID. Omit both secret and secret_version to adopt without rotation.
+# To rotate later, supply secret through an ephemeral sensitive variable and set
+# secret_version to a new positive integer. Changing secret alone does nothing.
 terraform import braintrust_ai_secret.example 00000000-0000-0000-0000-000000000000
 ```

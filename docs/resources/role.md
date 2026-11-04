@@ -13,6 +13,10 @@ Manages a custom Braintrust role. Roles are collections of permissions that can 
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Create a custom role with specific permissions
 resource "braintrust_role" "dataset_manager" {
   name        = "Dataset Manager"

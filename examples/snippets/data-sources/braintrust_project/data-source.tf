@@ -1,3 +1,7 @@
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 # Look up an existing Braintrust project by ID
 data "braintrust_project" "by_id" {
   id = "00000000-0000-0000-0000-000000000000" # replace with your project UUID

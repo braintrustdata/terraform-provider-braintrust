@@ -13,6 +13,10 @@ Manages a Braintrust [dataset](https://docs.braintrust.dev/annotate/datasets). D
 ## Example Usage
 
 ```terraform
+terraform {
+  required_version = ">= 1.11.1"
+}
+
 resource "braintrust_project" "my_project" {
   name = "my-project"
 }

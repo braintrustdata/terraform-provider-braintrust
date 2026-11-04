@@ -2,10 +2,13 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,7 +16,13 @@ import (
 )
 
 // Ensure the implementation satisfies the expected interfaces.
-var _ provider.Provider = &braintrustProvider{}
+var (
+	_ provider.Provider                       = &braintrustProvider{}
+	_ provider.ProviderWithEphemeralResources = &braintrustProvider{}
+)
+
+// Terraform 1.11.1 fixes serialization of values marked sensitive and ephemeral.
+var minimumTerraformVersion = version.Must(version.NewSemver("1.11.1"))
 
 // braintrustProvider is the provider implementation.
 type braintrustProvider struct {
@@ -47,8 +56,8 @@ func (p *braintrustProvider) Metadata(_ context.Context, _ provider.MetadataRequ
 // Schema defines the provider-level schema.
 func (p *braintrustProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "The Braintrust provider allows you to manage Braintrust resources.",
-		MarkdownDescription: "The Braintrust provider allows you to manage [Braintrust](https://www.braintrust.dev/) resources such as projects, datasets, functions, access control, and automations.",
+		Description:         "The Braintrust provider allows you to manage Braintrust resources. Requires Terraform 1.11.1 or later.",
+		MarkdownDescription: "The Braintrust provider allows you to manage [Braintrust](https://www.braintrust.dev/) resources such as projects, datasets, functions, access control, and automations. Requires Terraform 1.11.1 or later.",
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
 				Optional:            true,
@@ -67,6 +76,22 @@ func (p *braintrustProvider) Schema(_ context.Context, _ provider.SchemaRequest,
 
 // Configure prepares a Braintrust API client for data sources and resources.
 func (p *braintrustProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	terraformVersion, err := version.NewSemver(req.TerraformVersion)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Terraform Version",
+			fmt.Sprintf("The Braintrust provider requires Terraform %s or later, but received an invalid or unknown Terraform version %q. Run this provider with Terraform %s or later.", minimumTerraformVersion, req.TerraformVersion, minimumTerraformVersion),
+		)
+		return
+	}
+	if terraformVersion.LessThan(minimumTerraformVersion) {
+		resp.Diagnostics.AddError(
+			"Unsupported Terraform Version",
+			fmt.Sprintf("The Braintrust provider requires Terraform %s or later, but Terraform %q is running. Upgrade Terraform to %s or later.", minimumTerraformVersion, req.TerraformVersion, minimumTerraformVersion),
+		)
+		return
+	}
+
 	var config braintrustProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
@@ -113,6 +138,7 @@ func (p *braintrustProvider) Configure(ctx context.Context, req provider.Configu
 	// Make the client available to data sources and resources.
 	resp.DataSourceData = c
 	resp.ResourceData = c
+	resp.EphemeralResourceData = c
 }
 
 // Resources defines the resources implemented in the provider.
@@ -137,6 +163,13 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 		NewOrgAutomationResource,
 		NewMCPServerResource,
 		NewViewResource,
+	}
+}
+
+// EphemeralResources defines state-free resources implemented in the provider.
+func (p *braintrustProvider) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
+	return []func() ephemeral.EphemeralResource{
+		NewServiceTokenEphemeralResource,
 	}
 }
 
