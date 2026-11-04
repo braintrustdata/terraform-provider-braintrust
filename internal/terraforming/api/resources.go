@@ -18,7 +18,6 @@ type (
 	Function          = client.Raw[openapi.Function]
 	ProjectScore      = client.Raw[openapi.ProjectScore]
 	View              = client.Raw[openapi.View]
-	OrgAutomation     = client.Raw[openapi.OrgAutomation]
 	ProjectAutomation = client.Raw[openapi.ProjectAutomation]
 )
 
@@ -217,20 +216,6 @@ func (c *Client) ListViews(ctx context.Context, objectType, objectID string) ([]
 		}
 		return client.RawObjects(body.Objects, page.Body)
 	}, func(v View) string { return v.Value.Id.String() })
-}
-
-func (c *Client) ListOrgAutomations(ctx context.Context) ([]OrgAutomation, error) {
-	return client.ListAll("/v1/org_automation", func(limit int, startingAfter *string) ([]OrgAutomation, error) {
-		page, err := c.sdk.API.GetOrgAutomationWithResponse(ctx, &openapi.GetOrgAutomationParams{Limit: &limit, StartingAfter: startingAfter})
-		if err != nil {
-			return nil, err
-		}
-		body, err := client.JSON(page.JSON200)
-		if err != nil {
-			return nil, err
-		}
-		return client.RawObjects(body.Objects, page.Body)
-	}, func(a OrgAutomation) string { return a.Value.Id.String() })
 }
 
 func (c *Client) ListMCPServers(ctx context.Context) ([]openapi.MCPServer, error) {
