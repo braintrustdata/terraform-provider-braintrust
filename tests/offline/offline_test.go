@@ -66,10 +66,6 @@ func baseFixtures() fixtures {
 			{"id": "00000000-0000-4000-8000-000000000067", "project_id": project, "name": "Audit Preprocessor", "slug": "audit-preprocessor", "function_type": "preprocessor", "function_data": obj{"type": "global", "name": "thread", "function_type": "preprocessor"}},
 		},
 		"/v1/project_automation": {{"id": "00000000-0000-4000-8000-000000000007", "project_id": project, "name": "audit-retention", "config": obj{"event_type": "retention", "object_type": "project_logs", "retention_days": 90}}},
-		"/v1/org_automation": {
-			{"id": "00000000-0000-4000-8000-000000000051", "org_id": org, "name": "org-retention", "config": obj{"event_type": "retention", "object_type": "dataset", "retention_days": 0}},
-			{"id": "00000000-0000-4000-8000-000000000052", "org_id": otherOrg, "name": "other-org-retention", "config": obj{"event_type": "retention", "object_type": "dataset", "retention_days": 30}},
-		},
 		"/v1/mcp_server": {
 			{"id": "00000000-0000-4000-8000-000000000053", "project_id": project, "name": "audit-mcp", "url": "https://mcp.example.invalid", "deleted_at": nil},
 			{"id": "00000000-0000-4000-8000-000000000054", "project_id": secondProject, "name": "unselected-mcp", "url": "https://other.example.invalid"},

@@ -174,7 +174,6 @@ func fetchAndBuildBlocks(ctx context.Context, resourceTypes []string) ([]hcl.Res
 		"braintrust_project_score",
 		"braintrust_project_tag",
 		"braintrust_project_automation",
-		"braintrust_org_automation",
 		"braintrust_mcp_server",
 		"braintrust_env_var",
 		"braintrust_service_token",
@@ -216,8 +215,6 @@ func fetchAndBuildBlocks(ctx context.Context, resourceTypes []string) ([]hcl.Res
 			newBlocks, err = buildProjectTagBlocks(ctx, projects, resolver)
 		case "braintrust_project_automation":
 			newBlocks, err = buildProjectAutomationBlocks(ctx, projects, resolver)
-		case "braintrust_org_automation":
-			newBlocks, err = buildOrgAutomationBlocks(ctx, orgID)
 		case "braintrust_mcp_server":
 			newBlocks, err = buildMCPServerBlocks(ctx, projects, resolver)
 		case "braintrust_env_var":
@@ -1116,52 +1113,6 @@ func buildProjectAutomationBlocks(ctx context.Context, projects []openapi.Projec
 				LinkedFields: linked,
 			})
 		}
-	}
-	return blocks, nil
-}
-
-func buildOrgAutomationBlocks(ctx context.Context, orgID string) ([]hcl.ResourceBlock, error) {
-	automations, err := apiClient.ListOrgAutomations(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var blocks []hcl.ResourceBlock
-	for _, raw := range automations {
-		automation, id, automationOrgID := raw.Value, raw.Value.Id.String(), raw.Value.OrgId.String()
-		rawConfig := raw.Fields["config"]
-		if automationOrgID != orgID {
-			continue
-		}
-		var config struct {
-			EventType     string `json:"event_type"`
-			ObjectType    string `json:"object_type"`
-			RetentionDays *int64 `json:"retention_days"`
-		}
-		if err := json.Unmarshal(rawConfig, &config); err != nil {
-			return nil, fmt.Errorf("organization automation %s has invalid config: %w", id, err)
-		}
-		if config.EventType != "retention" || (config.ObjectType != "project_logs" && config.ObjectType != "experiment" && config.ObjectType != "dataset") || config.RetentionDays == nil || *config.RetentionDays < 0 {
-			return nil, fmt.Errorf("organization automation %s has unsupported retention config", id)
-		}
-		var configFields map[string]json.RawMessage
-		if err := json.Unmarshal(rawConfig, &configFields); err != nil || len(configFields) != 3 {
-			return nil, fmt.Errorf("organization automation %s has unsupported config fields", id)
-		}
-		fields := map[string]any{
-			"org_id": automationOrgID,
-			"name":   automation.Name,
-			"retention_config": map[string]any{
-				"object_type":    config.ObjectType,
-				"retention_days": float64(*config.RetentionDays),
-			},
-		}
-		if description, ok := client.Optional(automation.Description); ok {
-			fields["description"] = description
-		}
-		blocks = append(blocks, hcl.ResourceBlock{
-			Type: "braintrust_org_automation", Name: hcl.ResourceNameFromIDAndLabel(id, automation.Name),
-			Comment: automation.Name, ID: id, Fields: fields,
-		})
 	}
 	return blocks, nil
 }

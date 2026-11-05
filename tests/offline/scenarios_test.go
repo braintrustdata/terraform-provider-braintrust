@@ -50,14 +50,10 @@ var scenarios = []scenario{
 	{name: "view_import", command: "genimport", types: "braintrust_project,braintrust_view", check: func(r *result) {
 		r.failIfNot(r.has("org_project/"+org+"/00000000-0000-4000-8000-000000000032"), "scope-aware dashboard import ID omitted")
 	}},
-	{name: "new_resources", command: "genimport", types: "braintrust_project,braintrust_org_automation,braintrust_mcp_server", check: func(r *result) {
-		r.failIfNot(r.has(`resource "braintrust_org_automation"`) && r.has(`resource "braintrust_mcp_server"`) &&
-			r.has("retention_days = 0") && r.has("project_id = braintrust_project.") &&
-			!r.has("other-org-retention") && !r.has("unselected-mcp") && !r.has("deleted-mcp") &&
-			r.count("import {") == 3, "new resources, scope filtering, or imports incorrect")
-	}},
-	{name: "unknown_org_automation_config", command: "generate", types: "braintrust_org_automation", wantFail: true, setup: func(a *fakeAPI) {
-		a.fixtures["/v1/org_automation"][0]["config"].(obj)["new_setting"] = true
+	{name: "mcp_server_import", command: "genimport", types: "braintrust_project,braintrust_mcp_server", check: func(r *result) {
+		r.failIfNot(r.has(`resource "braintrust_mcp_server"`) && r.has("project_id = braintrust_project.") &&
+			!r.has("unselected-mcp") && !r.has("deleted-mcp") &&
+			r.count("import {") == 2, "MCP server scope filtering or imports incorrect")
 	}},
 	{name: "multi_project_fetch", command: "generate", types: "braintrust_project,braintrust_dataset,braintrust_function,braintrust_project_score,braintrust_project_tag,braintrust_project_automation", flags: []string{"--org-id", org}, setup: func(a *fakeAPI) {
 		a.fixtures["/v1/project"] = append(a.fixtures["/v1/project"],

@@ -128,7 +128,6 @@ var AllResourceTypes = []string{
 	"braintrust_project_score",
 	"braintrust_project_tag",
 	"braintrust_project_automation",
-	"braintrust_org_automation",
 	"braintrust_mcp_server",
 	"braintrust_env_var",
 	"braintrust_service_token",

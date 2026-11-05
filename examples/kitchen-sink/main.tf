@@ -53,12 +53,6 @@ variable "alert_webhook_url" {
   default = "https://hooks.example.com/braintrust-alerts"
 }
 
-variable "org_experiment_retention_days" {
-  description = "Org-wide experiment retention. Requires a plan with custom retention; leave null to skip."
-  type        = number
-  default     = null
-}
-
 # =============================================================================
 # Project and its contents
 # =============================================================================
@@ -295,17 +289,6 @@ resource "braintrust_project_automation" "topics" {
     rerun_seconds       = 86400     # regenerate topic maps daily
     backfill_time_range = "259200s" # classify the last 3 days on creation
   })
-}
-
-resource "braintrust_org_automation" "experiment_retention" {
-  count  = var.org_experiment_retention_days == null ? 0 : 1
-  org_id = local.org_id
-  name   = "Experiment retention"
-
-  retention_config = {
-    object_type    = "experiment"
-    retention_days = var.org_experiment_retention_days
-  }
 }
 
 # =============================================================================
