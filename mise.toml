@@ -2,5 +2,6 @@
 [tools]
 go = "1.26.9"
 terraform = "1.15.8"
+opentofu = "1.13.8"
 golangci-lint = "2.14.0"
 goreleaser = "2.19.0"

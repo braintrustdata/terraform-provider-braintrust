@@ -52,6 +52,10 @@ expect "terraform (.terraform-version, workflows)" "$(mise_version terraform)" \
   $(grep -ho 'terraform[_ /][0-9][0-9.]*[0-9]' .github/workflows/*.yml | sed 's/^terraform[_ /]//')
 
 # shellcheck disable=SC2046
+expect "opentofu (workflows)" "$(mise_version opentofu)" \
+  $(grep -ho 'tofu_[0-9][0-9.]*[0-9]' .github/workflows/*.yml | sed 's/^tofu_//')
+
+# shellcheck disable=SC2046
 expect "golangci-lint (workflows)" "$(mise_version golangci-lint)" \
   $(action_versions golangci/golangci-lint-action)
 

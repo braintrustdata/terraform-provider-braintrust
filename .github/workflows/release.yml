@@ -66,6 +66,12 @@ jobs:
           unzip -q /tmp/terraform_1.15.8_linux_amd64.zip terraform -d /tmp
           sudo mv /tmp/terraform /usr/local/bin/terraform
 
+      - name: Install OpenTofu 1.13.8
+        run: |
+          curl -fsSL https://github.com/opentofu/opentofu/releases/download/v1.13.8/tofu_1.13.8_linux_amd64.zip -o /tmp/tofu_1.13.8_linux_amd64.zip
+          unzip -q /tmp/tofu_1.13.8_linux_amd64.zip tofu -d /tmp
+          sudo mv /tmp/tofu /usr/local/bin/tofu
+
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:

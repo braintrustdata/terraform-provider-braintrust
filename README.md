@@ -113,3 +113,20 @@ Useful flags:
 - `--org-id` (or `BRAINTRUST_ORG_ID`): required if your key can access more than one organization.
 
 `generate` writes only the resource config, and `import` writes only the import blocks. Applying `generate` output without import blocks creates duplicate resources.
+
+## Testing engine compatibility
+
+`tests/compat` runs the same small behavioral contract under Terraform and OpenTofu. It builds the current provider once and uses isolated workspaces and a local, stateful Braintrust API fixture; no Braintrust credentials are needed.
+
+```sh
+mise install
+mise exec -- make test-compat
+```
+
+`TestResourceLifecycle` has `terraform` and `opentofu` subtests. Each validates a project configuration, plans and applies creation, checks state and API values, requires a no-change plan, applies an in-place update, checks convergence again, and destroys the project. Assertions compare semantic plan actions and resource values, not CLI wording or engine-specific state-file internals.
+
+The suite also runs with `make test` and `make check`, including PR and release CI on Linux. Both engines must be on `PATH`; a missing engine fails rather than silently skipping coverage. `go test -short ./...` skips these integration checks. Tool versions are pinned in `mise.toml` and checked against CI.
+
+Keep compatibility scenarios small. Add a shared scenario when an engine difference is found; keep resource-specific coverage in the provider and offline suites. CLI workspace setup and command execution are shared with `tests/offline` through `tests/internal/testcli`.
+
+Development overrides load the local provider without `init`, so this does not check registry discovery, published release installation, or every provider feature.
