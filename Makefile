@@ -19,6 +19,9 @@ doc:
 test: deps
 	go test -mod=readonly -count=1 ./...
 
+test-compat:
+	go test -mod=readonly -count=1 -v ./tests/compat
+
 test-acceptance: deps
 	./scripts/test-acceptance.sh
 
@@ -96,4 +99,4 @@ install-hooks:
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed."
 
-.PHONY: default build build-terraforming install doc test test-acceptance test-acceptance-local run-example check-docs check-versions check-fmt check-tidy vet check deps fmt lint lint-fix install-hooks
+.PHONY: default build build-terraforming install doc test test-compat test-acceptance test-acceptance-local run-example check-docs check-versions check-fmt check-tidy vet check deps fmt lint lint-fix install-hooks

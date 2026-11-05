@@ -5,7 +5,6 @@
 package offline
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -19,7 +18,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
+
+	"github.com/braintrustdata/terraform-provider-braintrust/tests/internal/testcli"
 )
 
 const (
@@ -37,7 +37,6 @@ const (
 	staleACL      = "50000000-0000-4000-8000-000000000014"
 
 	providerConfig = "terraform {\n required_providers {\n  braintrust = { source = \"braintrustdata/braintrust\" }\n }\n}\nprovider \"braintrust\" {}\n"
-	commandTimeout = 60 * time.Second
 )
 
 type obj = map[string]any
@@ -273,32 +272,7 @@ func newHarness(t *testing.T) *harness {
 	server := httptest.NewServer(api)
 	t.Cleanup(server.Close)
 
-	root := t.TempDir()
-	config := filepath.Join(root, "terraform.rc")
-	rc := fmt.Sprintf("provider_installation {\n  dev_overrides {\n    \"braintrustdata/braintrust\" = %q\n  }\n  direct {}\n}\n", binDir)
-	if err := os.WriteFile(config, []byte(rc), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	// Drop ambient Braintrust and Terraform settings so only the fixture API is used.
-	var env []string
-	for _, kv := range os.Environ() {
-		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(name, "BRAINTRUST_") || name == "TF_ACC" || name == "TF_LOG" || name == "TF_LOG_PATH" || name == "TF_CLI_CONFIG_FILE" {
-			continue
-		}
-		env = append(env, kv)
-	}
-	env = append(env,
-		"BRAINTRUST_API_KEY=offline-fixture-token",
-		"BRAINTRUST_API_URL="+server.URL,
-		"TF_IN_AUTOMATION=1",
-		"CHECKPOINT_DISABLE=1",
-		"TF_CLI_CONFIG_FILE="+config,
-	)
-	workspace := filepath.Join(root, "workspace")
-	if err := os.Mkdir(workspace, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	workspace, env := testcli.Workspace(t, binDir, server.URL)
 	return &harness{t: t, api: api, workspace: workspace, env: env}
 }
 
@@ -313,23 +287,7 @@ func (h *harness) writeFile(name, content string) {
 // Timeouts and launch failures fail the test rather than count as application exits.
 func (h *harness) run(name string, args ...string) (stdout, stderr string, exitCode int) {
 	h.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = h.workspace
-	cmd.Env = h.env
-	var out, errOut strings.Builder
-	cmd.Stdout, cmd.Stderr = &out, &errOut
-	err := cmd.Run()
-	if ctx.Err() != nil {
-		h.t.Fatalf("run %s: %v", name, ctx.Err())
-	}
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		return out.String(), errOut.String(), exitErr.ExitCode()
-	} else if err != nil {
-		h.t.Fatalf("run %s: %v", name, err)
-	}
-	return out.String(), errOut.String(), 0
+	return testcli.Run(h.t, h.workspace, h.env, name, args...)
 }
 
 func (h *harness) requests() []string {
