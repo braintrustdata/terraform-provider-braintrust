@@ -178,10 +178,21 @@ func TestDefaultBuiltinACLClassification(t *testing.T) {
 	resolver.RegisterRoleDataSource(viewerRole.String(), "Viewer")
 	read := openapi.Permission("read")
 	acl := func(objectType openapi.AclObjectType, objectID, group uuid.UUID, role *uuid.UUID, permission *openapi.Permission) openapi.Acl {
-		a := openapi.Acl{ObjectType: objectType, ObjectId: objectID, GroupId: nullable.NewNullableWithValue(group), Permission: permission}
+		a := openapi.Acl{ObjectType: objectType, ObjectId: objectID, GroupId: nullable.NewNullableWithValue(group)}
+		if permission != nil {
+			a.Permission = nullable.NewNullableWithValue(*permission)
+		}
 		if role != nil {
 			a.RoleId = nullable.NewNullableWithValue(*role)
 		}
+		return a
+	}
+	withNullRestrict := func(a openapi.Acl) openapi.Acl {
+		a.RestrictObjectType = nullable.NewNullNullable[openapi.AclObjectType]()
+		return a
+	}
+	withRestrict := func(a openapi.Acl, objectType openapi.AclObjectType) openapi.Acl {
+		a.RestrictObjectType = nullable.NewNullableWithValue(objectType)
 		return a
 	}
 	tests := []struct {
@@ -196,6 +207,8 @@ func TestDefaultBuiltinACLClassification(t *testing.T) {
 		{"custom project grant", acl("project", fixtureID(9), ai, nil, &read), false},
 		{"custom role grant", acl("organization", org, owners, &viewerRole, nil), false},
 		{"different organization", acl("org_ai_secret", fixtureID(10), ai, nil, &read), false},
+		{"explicit null restrict_object_type", withNullRestrict(acl("organization", org, owners, &ownerRole, nil)), true},
+		{"restricted grant", withRestrict(acl("org_project", org, engineers, &engineerRole, nil), "project"), false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

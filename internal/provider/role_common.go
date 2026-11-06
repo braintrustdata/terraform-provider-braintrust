@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/nullable"
 )
 
 var rolePermissionObjectType = types.ObjectType{AttrTypes: map[string]attr.Type{
@@ -37,8 +38,8 @@ type memberPermissionModel struct {
 // memberPermission matches the SDK's inline member permission struct, so
 // slices of it can be assigned to SDK role fields directly.
 type memberPermission = struct {
-	Permission         openapi.Permission     `json:"permission"`
-	RestrictObjectType *openapi.AclObjectType `json:"restrict_object_type,omitempty"`
+	Permission         openapi.Permission                       `json:"permission"`
+	RestrictObjectType nullable.Nullable[openapi.AclObjectType] `json:"restrict_object_type,omitempty"`
 }
 
 // mapRoleToModel maps an SDK role to the shared Terraform model.
@@ -56,13 +57,9 @@ func mapRoleToModel(role *openapi.Role, model *roleModel) {
 	memberPermissions := nullableSliceValue(role.MemberPermissions)
 	perms := make([]attr.Value, 0, len(memberPermissions))
 	for _, mp := range memberPermissions {
-		restrict := types.StringNull()
-		if mp.RestrictObjectType != nil {
-			restrict = types.StringValue(string(*mp.RestrictObjectType))
-		}
 		perms = append(perms, types.ObjectValueMust(rolePermissionObjectType.AttrTypes, map[string]attr.Value{
 			"permission":           types.StringValue(string(mp.Permission)),
-			"restrict_object_type": restrict,
+			"restrict_object_type": nullableStringToTF(mp.RestrictObjectType),
 		}))
 	}
 	model.MemberPermissions = types.SetValueMust(rolePermissionObjectType, perms)
@@ -109,7 +106,7 @@ func memberPermissionsFromModel(ctx context.Context, value types.Set) ([]memberP
 	for i, p := range perms {
 		result[i] = memberPermission{
 			Permission:         openapi.Permission(p.Permission.ValueString()),
-			RestrictObjectType: tfStringToEnum[openapi.AclObjectType](p.RestrictObjectType),
+			RestrictObjectType: tfStringToNullableEnum[openapi.AclObjectType](p.RestrictObjectType),
 		}
 	}
 	return result, diags

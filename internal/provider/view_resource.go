@@ -59,7 +59,7 @@ func (r *viewResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"id":             computedStringAttribute("Unique identifier for the view (UUID)."),
 			"object_type":    schema.StringAttribute{Required: true, Description: "Type of the containing object, commonly project or org_project.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, Validators: []validator.String{stringvalidator.OneOf("organization", "project", "experiment", "dataset", "prompt", "prompt_session", "group", "role", "org_member", "project_log", "org_project", "org_audit_logs", "project_group", "project_group_projects", "ai_secret", "org_ai_secret", "org_account")}},
 			"object_id":      schema.StringAttribute{Required: true, Description: "ID of the containing object. For org_project dashboards, this is the organization ID; set options_json.options.projectId to the project ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"view_type":      schema.StringAttribute{Required: true, Description: "Braintrust view type. Use monitor for dashboards or logs for saved project log views.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, Validators: []validator.String{stringvalidator.OneOf("projects", "experiments", "experiment", "playgrounds", "playground", "datasets", "dataset", "prompts", "parameters", "tools", "scorers", "classifiers", "logs", "monitor", "for_review_project_log", "for_review_experiments", "for_review_datasets")}},
+			"view_type":      schema.StringAttribute{Required: true, Description: "Braintrust view type. Use monitor for dashboards or logs for saved project log views.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}, Validators: []validator.String{stringvalidator.OneOf("projects", "experiments", "experiment", "playgrounds", "playground", "datasets", "dataset", "prompts", "parameters", "tools", "scorers", "classifiers", "logs", "monitor", "patterns", "for_review_project_log", "for_review_experiments", "for_review_datasets")}},
 			"name":           schema.StringAttribute{Required: true, Description: "Name of the view.", Validators: []validator.String{stringvalidator.LengthAtLeast(1)}},
 			"description":    optionalComputedStringAttribute("Description of the view."),
 			"starred":        schema.BoolAttribute{Optional: true, Computed: true, Description: "Whether the view is starred in the project."},
@@ -99,7 +99,7 @@ func mapViewToModel(raw *view, model *viewModel) {
 	model.ID = types.StringValue(v.Id.String())
 	model.ObjectType = types.StringValue(string(v.ObjectType))
 	model.ObjectID = types.StringValue(v.ObjectId.String())
-	model.ViewType = types.StringValue(string(v.ViewType.GetOrEmpty()))
+	model.ViewType = types.StringValue(string(v.ViewType))
 	model.Name = types.StringValue(v.Name)
 	model.Description = nullableStringToTF(v.Description)
 	if v.Starred == nil {
@@ -162,7 +162,7 @@ func (r *viewResource) Create(ctx context.Context, req resource.CreateRequest, r
 	body, err := client.JSONBody(openapi.CreateView{
 		ObjectType:  openapi.AclObjectType(plan.ObjectType.ValueString()),
 		ObjectId:    objectID,
-		ViewType:    nullable.NewNullableWithValue(openapi.CreateViewViewType(plan.ViewType.ValueString())),
+		ViewType:    openapi.CreateViewViewType(plan.ViewType.ValueString()),
 		Name:        plan.Name.ValueString(),
 		Description: tfStringToNullable(plan.Description),
 	}, map[string]json.RawMessage{"view_data": viewData, "options": options})

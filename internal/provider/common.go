@@ -127,8 +127,8 @@ func diffStringSlices(current, desired []string) (add, remove []string) {
 // memberPermissionKey returns a unique string key for a member permission.
 func memberPermissionKey(mp memberPermission) string {
 	key := string(mp.Permission)
-	if mp.RestrictObjectType != nil {
-		key += ":" + string(*mp.RestrictObjectType)
+	if restrict, ok := client.OptionalEnum(mp.RestrictObjectType); ok {
+		key += ":" + restrict
 	}
 	return key
 }
