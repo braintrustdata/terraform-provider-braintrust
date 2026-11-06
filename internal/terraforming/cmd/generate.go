@@ -176,6 +176,7 @@ func fetchAndBuildBlocks(ctx context.Context, resourceTypes []string) ([]hcl.Res
 		"braintrust_project_automation",
 		"braintrust_mcp_server",
 		"braintrust_env_var",
+		"braintrust_api_key",
 		"braintrust_service_token",
 		"braintrust_ai_secret",
 		"braintrust_view",
@@ -219,6 +220,8 @@ func fetchAndBuildBlocks(ctx context.Context, resourceTypes []string) ([]hcl.Res
 			newBlocks, err = buildMCPServerBlocks(ctx, projects, resolver)
 		case "braintrust_env_var":
 			newBlocks, newVars, err = buildEnvVarBlocks(ctx, projects, orgID, resolver)
+		case "braintrust_api_key":
+			newBlocks, err = buildAPIKeyBlocks(ctx, orgID)
 		case "braintrust_service_token":
 			newBlocks, err = buildServiceTokenBlocks(ctx, orgID, resolver)
 		case "braintrust_ai_secret":
@@ -1435,6 +1438,31 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 	}
 
 	return blocks, vars, nil
+}
+
+func buildAPIKeyBlocks(ctx context.Context, orgID string) ([]hcl.ResourceBlock, error) {
+	keys, err := apiClient.ListAPIKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var blocks []hcl.ResourceBlock
+	for _, key := range keys {
+		if keyOrgID, ok := client.OptionalUUID(key.OrgId); !ok || keyOrgID != orgID {
+			continue
+		}
+		id := key.Id.String()
+		blocks = append(blocks, hcl.ResourceBlock{
+			Type:    "braintrust_api_key",
+			Name:    hcl.ResourceNameFromIDAndLabel(id, key.Name),
+			Comment: key.Name,
+			ID:      id,
+			Fields:  map[string]any{"name": key.Name, "org_id": orgID},
+		})
+	}
+	if len(blocks) > 0 {
+		fmt.Fprintln(os.Stderr, "Warning: API key export includes only name and org_id, never a secret or inferred lifetime. Import preserves the existing key but cannot recover its secret; explicitly replace the resource to rotate (replacement revokes the old key). Export may include the credential Terraform itself uses: importing takes ownership, and destroying the resource revokes that credential. Manage only keys intended for Terraform ownership. Newly created managed keys are stored in Terraform state; use an encrypted backend.")
+	}
+	return blocks, nil
 }
 
 func buildServiceTokenBlocks(ctx context.Context, orgID string, resolver *hcl.ReferenceResolver) ([]hcl.ResourceBlock, error) {

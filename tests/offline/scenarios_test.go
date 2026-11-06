@@ -124,6 +124,20 @@ var scenarios = []scenario{
 	{name: "project_group_membership_import", command: "genimport", types: "braintrust_project_group,braintrust_project_group_membership", flags: []string{"--org-id", org}, plan: true, setup: setupProjectGroups, check: func(r *result) {
 		r.failIfNot(r.has("braintrust_project_group_membership") && r.has(projectGroup+"/"+project) && !r.has("member_projects"), "membership adoption is incomplete or double-managed")
 	}},
+	{name: "api_key_generation", command: "generate", types: "braintrust_api_key", check: func(r *result) {
+		r.failIfNot(r.count(`resource "braintrust_api_key"`) == 1 && r.matches(`name\s*=\s*"audit-key"`) &&
+			r.matches(`org_id\s*=\s*"`+regexp.QuoteMeta(org)+`"`), "API key configuration omitted or not scoped")
+		r.failIf(r.has("other-org-key") || r.has("unscoped-key") || r.has("expires_in_seconds") || r.has("expires_at") ||
+			r.has("sk-preview") || r.matches(`(?m)^\s*key\s*=`), "API key export leaked metadata, a secret, or an inferred lifetime")
+		r.failIfNot(r.reported("explicitly replace") && r.reported("cannot recover") &&
+			r.reported("credential Terraform itself uses") && r.reported("destroying the resource revokes"), "API key safety guidance missing")
+	}},
+	{name: "api_key_import", command: "genimport", types: "braintrust_api_key", plan: true, check: func(r *result) {
+		r.failIfNot(r.count(`resource "braintrust_api_key"`) == 1 && r.count("to = braintrust_api_key.") == 1 &&
+			r.has("00000000-0000-4000-8000-000000000009"), "API key metadata import omitted")
+		r.failIf(r.has("expires_in_seconds") || r.has("other-org-key") || r.has("unscoped-key") || r.reported("omitted 1"), "API key adoption included unsafe fields or was treated as unsupported")
+		r.failIfNot(strings.Contains(r.tfStdout, "Plan: 1 to import, 0 to add, 0 to change, 0 to destroy."), "API key import would replace or change the existing key")
+	}},
 	{name: "service_token_import", command: "genimport", types: "braintrust_service_token", plan: true, check: func(r *result) {
 		r.failIf(r.has(`resource "`) || r.has("import {") || !r.reported("omitted 1"), "unsupported import was not explicitly omitted")
 	}},

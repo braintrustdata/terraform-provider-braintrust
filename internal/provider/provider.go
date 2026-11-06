@@ -158,6 +158,7 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 		NewProjectScoreResource,
 		NewServiceAccountResource,
 		NewServiceTokenResource,
+		NewAPIKeyResource,
 		NewAISecretResource,
 		NewProjectAutomationResource,
 		NewMCPServerResource,
@@ -169,6 +170,7 @@ func (p *braintrustProvider) Resources(_ context.Context) []func() resource.Reso
 func (p *braintrustProvider) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
 	return []func() ephemeral.EphemeralResource{
 		NewServiceTokenEphemeralResource,
+		NewAPIKeyEphemeralResource,
 	}
 }
 
@@ -183,5 +185,6 @@ func (p *braintrustProvider) DataSources(_ context.Context) []func() datasource.
 		NewRoleDataSource,
 		NewUserDataSource,
 		NewUsersDataSource,
+		NewAPIKeyDataSource,
 	}
 }

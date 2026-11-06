@@ -56,7 +56,6 @@ func (d *doer) Do(req *http.Request) (*http.Response, error) {
 				"path":    path,
 				"attempt": attempt,
 				"backoff": backoff.String(),
-				"error":   lastErr.Error(),
 			})
 
 			select {

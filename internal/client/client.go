@@ -47,7 +47,8 @@ type Client struct {
 	// error for every non-2xx response, so a nil error means success.
 	API *openapi.ClientWithResponses
 
-	baseURL string
+	baseURL    string
+	httpClient *doer
 }
 
 // NewClient creates a new Braintrust API client.
@@ -64,15 +65,16 @@ func NewClient(baseURL, apiKey, userAgent string) (*Client, error) {
 		userAgent = defaultUserAgent
 	}
 
-	api, err := openapi.NewClientWithResponses(baseURL, openapi.WithHTTPClient(&doer{
+	httpClient := &doer{
 		httpClient: &http.Client{Timeout: defaultTimeout},
 		apiKey:     apiKey,
 		userAgent:  userAgent,
-	}))
+	}
+	api, err := openapi.NewClientWithResponses(baseURL, openapi.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Braintrust API client: %w", err)
 	}
-	return &Client{API: api, baseURL: baseURL}, nil
+	return &Client{API: api, baseURL: baseURL, httpClient: httpClient}, nil
 }
 
 // APIError represents an error returned by the Braintrust API.

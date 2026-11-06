@@ -118,3 +118,47 @@ func TestGetOrganizationReturnsCanonicalID(t *testing.T) {
 		}
 	}
 }
+
+func TestListAPIKeysPaginatesMetadata(t *testing.T) {
+	requests := 0
+	key := func(i int) map[string]string {
+		return map[string]string{
+			"id":   fmt.Sprintf("00000000-0000-0000-0002-%012d", i),
+			"name": "fixture-key", "org_id": fixtureOrgID, "preview_name": "sk-preview",
+		}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/api_key" || r.URL.Query().Get("limit") != "100" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		var rows []map[string]string
+		if requests == 1 {
+			if r.URL.Query().Has("starting_after") {
+				t.Errorf("first page unexpectedly has a cursor: %s", r.URL)
+			}
+			for i := range 100 {
+				rows = append(rows, key(i))
+			}
+		} else {
+			if r.URL.Query().Get("starting_after") != key(99)["id"] {
+				t.Errorf("wrong pagination cursor: %s", r.URL)
+			}
+			rows = []map[string]string{key(100)}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"objects": rows})
+	}))
+	defer server.Close()
+	c, err := NewClient(server.URL, "fixture", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := c.ListAPIKeys(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 101 || requests != 2 || keys[100].Id.String() != key(100)["id"] {
+		t.Fatalf("got %d API keys in %d requests", len(keys), requests)
+	}
+}

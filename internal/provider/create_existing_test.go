@@ -66,6 +66,11 @@ func TestCreateExistingWithoutHeaderIsNotAdopted(t *testing.T) {
 		wantCreates                int
 	}{
 		{
+			name: "api_key", path: "/v1/api_key", wantCreates: 0,
+			object: `{"id":"` + existingID + `","org_id":"` + orgID + `","name":"existing"}`,
+			config: `resource "braintrust_api_key" "existing" { name = "existing" }`,
+		},
+		{
 			name: "group", path: "/v1/group", wantCreates: 1,
 			object: `{"id":"` + existingID + `","org_id":"` + orgID + `","name":"existing"}`,
 			config: `resource "braintrust_group" "existing" { name = "existing" }`,

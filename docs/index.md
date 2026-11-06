@@ -49,7 +49,9 @@ output "project_id" {
 }
 ```
 
-Managed service-token keys persist in Terraform state, so use an encrypted remote backend and never commit state to version control. AI-secret and environment-variable inputs are write-only; use ephemeral input variables to keep them out of saved plans as well. For state-free token generation, see the [ephemeral service-token resource](ephemeral-resources/service_token), whose delivery and revocation are caller-owned.
+Managed service-token and user API-key secrets persist in Terraform state, so use an encrypted remote backend and never commit state to version control. AI-secret and environment-variable inputs are write-only; use ephemeral input variables to keep them out of saved plans as well. For state-free generation, see the [ephemeral service-token resource](ephemeral-resources/service_token) or [ephemeral API-key resource](ephemeral-resources/api_key), whose delivery and revocation are caller-owned.
+
+User [API-key creation](resources/api_key) requires an unrestricted user API key, not a service token, and a deployment supporting `POST /v1/api_key`. New keys belong to the authenticated user. Scoped credentials can only create keys in their own organization; unscoped credentials must supply a member `org_id`. Imported API keys have no recoverable secret, but Terraform can revoke them. Do not import the credential Terraform itself uses unless you intend Terraform to own its revocation.
 
 ## Examples
 

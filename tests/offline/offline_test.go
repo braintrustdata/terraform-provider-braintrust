@@ -70,6 +70,11 @@ func baseFixtures() fixtures {
 			{"id": "00000000-0000-4000-8000-000000000054", "project_id": secondProject, "name": "unselected-mcp", "url": "https://other.example.invalid"},
 			{"id": "00000000-0000-4000-8000-000000000055", "project_id": project, "name": "deleted-mcp", "url": "https://deleted.example.invalid", "deleted_at": "2026-01-01T00:00:00Z"},
 		},
+		"/v1/api_key": {
+			{"id": "00000000-0000-4000-8000-000000000009", "name": "audit-key", "org_id": org, "user_id": user, "preview_name": "sk-preview", "created": "2026-01-01T00:00:00Z", "expires_at": "2099-01-01T00:00:00Z"},
+			{"id": "90000000-0000-4000-8000-000000000009", "name": "other-org-key", "org_id": otherOrg, "preview_name": "sk-other"},
+			{"id": "80000000-0000-4000-8000-000000000009", "name": "unscoped-key", "org_id": nil, "preview_name": "sk-unscoped"},
+		},
 		"/v1/service_token": {{"id": "00000000-0000-4000-8000-000000000008", "name": "audit-token", "service_account_id": user, "org_id": org}},
 		"/v1/ai_secret":     {{"id": "00000000-0000-4000-8000-000000000010", "name": "OpenAI", "type": "openai", "org_id": org}},
 		"/v1/env_var":       {{"id": "00000000-0000-4000-8000-000000000011", "name": "ORDINARY_VALUE", "object_type": "project", "object_id": project}},
@@ -135,6 +140,8 @@ func (a *fakeAPI) handle(r *http.Request) (int, any) {
 			return http.StatusBadRequest, obj{"error": "ACL does not exist"}
 		}
 		return a.get("/v1/acl/list_org", path, "ACL does not exist")
+	case strings.HasPrefix(path, "/v1/api_key/"):
+		return a.get("/v1/api_key", path, "API key does not exist")
 	case strings.HasPrefix(path, "/v1/project_group/"):
 		return a.get("/v1/project_group", path, "Project group does not exist")
 	case strings.HasPrefix(path, "/v1/project_automation/"):

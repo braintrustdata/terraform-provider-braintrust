@@ -106,16 +106,7 @@ func TestEphemeralServiceTokenConfiguredOpenPreservesInputs(t *testing.T) {
 			if configured.EphemeralResourceData == nil || configured.EphemeralResourceData != configured.ResourceData {
 				t.Fatal("ephemeral resource did not receive the configured shared client")
 			}
-			factories := p.EphemeralResources(ctx)
-			if len(factories) != 1 {
-				t.Fatalf("got %d ephemeral resources", len(factories))
-			}
-			r := factories[0]()
-			var metadata ephemeral.MetadataResponse
-			r.Metadata(ctx, ephemeral.MetadataRequest{ProviderTypeName: "braintrust"}, &metadata)
-			if metadata.TypeName != "braintrust_service_token" {
-				t.Fatalf("wrong registered name: %s", metadata.TypeName)
-			}
+			r := NewServiceTokenEphemeralResource()
 			var resourceConfigured ephemeral.ConfigureResponse
 			r.(ephemeral.EphemeralResourceWithConfigure).Configure(ctx, ephemeral.ConfigureRequest{ProviderData: configured.EphemeralResourceData}, &resourceConfigured)
 			if resourceConfigured.Diagnostics.HasError() {

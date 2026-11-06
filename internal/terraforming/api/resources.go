@@ -228,6 +228,16 @@ func (c *Client) ListMCPServers(ctx context.Context) ([]openapi.MCPServer, error
 	}, func(s openapi.MCPServer) string { return s.Id.String() })
 }
 
+func (c *Client) ListAPIKeys(ctx context.Context) ([]openapi.ApiKey, error) {
+	return client.ListObjects("/v1/api_key", func(limit int, startingAfter *string) (*client.Page[openapi.ApiKey], error) {
+		page, err := c.sdk.API.GetApiKeyWithResponse(ctx, &openapi.GetApiKeyParams{Limit: &limit, StartingAfter: startingAfter})
+		if err != nil {
+			return nil, err
+		}
+		return page.JSON200, nil
+	}, func(k openapi.ApiKey) string { return k.Id.String() })
+}
+
 func (c *Client) ListServiceTokens(ctx context.Context) ([]openapi.ServiceToken, error) {
 	return client.ListObjects("/v1/service_token", func(limit int, startingAfter *string) (*client.Page[openapi.ServiceToken], error) {
 		page, err := c.sdk.API.GetServiceTokenWithResponse(ctx, &openapi.GetServiceTokenParams{Limit: &limit, StartingAfter: startingAfter})

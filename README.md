@@ -84,6 +84,28 @@ See the [AI secret example](examples/snippets/resources/braintrust_ai_secret/res
 
 The managed `resource "braintrust_service_token"` still persists its `key` in state. For state-free generation, use `ephemeral "braintrust_service_token"` and deliver its key through an ephemeral-capable provisioner or a secret-store write-only argument. The [local file-store example](examples/ephemeral-service-token) demonstrates apply-only generation and the full lifecycle: a separate Terraform owner revokes the token and deletes its stored key on destroy. The ephemeral resource itself does not revoke delivered tokens on close.
 
+## User API keys
+
+Use `resource "braintrust_api_key"` to create, refresh, rotate by replacement, and revoke user API keys. Unlike service tokens, creation requires an unrestricted **user API key** as the provider credential. New keys belong to that user. Scoped credentials can only create keys in their own organization; unscoped credentials must supply `org_id` for a member organization.
+
+```hcl
+resource "braintrust_api_key" "automation" {
+  name               = "terraform-automation"
+  expires_in_seconds = 3600
+}
+```
+
+- The raw `key` is returned once and retained in sensitive Terraform state. Use an encrypted backend; sensitive marking does not encrypt state.
+- Changes to `name`, `org_id`, or `expires_in_seconds` replace the key. The API caps lifetime to the calling key's remaining lifetime; `expires_at` reports the effective expiry without changing the requested TTL. Expiration does not automatically rotate a key.
+- `data "braintrust_api_key"` reads metadata by ID, never the secret. Import by UUID manages metadata and revocation with a null `key`; omit `expires_in_seconds` when adopting an existing key to avoid replacement. Explicitly replace it to obtain a new secret.
+- `braintrust-terraforming genimport --resource-types braintrust_api_key --org-id <org-id>` exports metadata and import blocks. Review ownership carefully: export can include Terraform's own credential, and importing it makes destroy revoke that credential. Only import keys intended for Terraform management.
+- For state-free delivery, use `ephemeral "braintrust_api_key"` with `nonce = timestamp()`. Callers own secure delivery and revocation; closing or destroying the ephemeral configuration does not revoke the remote key. Revoking a parent key does not revoke keys it created.
+- Existing same-name keys are rejected rather than adopted. A lost creation response without an attributable key ID requires manual reconciliation; retrying cannot recover the secret.
+
+See the [managed resource](examples/snippets/resources/braintrust_api_key/resource.tf), [import](examples/snippets/resources/braintrust_api_key/import.sh), and [ephemeral](examples/snippets/ephemeral-resources/braintrust_api_key/ephemeral-resource.tf) examples.
+
+This feature requires a Braintrust deployment exposing `POST /v1/api_key`. Creation temporarily uses a small HTTP adapter with the provider's existing transport; metadata reads and revocation use the pinned Go SDK. No SDK upgrade is required.
+
 ## Adopting Existing Orgs
 
 If you already have a Braintrust organization, the `braintrust-terraforming` CLI exports it as Terraform config, along with `import` blocks so Terraform adopts the existing resources instead of creating new ones.

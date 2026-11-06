@@ -45,3 +45,15 @@ func TestACLsRequireExplicitSelection(t *testing.T) {
 		t.Fatalf("ACL selected %d times, want once", len(selected))
 	}
 }
+
+func TestAPIKeySelection(t *testing.T) {
+	for _, requested := range [][]string{{"braintrust_api_key"}, {"all"}} {
+		selected, err := selectResourceTypes(requested, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(selected, "braintrust_api_key") {
+			t.Fatalf("API keys missing from selection %v", selected)
+		}
+	}
+}

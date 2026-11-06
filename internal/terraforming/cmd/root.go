@@ -25,7 +25,16 @@ var rootCmd = &cobra.Command{
 	Long: `braintrust-terraforming fetches resources from the Braintrust API and
 generates the corresponding Terraform configuration files and import blocks.
 
-Use it to bootstrap Terraform management of an existing Braintrust deployment.`,
+Use it to bootstrap Terraform management of an existing Braintrust deployment.
+
+API keys export only name and org_id. Import adopts metadata without recovering
+the secret or rotating the existing key. To rotate, explicitly replace the
+resource with terraform apply -replace=<resource-address>; replacement revokes
+the old key. Newly created managed keys are stored in Terraform state, so use
+an encrypted backend and never commit state. API key export can include the
+credential Terraform itself uses; importing takes ownership, and destroying
+the resource revokes that credential. Manage only keys intended for Terraform
+ownership.`,
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip client init for version command.
@@ -130,6 +139,7 @@ var AllResourceTypes = []string{
 	"braintrust_project_automation",
 	"braintrust_mcp_server",
 	"braintrust_env_var",
+	"braintrust_api_key",
 	"braintrust_service_token",
 	"braintrust_ai_secret",
 	"braintrust_view",
