@@ -3,7 +3,7 @@ module github.com/braintrustdata/terraform-provider-braintrust
 go 1.26.9
 
 require (
-	github.com/braintrustdata/braintrust-sdk-go v0.19.0
+	github.com/braintrustdata/braintrust-sdk-go v0.20.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/hcl/v2 v2.25.0

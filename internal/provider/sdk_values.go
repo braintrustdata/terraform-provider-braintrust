@@ -19,13 +19,14 @@ const (
 	preciseTimeLayout = time.RFC3339Nano
 )
 
-// nullableStringToTF converts an SDK nullable string to a Terraform value.
-// Unspecified and null both map to null.
-func nullableStringToTF(v nullable.Nullable[string]) types.String {
-	if !v.IsSpecified() || v.IsNull() {
+// nullableStringToTF converts an SDK nullable string or string enum to a
+// Terraform value. Unspecified and null both map to null.
+func nullableStringToTF[T ~string](v nullable.Nullable[T]) types.String {
+	value, ok := client.Optional(v)
+	if !ok {
 		return types.StringNull()
 	}
-	return types.StringValue(v.MustGet())
+	return types.StringValue(string(value))
 }
 
 // nullableUUIDToTF converts an SDK nullable UUID to a Terraform value.
@@ -69,10 +70,7 @@ func optionalUUIDToTF(id uuid.UUID) types.String {
 // tfStringToNullable converts a Terraform value to an SDK nullable string.
 // Null and unknown values are left unspecified so they are omitted from requests.
 func tfStringToNullable(s types.String) nullable.Nullable[string] {
-	if s.IsNull() || s.IsUnknown() {
-		return nullable.Nullable[string]{}
-	}
-	return nullable.NewNullableWithValue(s.ValueString())
+	return tfStringToNullableEnum[string](s)
 }
 
 // nullableIsSet reports whether an SDK nullable holds a non-null value.
@@ -166,11 +164,12 @@ func tfStringToEnum[T ~string](s types.String) *T {
 	return &v
 }
 
-// enumToTF converts an optional SDK enum to a Terraform value.
-func enumToTF[T ~string](v *T) types.String {
-	value, ok := client.OptionalEnum(v)
-	if !ok {
-		return types.StringNull()
+// tfStringToNullableEnum converts a Terraform value to an SDK nullable string
+// enum. Null and unknown values are left unspecified so they are omitted from
+// requests.
+func tfStringToNullableEnum[T ~string](s types.String) nullable.Nullable[T] {
+	if s.IsNull() || s.IsUnknown() {
+		return nullable.Nullable[T]{}
 	}
-	return types.StringValue(value)
+	return nullable.NewNullableWithValue(T(s.ValueString()))
 }

@@ -34,10 +34,8 @@ func UUIDStrings(ids []uuid.UUID) []string {
 	return result
 }
 
-// OptionalEnum returns an SDK enum pointer's value as a string.
-func OptionalEnum[T ~string](v *T) (string, bool) {
-	if v == nil {
-		return "", false
-	}
-	return string(*v), true
+// OptionalEnum returns an SDK nullable enum's value as a string.
+func OptionalEnum[T ~string](v nullable.Nullable[T]) (string, bool) {
+	value, ok := Optional(v)
+	return string(value), ok
 }

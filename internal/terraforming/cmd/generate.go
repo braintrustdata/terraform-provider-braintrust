@@ -680,7 +680,8 @@ func verifyACLTargets(ctx context.Context, acls []openapi.Acl, read func(context
 func isDefaultBuiltinACL(acl openapi.Acl, orgID string, resolver *hcl.ReferenceResolver) bool {
 	groupID, hasGroup := client.OptionalUUID(acl.GroupId)
 	_, hasUser := client.OptionalUUID(acl.UserId)
-	if !hasGroup || acl.ObjectId.String() != orgID || hasUser || acl.RestrictObjectType != nil {
+	_, restricted := client.Optional(acl.RestrictObjectType)
+	if !hasGroup || acl.ObjectId.String() != orgID || hasUser || restricted {
 		return false
 	}
 	groupName := resolver.BuiltinGroupName(groupID)
@@ -913,8 +914,7 @@ func buildViewBlocks(ctx context.Context, projects []openapi.Project, orgID stri
 	blocks := make([]hcl.ResourceBlock, 0, len(views))
 	for _, raw := range views {
 		v, id, objectType, objectID := raw.Value, raw.Value.Id.String(), string(raw.Value.ObjectType), raw.Value.ObjectId.String()
-		viewType, _ := client.Optional(v.ViewType)
-		fields := map[string]any{"object_type": objectType, "view_type": string(viewType), "name": v.Name}
+		fields := map[string]any{"object_type": objectType, "view_type": string(v.ViewType), "name": v.Name}
 		linked := map[string]string{}
 		if ref := resolver.Resolve("object_id", objectID); ref != "" {
 			linked["object_id"] = ref

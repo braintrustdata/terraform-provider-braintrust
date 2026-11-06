@@ -29,8 +29,8 @@ func mapACLToModel(acl *openapi.Acl, model *aclModel) {
 	model.ObjectID = types.StringValue(acl.ObjectId.String())
 	model.UserID = nullableUUIDToTF(acl.UserId)
 	model.GroupID = nullableUUIDToTF(acl.GroupId)
-	model.Permission = enumToTF(acl.Permission)
-	model.RestrictObjectType = enumToTF(acl.RestrictObjectType)
+	model.Permission = nullableStringToTF(acl.Permission)
+	model.RestrictObjectType = nullableStringToTF(acl.RestrictObjectType)
 	model.RoleID = nullableUUIDToTF(acl.RoleId)
 	model.ObjectOrgID = types.StringValue(acl.UnderscoreObjectOrgId.String())
 	model.Created = nullableTimeToTF(acl.Created, model.Created)
@@ -68,8 +68,8 @@ func listACLs(ctx context.Context, c *client.Client, plan aclModel) ([]openapi.A
 func aclItemFromModel(plan aclModel) (openapi.AclItem, error) {
 	item := openapi.AclItem{
 		ObjectType:         openapi.AclObjectType(plan.ObjectType.ValueString()),
-		Permission:         tfStringToEnum[openapi.Permission](plan.Permission),
-		RestrictObjectType: tfStringToEnum[openapi.AclObjectType](plan.RestrictObjectType),
+		Permission:         tfStringToNullableEnum[openapi.Permission](plan.Permission),
+		RestrictObjectType: tfStringToNullableEnum[openapi.AclObjectType](plan.RestrictObjectType),
 	}
 	var err error
 	if item.ObjectId, err = parseUUID(plan.ObjectID, "object_id"); err != nil {
