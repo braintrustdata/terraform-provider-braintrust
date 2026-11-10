@@ -44,7 +44,14 @@ func (r *aclResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 			"role to a user or group on a specific object.\n\n" +
 			"ACLs are **immutable** — any attribute change requires destroying and recreating the ACL, " +
 			"so the permission is briefly revoked during the replacement. " +
-			"ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).",
+			"ACLs are inherited through the object hierarchy (e.g., a project ACL applies to all experiments and datasets within it).\n\n" +
+			"For a Terraform-managed service account, set `user_id = braintrust_service_account.<name>.id` " +
+			"instead of copying its UUID. This dependency orders deletion and replacement and connects the ACL to the replacement account's new ID. " +
+			"External removal through the organization-members API also removes the account's ACLs, but Terraform cannot detect service-account deletion and retains its old ID. " +
+			"Only after confirming external account deletion, explicitly replace the account with `terraform apply -replace=<resource-address>`, using its full Terraform address. " +
+			"Recreating an account with the same name creates a new UUID. " +
+			"Persistent ACL read or delete HTTP 500 errors are not proof of deletion: the provider retains state; contact Braintrust support. " +
+			"See [What to Manage in Terraform](../guides/what-to-manage) for recovery guidance.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:    true,

@@ -41,7 +41,13 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 		MarkdownDescription: "Manages a Braintrust service account.\n\n" +
 			"Service accounts are organization members intended for non-human, programmatic use. " +
 			"Use `braintrust_service_token` to mint tokens for this service account.\n\n" +
-			"~> **Note:** The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift. Import is not supported for the same reason.",
+			"~> **Note:** The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift. Import is not supported for the same reason.\n\n" +
+			"Reference this resource's `id` directly in each ACL's `user_id` so Terraform orders deletion and replacement correctly. " +
+			"External removal through the organization-members API also removes the account's ACLs, but Terraform retains the stale account ID. " +
+			"Only after confirming external account deletion, explicitly replace the account with `terraform apply -replace=<resource-address>`, using its full Terraform address. " +
+			"Recreating the same name creates a new UUID; direct ACL references use that replacement ID. " +
+			"An ACL read or delete returning HTTP 500 is not proof of deletion: retain its state and contact Braintrust support if the error persists. " +
+			"See [What to Manage in Terraform](../guides/what-to-manage) for recovery guidance.",
 		Attributes: map[string]schema.Attribute{
 			"id":      computedStringAttribute("Unique identifier for the service account (UUID)."),
 			"email":   computedStringAttribute("The service account email (not routable)."),
@@ -117,7 +123,7 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	// GET /v1/user is restricted to human users. An empty result for a
 	// service-account ID is not evidence of deletion. Retain the known state
 	// until the API offers a service-account read contract.
-	resp.Diagnostics.AddWarning("Service Account Refresh Is Limited", "Braintrust does not expose a public service-account read endpoint. Terraform preserves the last known service-account state; deletion or drift outside Terraform cannot currently be detected.")
+	resp.Diagnostics.AddWarning("Service Account Refresh Is Limited", "Braintrust does not expose a public service-account read endpoint. Terraform preserves the last known state and cannot detect external deletion or drift. If you confirm external deletion, run terraform apply -replace=<resource-address> using this account's full Terraform address; direct ACL user_id references will use the new UUID. An ACL API error alone does not confirm account deletion.")
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
