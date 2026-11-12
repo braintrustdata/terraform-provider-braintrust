@@ -6,6 +6,7 @@ description: |-
   Manages a Braintrust service account.
   Service accounts are organization members intended for non-human, programmatic use. Use braintrust_service_token to mint tokens for this service account.
   ~> Note: The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift. Import is not supported for the same reason.
+  Reference this resource's id directly in each ACL's user_id so Terraform orders deletion and replacement correctly. External removal through the organization-members API also removes the account's ACLs, but Terraform retains the stale account ID. Only after confirming external account deletion, explicitly replace the account with terraform apply -replace=<resource-address>, using its full Terraform address. Recreating the same name creates a new UUID; direct ACL references use that replacement ID. An ACL read or delete returning HTTP 500 is not proof of deletion: retain its state and contact Braintrust support if the error persists. See What to Manage in Terraform ../guides/what-to-manage for recovery guidance.
 ---
 
 # braintrust_service_account (Resource)
@@ -15,6 +16,8 @@ Manages a Braintrust service account.
 Service accounts are organization members intended for non-human, programmatic use. Use `braintrust_service_token` to mint tokens for this service account.
 
 ~> **Note:** The current public API does not support reading service accounts, so Terraform preserves the last known state during refresh and cannot detect external deletion or drift. Import is not supported for the same reason.
+
+Reference this resource's `id` directly in each ACL's `user_id` so Terraform orders deletion and replacement correctly. External removal through the organization-members API also removes the account's ACLs, but Terraform retains the stale account ID. Only after confirming external account deletion, explicitly replace the account with `terraform apply -replace=<resource-address>`, using its full Terraform address. Recreating the same name creates a new UUID; direct ACL references use that replacement ID. An ACL read or delete returning HTTP 500 is not proof of deletion: retain its state and contact Braintrust support if the error persists. See [What to Manage in Terraform](../guides/what-to-manage) for recovery guidance.
 
 ## Example Usage
 
