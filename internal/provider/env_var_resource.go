@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
@@ -103,6 +104,7 @@ func (r *envVarResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Description: "Non-sensitive, non-ephemeral positive version stored in state. Change it to write value, or to explicitly clear the remote value on update when value is null or omitted. Omitting this version leaves the remote value untouched on update.",
 				Validators:  []validator.Int64{int64validator.AtLeast(1)},
 			},
+			"metadata":    secretMetadataAttribute("value"),
 			"created":     computedStringAttribute("Date of environment variable creation."),
 			"used":        computedStringAttribute("Date the environment variable was last used."),
 			"secret_type": optionalComputedStringAttribute("The AI provider name (e.g. \"openai\", \"anthropic\"). When set, the env var appears under \"Project AI providers\" in the Braintrust UI."),
@@ -137,6 +139,11 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	metadata, err := functionJSONObject(plan.Metadata, "metadata")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
+		return
+	}
 	if !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
@@ -155,6 +162,12 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 		Value:      tfStringToNullable(config.Value),
 		SecretType: tfStringToNullable(plan.SecretType),
 	}
+	planned := plan.Metadata
+	body, err := client.JSONBody(replaceReq, map[string]json.RawMessage{"metadata": metadata})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust Env Var", err.Error())
+		return
+	}
 
 	tflog.Debug(ctx, "Creating env var", map[string]any{
 		"object_type": replaceReq.ObjectType,
@@ -162,10 +175,10 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 		"name":        replaceReq.Name,
 	})
 
-	replaceResp, err := client.Write(r.client.API.PutEnvVarWithResponse(ctx, replaceReq))
-	var created *openapi.EnvVar
+	replaceResp, err := client.Write(r.client.API.PutEnvVarWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *rawEnvVar
 	if err == nil {
-		created, err = client.Written(replaceResp.JSON200)
+		created, err = client.WrittenRaw(replaceResp.JSON200, replaceResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -176,19 +189,20 @@ func (r *envVarResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	// Re-read to get full state.
-	envVar, err := getEnvVar(ctx, r.client, created.Id.String())
+	fetched, err := getEnvVar(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapEnvVarToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust Env Var After Create",
-			"Env var was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
+			"Env var was created (ID: "+created.Value.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
 
-	mapEnvVarToModel(envVar, &plan)
+	mapEnvVarToModel(fetched, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	checkSecretMetadataApplied(planned, plan.Metadata, &resp.Diagnostics)
 }
 
 func (r *envVarResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -201,7 +215,7 @@ func (r *envVarResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	envVar, err := getEnvVar(ctx, r.client, state.ID.ValueString())
+	fetched, err := getEnvVar(ctx, r.client, state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			tflog.Warn(ctx, "Env var not found, removing from state", map[string]any{
@@ -217,7 +231,7 @@ func (r *envVarResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	mapEnvVarToModel(envVar, &state)
+	mapEnvVarToModel(fetched, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
 
@@ -238,6 +252,11 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	metadata, changed, err := secretMetadataPatch(plan.Metadata, state.Metadata)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
+		return
+	}
 	if !requireClient(r.client, &resp.Diagnostics) {
 		return
 	}
@@ -254,13 +273,23 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 			updateReq.Value = tfStringToNullable(config.Value)
 		}
 	}
+	raw := map[string]json.RawMessage{}
+	if changed {
+		raw["metadata"] = metadata
+	}
+	planned := plan.Metadata
+	body, err := client.JSONBody(updateReq, raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Braintrust Env Var", err.Error())
+		return
+	}
 
 	tflog.Debug(ctx, "Updating env var", map[string]any{"id": state.ID.ValueString()})
 
-	updateResp, err := client.Write(r.client.API.PatchEnvVarIdWithResponse(ctx, state.ID.ValueString(), updateReq))
-	var envVar *openapi.EnvVar
+	updateResp, err := client.Write(r.client.API.PatchEnvVarIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var updated *rawEnvVar
 	if err == nil {
-		envVar, err = client.Written(updateResp.JSON200)
+		updated, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -270,8 +299,9 @@ func (r *envVarResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	mapEnvVarToModel(envVar, &plan)
+	mapEnvVarToModel(updated, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	checkSecretMetadataApplied(planned, plan.Metadata, &resp.Diagnostics)
 }
 
 func (r *envVarResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

@@ -1,6 +1,7 @@
 package offline
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 )
@@ -147,6 +148,12 @@ var scenarios = []scenario{
 		r.failIfNot(r.matches(`value\s*=\s*var\.braintrust_env_var_`), "write-only ordinary env var value has no variable")
 		r.failIfNot(r.matches(`object_id\s*=\s*braintrust_project\.`), "project env var still points to a source-org project ID")
 	}},
+	{name: "secret_metadata_generation", command: "generate", types: "braintrust_ai_secret,braintrust_env_var", setup: setupSecretMetadata, check: checkSecretMetadata},
+	{name: "secret_metadata_adoption", command: "genimport", types: "braintrust_ai_secret,braintrust_env_var", plan: true, setup: setupSecretMetadata, check: func(r *result) {
+		checkSecretMetadata(r)
+		r.failIf(r.matches(`(?m)^\s*(secret|value|secret_version|value_version)\s*=`), "metadata adoption would configure credential rotation")
+		r.failIfNot(strings.Contains(r.tfStdout, "Plan: 2 to import, 0 to add, 0 to change, 0 to destroy."), "metadata adoption would change existing secrets")
+	}},
 	{name: "stale_acl_unverified", command: "generate", types: "braintrust_project,braintrust_acl", flags: []string{"--verify-acl-targets=false"}, setup: setupStaleACL, check: func(r *result) {
 		r.failIfNot(r.has(`resource "braintrust_acl" "terraform_managed_resource_50000000"`) && r.reported("ACL target(s) were not verified"), "unverified ACL was omitted or warning is missing")
 	}},
@@ -173,6 +180,16 @@ var scenarios = []scenario{
 	{name: "mismatched_acl_scope", command: "generate", types: "braintrust_acl", flags: []string{"--org-id", org}, wantFail: true, setup: func(a *fakeAPI) {
 		a.fixtures["/v1/acl/list_org"][0]["_object_org_id"] = otherOrg
 	}},
+}
+
+func setupSecretMetadata(a *fakeAPI) {
+	for _, path := range []string{"/v1/ai_secret", "/v1/env_var"} {
+		a.fixtures[path][0]["metadata"] = json.RawMessage(`{"future":{"enabled":true,"big":12345678901234567890}}`)
+	}
+}
+
+func checkSecretMetadata(r *result) {
+	r.failIfNot(r.count("12345678901234567890") == 2 && r.count("future") == 2 && r.matches(`metadata\s*=`), "secret metadata lost unknown keys or integer precision")
 }
 
 func checkACLsOmittedByDefault(r *result) {

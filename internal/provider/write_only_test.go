@@ -23,14 +23,14 @@ func TestWriteOnlyMappingsDiscardPlaintext(t *testing.T) {
 	secret := aiSecretModel{
 		Secret: types.StringValue("old-plaintext"), SecretVersion: types.Int64Value(3),
 	}
-	mapAISecretToModel(&openapi.AISecret{}, &secret)
+	mapAISecretToModel(&rawAISecret{Value: &openapi.AISecret{}}, &secret)
 	if !secret.Secret.IsNull() || !secret.SecretVersion.Equal(types.Int64Value(3)) {
 		t.Fatal("AI secret mapping retained plaintext or lost the version")
 	}
 	envVar := envVarModel{
 		Value: types.StringValue("old-plaintext"), ValueVersion: types.Int64Value(4),
 	}
-	mapEnvVarToModel(&openapi.EnvVar{}, &envVar)
+	mapEnvVarToModel(&rawEnvVar{Value: &openapi.EnvVar{}}, &envVar)
 	if !envVar.Value.IsNull() || !envVar.ValueVersion.Equal(types.Int64Value(4)) {
 		t.Fatal("environment variable mapping retained plaintext or lost the version")
 	}
