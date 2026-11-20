@@ -238,11 +238,22 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
 		return
 	}
-	raw := map[string]json.RawMessage{}
+	var orgName string
 	if changed {
-		// PATCH deep-merges JSON fields unless asked to replace them.
-		raw["metadata"] = metadata
-		raw["shallow_replace_json_fields"] = json.RawMessage(`["metadata"]`)
+		// PUT is scoped by organization and name, not ID. Resolve the
+		// resource's organization rather than using the key's default org.
+		orgResp, err := r.client.API.GetOrganizationIdWithResponse(ctx, state.OrgID.ValueString())
+		if err == nil {
+			var org *openapi.Organization
+			org, err = client.JSON(orgResp.JSON200)
+			if err == nil {
+				orgName = org.Name
+			}
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error Reading Braintrust Organization", err.Error())
+			return
+		}
 	}
 	planned := plan.Metadata
 
@@ -258,7 +269,7 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 
 	tflog.Debug(ctx, "Updating AI secret", map[string]any{"id": state.ID.ValueString()})
 
-	body, err := client.JSONBody(updateReq, raw)
+	body, err := client.JSONBody(updateReq, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Braintrust AI Secret", err.Error())
 		return
@@ -274,6 +285,42 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 			"Could not update AI secret ID "+state.ID.ValueString()+": "+err.Error(),
 		)
 		return
+	}
+
+	if changed {
+		// PATCH merges metadata and cannot remove keys. Rename/rotate by ID
+		// first, then PUT the returned name to replace metadata. Omitting
+		// secret from PUT preserves the existing write-only value.
+		state.SecretVersion = plan.SecretVersion
+		mapAISecretToModel(secret, &state)
+		resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		replaceReq := openapi.CreateAISecret{
+			Name:    secret.Value.Name,
+			OrgName: nullable.NewNullableWithValue(orgName),
+			Type:    secret.Value.Type,
+		}
+		body, err := client.JSONBody(replaceReq, map[string]json.RawMessage{"metadata": metadata})
+		if err == nil {
+			var replaceResp *openapi.PutAiSecretResponse
+			replaceResp, err = client.Write(r.client.API.PutAiSecretWithBodyWithResponse(ctx, client.JSONContentType, body))
+			if err == nil {
+				secret, err = client.WrittenRaw(replaceResp.JSON200, replaceResp.Body)
+			}
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error Updating Braintrust AI Secret Metadata",
+				"Could not replace metadata for AI secret ID "+state.ID.ValueString()+": "+err.Error())
+			return
+		}
+		if secret.Value.Id.String() != state.ID.ValueString() {
+			resp.Diagnostics.AddError("AI Secret Changed During Update",
+				"The name-based metadata update returned AI secret ID "+secret.Value.Id.String()+
+					" instead of "+state.ID.ValueString()+". Inspect the remote resources before retrying; the returned resource has not been adopted.")
+			return
+		}
 	}
 
 	mapAISecretToModel(secret, &plan)

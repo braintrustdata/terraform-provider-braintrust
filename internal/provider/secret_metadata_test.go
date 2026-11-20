@@ -15,10 +15,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// secretMetadataServer fakes the AI secret and env var endpoints. AI-secret
-// PATCH deep-merges metadata unless the replace flag is sent; env-var PATCH
-// replaces it. With mergeOnly, PATCH always merges, like an API without
-// shallow_replace_json_fields.
+// secretMetadataServer fakes the deployed contracts: AI-secret PATCH
+// deep-merges metadata, PUT replaces it, and env-var PATCH replaces it.
+// mergeOnly simulates a server that cannot replace metadata.
 func secretMetadataServer(t *testing.T, kind string, mergeOnly bool, defaultMetadata json.RawMessage) (*httptest.Server, map[string]json.RawMessage) {
 	t.Helper()
 	object := map[string]json.RawMessage{"id": json.RawMessage(fmt.Sprintf("%q", secretMetadataID)), "name": json.RawMessage(`"metadata-test"`)}
@@ -34,8 +33,13 @@ func secretMetadataServer(t *testing.T, kind string, mergeOnly bool, defaultMeta
 		object["secret_type"] = json.RawMessage(`"openai"`)
 		object["secret_category"] = json.RawMessage(`"ai_provider"`)
 	}
+	created := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/organization/"+secretMetadataOrgID {
+			_, _ = fmt.Fprintf(w, `{"id":%q,"name":"metadata-org"}`, secretMetadataOrgID)
+			return
+		}
 		switch r.Method {
 		case http.MethodPut, http.MethodPatch:
 			var body map[string]json.RawMessage
@@ -44,27 +48,44 @@ func secretMetadataServer(t *testing.T, kind string, mergeOnly bool, defaultMeta
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			if r.Method == http.MethodPatch {
-				for _, field := range []string{"secret", "value"} {
-					if _, ok := body[field]; ok {
-						t.Errorf("metadata update resent write-only %s", field)
+			if kind == "ai_secret" && r.Method == http.MethodPatch {
+				for field := range body {
+					switch field {
+					case "name", "type", "secret", "metadata":
+					default:
+						http.Error(w, "Extraneous key "+field, http.StatusBadRequest)
+						return
 					}
+				}
+			}
+			if kind == "ai_secret" && r.Method == http.MethodPut && created {
+				if _, ok := body["secret"]; ok {
+					t.Error("metadata replacement resent write-only secret")
+				}
+				if string(body["name"]) != string(object["name"]) {
+					http.Error(w, "PUT would create a different secret", http.StatusConflict)
+					return
+				}
+				if string(body["org_name"]) != `"metadata-org"` {
+					http.Error(w, "PUT targeted the wrong organization", http.StatusBadRequest)
+					return
+				}
+			}
+			for _, field := range []string{"name", "type"} {
+				if value, ok := body[field]; ok && string(value) != "null" {
+					object[field] = value
 				}
 			}
 			if metadata, ok := body["metadata"]; ok {
-				if r.Method == http.MethodPatch {
-					if kind == "ai_secret" && string(metadata) == "null" {
-						break // AI-secret PATCH ignores whole-field null.
-					}
-					var replace []string
-					_ = json.Unmarshal(body["shallow_replace_json_fields"], &replace)
-					replaced := len(replace) == 1 && replace[0] == "metadata"
-					if mergeOnly || (kind == "ai_secret" && !replaced) {
-						metadata = mergeSecretMetadata(object["metadata"], metadata)
-					}
+				if kind == "ai_secret" && r.Method == http.MethodPatch && string(metadata) == "null" {
+					break // AI-secret PATCH ignores whole-field null.
+				}
+				if mergeOnly || (kind == "ai_secret" && r.Method == http.MethodPatch) {
+					metadata = mergeSecretMetadata(object["metadata"], metadata)
 				}
 				object["metadata"] = metadata
 			}
+			created = true
 		case http.MethodGet:
 		case http.MethodDelete:
 			w.WriteHeader(http.StatusNoContent)
@@ -99,7 +120,7 @@ func secretVersionAttribute(kind string) string {
 }
 
 // Exercise Terraform plans, refresh, import, replacement and clearing against
-// the two API contracts, including the AI-secret opt-in replacement flag.
+// the deployed API contracts, including replacement of nested metadata keys.
 func TestSecretMetadataLifecycle(t *testing.T) {
 	for _, kind := range []string{"ai_secret", "env_var"} {
 		t.Run(kind, func(t *testing.T) {
@@ -125,6 +146,16 @@ func TestSecretMetadataLifecycle(t *testing.T) {
 						ExpectNonEmptyPlan: true,
 					},
 					{Config: config(attr(updated)), Check: resource.TestCheckResourceAttr(rn, "metadata", updated)},
+					// A simultaneous rename must update the same secret, not
+					// PUT a new secret under the planned name.
+					{
+						Config: strings.ReplaceAll(config(attr(initial)), `"metadata-test"`, `"metadata-renamed"`),
+						Check: resource.ComposeTestCheckFunc(
+							resource.TestCheckResourceAttr(rn, "id", secretMetadataID),
+							resource.TestCheckResourceAttr(rn, "name", "metadata-renamed"),
+							resource.TestCheckResourceAttr(rn, "metadata", initial),
+						),
+					},
 					{Config: config("metadata = jsonencode({})"), Check: resource.TestCheckResourceAttr(rn, "metadata", "{}")},
 					{Config: config("metadata = jsonencode({})"), PlanOnly: true},
 					// Removing the attribute stops managing metadata rather than clearing it.
@@ -196,6 +227,52 @@ func TestSecretMetadataMergeOnlyAPI(t *testing.T) {
 						ExpectNonEmptyPlan: true,
 					},
 					{RefreshState: true, ExpectNonEmptyPlan: true, Check: resource.TestCheckResourceAttr(rn, "metadata", `{"keep":1,"remove":2}`)},
+				},
+			})
+		})
+	}
+}
+
+func TestAISecretMetadataReplacementFailure(t *testing.T) {
+	for _, differentID := range []bool{false, true} {
+		name := "rejected"
+		message := "Error Updating Braintrust AI Secret Metadata"
+		if differentID {
+			name = "different resource"
+			message = "AI Secret Changed During Update"
+		}
+		t.Run(name, func(t *testing.T) {
+			server, object := secretMetadataServer(t, "ai_secret", false, nil)
+			handler := server.Config.Handler
+			server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Creation uses PUT too; fail only after the ID-scoped rename.
+				if r.Method == http.MethodPut && string(object["name"]) == `"metadata-renamed"` {
+					if !differentID {
+						http.Error(w, "replacement rejected", http.StatusBadRequest)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprintf(w, `{"id":"00000000-0000-4000-8000-000000000003","org_id":%q,"name":"metadata-renamed","type":"openai","metadata":{"keep":1}}`, secretMetadataOrgID)
+					return
+				}
+				handler.ServeHTTP(w, r)
+			})
+			initial := secretMetadataTestConfig(server, "ai_secret", `metadata = jsonencode({ keep = 1, remove = 2 })`)
+			updated := strings.ReplaceAll(secretMetadataTestConfig(server, "ai_secret", `metadata = jsonencode({ keep = 1 })`), `"metadata-test"`, `"metadata-renamed"`)
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Steps: []resource.TestStep{
+					{Config: initial},
+					{Config: updated, ExpectError: regexp.MustCompile(message)},
+					{
+						RefreshState:       true,
+						ExpectNonEmptyPlan: true,
+						Check: resource.ComposeTestCheckFunc(
+							resource.TestCheckResourceAttr("braintrust_ai_secret.test", "id", secretMetadataID),
+							resource.TestCheckResourceAttr("braintrust_ai_secret.test", "name", "metadata-renamed"),
+							resource.TestCheckResourceAttr("braintrust_ai_secret.test", "metadata", `{"keep":1,"remove":2}`),
+						),
+					},
 				},
 			})
 		})
