@@ -49,6 +49,17 @@ resource "braintrust_env_var" "project_openai" {
   secret_type   = "openai"
   value         = var.openai_api_key
   value_version = 1
+  metadata = jsonencode({
+    api_base          = "https://api.openai.com"
+    endpoint_path     = "/v1/chat/completions"
+    supportsStreaming = true
+  })
 }
+
+# Metadata can also come from file("${path.module}/provider.json") or
+# jsonencode(yamldecode(file("${path.module}/provider.yaml"))).
+# Updates replace metadata without rotating value. Omitting metadata leaves it
+# unmanaged; set jsonencode({}) to clear it.
+# Metadata is sensitive but stored in state; use value for API keys.
 
 # For organization-level AI providers, use braintrust_ai_secret instead.

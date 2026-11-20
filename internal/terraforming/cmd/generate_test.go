@@ -2,14 +2,18 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
+	"github.com/braintrustdata/terraform-provider-braintrust/internal/terraforming/api"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/terraforming/hcl"
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/nullable"
@@ -216,5 +220,89 @@ func TestDefaultBuiltinACLClassification(t *testing.T) {
 				t.Fatalf("isDefaultBuiltinACL() = %v, want %v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestSecretBlocksPreserveRawMetadata(t *testing.T) {
+	// Nested keys arrive unsorted; output must match the provider's canonical state.
+	const remote = `{"future":{"list":[true,"unknown"],"large":12345678901234567890}}`
+	const metadata = `{"future":{"large":12345678901234567890,"list":[true,"unknown"]}}`
+	orgID, projectID := fixtureID(1).String(), fixtureID(2).String()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/ai_secret":
+			fmt.Fprintf(w, `{"objects":[{"id":%q,"org_id":%q,"name":"key","metadata":%s}]}`, fixtureID(3), orgID, remote)
+		case "/v1/env_var":
+			objectType := r.URL.Query().Get("object_type")
+			id := fixtureID(4)
+			if objectType == "organization" {
+				id = fixtureID(5)
+			}
+			fmt.Fprintf(w, `{"objects":[{"id":%q,"object_id":%q,"object_type":%q,"name":"VALUE","metadata":%s}]}`, id, r.URL.Query().Get("object_id"), objectType, remote)
+		default:
+			t.Errorf("unexpected request: %s", r.URL)
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	previous := apiClient
+	t.Cleanup(func() { apiClient = previous })
+	var err error
+	apiClient, err = api.NewClient(server.URL, "fixture", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := hcl.NewReferenceResolver(nil)
+	secrets, secretVars, err := buildAISecretBlocks(context.Background(), orgID, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envVars, valueVars, err := buildEnvVarBlocks(context.Background(), []openapi.Project{{Id: uuid.MustParse(projectID)}}, orgID, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(secrets) != 1 || len(secretVars) != 1 || len(envVars) != 2 || len(valueVars) != 2 {
+		t.Fatalf("unexpected block/variable counts: %d/%d, %d/%d", len(secrets), len(secretVars), len(envVars), len(valueVars))
+	}
+	for _, block := range append(secrets, envVars...) {
+		if got := block.Fields["metadata"]; got != metadata {
+			t.Errorf("%s metadata = %v, want %s", block.Type, got, metadata)
+		}
+	}
+}
+
+func TestSecretMetadataOptionalObject(t *testing.T) {
+	// The provider stores an empty remote object as null, so "{}" is omitted too.
+	for _, raw := range []string{"", "null", "{}", " { } "} {
+		fields := map[string]any{}
+		if err := addSecretMetadata(fields, []byte(raw)); err != nil {
+			t.Fatalf("%q: %v", raw, err)
+		}
+		if _, ok := fields["metadata"]; ok {
+			t.Fatalf("%q metadata should be omitted", raw)
+		}
+	}
+	for _, raw := range []string{`[]`, `"text"`, `1`, `true`, `{`, `{"a":1} junk`} {
+		if err := addSecretMetadata(map[string]any{}, []byte(raw)); err == nil {
+			t.Errorf("accepted non-object metadata %s", raw)
+		}
+	}
+}
+
+func TestCanonicalJSONMatchesProvider(t *testing.T) {
+	for raw, want := range map[string]string{
+		`{"b":{"z":1,"a":[{"y":2,"x":1}]},"a":true}`: `{"a":true,"b":{"a":[{"x":1,"y":2}],"z":1}}`,
+		`{"id":12345678901234567890}`:                `{"id":12345678901234567890}`,
+		`{"d":0.1234567890123456789}`:                `{"d":0.1234567890123456789}`,
+		`[1.0, 1e3]`:                                 `[1.0,1e3]`,
+	} {
+		got, err := canonicalJSON(json.RawMessage(raw))
+		if err != nil || got != want {
+			t.Errorf("canonicalJSON(%s) = %s, %v; want %s", raw, got, err, want)
+		}
+	}
+	if _, err := canonicalJSON(json.RawMessage(`{} {}`)); err == nil {
+		t.Error("accepted trailing data")
 	}
 }

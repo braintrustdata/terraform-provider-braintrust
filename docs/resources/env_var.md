@@ -82,7 +82,18 @@ resource "braintrust_env_var" "project_openai" {
   secret_type   = "openai"
   value         = var.openai_api_key
   value_version = 1
+  metadata = jsonencode({
+    api_base          = "https://api.openai.com"
+    endpoint_path     = "/v1/chat/completions"
+    supportsStreaming = true
+  })
 }
+
+# Metadata can also come from file("${path.module}/provider.json") or
+# jsonencode(yamldecode(file("${path.module}/provider.yaml"))).
+# Updates replace metadata without rotating value. Omitting metadata leaves it
+# unmanaged; set jsonencode({}) to clear it.
+# Metadata is sensitive but stored in state; use value for API keys.
 
 # For organization-level AI providers, use braintrust_ai_secret instead.
 ```
@@ -100,6 +111,7 @@ resource "braintrust_env_var" "project_openai" {
 
 > **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
+- `metadata` (String, Sensitive) Provider-specific configuration as a JSON object. Use jsonencode({...}), file("provider.json"), or jsonencode(yamldecode(file("provider.yaml"))). Updates replace the entire object. Omitting this attribute leaves the remote metadata unmanaged; set it to jsonencode({}) to clear it. Stored in Terraform state, even though marked sensitive; put the provider key in value instead.
 - `secret_type` (String) The AI provider name (e.g. "openai", "anthropic"). When set, the env var appears under "Project AI providers" in the Braintrust UI.
 - `value` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only environment variable value. Requires value_version when non-null. Use an ephemeral, sensitive input variable; changing this value alone does not update it.
 - `value_version` (Number) Non-sensitive, non-ephemeral positive version stored in state. Change it to write value, or to explicitly clear the remote value on update when value is null or omitted. Omitting this version leaves the remote value untouched on update.

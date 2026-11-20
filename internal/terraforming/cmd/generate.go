@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -767,21 +770,12 @@ func buildDatasetBlocks(ctx context.Context, projects []openapi.Project, resolve
 			if tags, ok := client.Optional(d.Tags); ok {
 				fields["tags"] = tags
 			}
-			if metadata := raw.Fields["metadata"]; len(metadata) > 0 {
-				var shape any
-				if err := json.Unmarshal(metadata, &shape); err != nil {
-					return nil, fmt.Errorf("dataset %s has invalid metadata: %w", id, err)
-				}
-				if shape != nil {
-					if _, ok := shape.(map[string]any); !ok {
-						return nil, fmt.Errorf("dataset %s metadata must be an object", id)
-					}
-					canonical, err := canonicalJSON(metadata)
-					if err != nil {
-						return nil, fmt.Errorf("dataset %s has invalid metadata: %w", id, err)
-					}
-					fields["metadata_json"] = canonical
-				}
+			metadata, err := canonicalJSONObject(raw.Fields["metadata"])
+			if err != nil {
+				return nil, fmt.Errorf("dataset %s metadata: %w", id, err)
+			}
+			if metadata != "" {
+				fields["metadata_json"] = metadata
 			}
 
 			blocks = append(blocks, hcl.ResourceBlock{
@@ -842,23 +836,12 @@ func buildProjectScoreBlocks(ctx context.Context, projects []openapi.Project, re
 					fields["categories_json"] = categories
 				}
 			}
-			if rawConfig := raw.Fields["config"]; len(rawConfig) > 0 {
-				var shape any
-				if err := json.Unmarshal(rawConfig, &shape); err != nil {
-					return nil, fmt.Errorf("score %s has invalid config: %w", id, err)
-				}
-				if shape != nil {
-					if _, ok := shape.(map[string]any); !ok {
-						return nil, fmt.Errorf("score %s config must be an object", id)
-					}
-				}
-				config, err := canonicalJSON(rawConfig)
-				if err != nil {
-					return nil, fmt.Errorf("score %s has invalid config: %w", id, err)
-				}
-				if config != "null" {
-					fields["config_json"] = config
-				}
+			config, err := canonicalJSONObject(raw.Fields["config"])
+			if err != nil {
+				return nil, fmt.Errorf("score %s config: %w", id, err)
+			}
+			if config != "" {
+				fields["config_json"] = config
 			}
 
 			blocks = append(blocks, hcl.ResourceBlock{
@@ -1346,7 +1329,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 	var vars []hcl.VariableBlock
 	seen := make(map[string]bool)
 
-	projectEnvVars, err := fetchProjectResources(ctx, projects, "env vars", func(ctx context.Context, projectID string) ([]openapi.EnvVar, error) {
+	projectEnvVars, err := fetchProjectResources(ctx, projects, "env vars", func(ctx context.Context, projectID string) ([]api.EnvVar, error) {
 		return apiClient.ListEnvVars(ctx, "project", projectID)
 	})
 	if err != nil {
@@ -1354,7 +1337,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 	}
 	for _, envVars := range projectEnvVars {
 		for i := range envVars {
-			ev := &envVars[i]
+			ev := envVars[i].Value
 			id, objectID := ev.Id.String(), ev.ObjectId.String()
 			if seen[id] {
 				continue
@@ -1366,6 +1349,9 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 				"name":        ev.Name,
 				"object_type": string(ev.ObjectType),
 				"object_id":   objectID,
+			}
+			if err := addSecretMetadata(fields, envVars[i].Fields["metadata"]); err != nil {
+				return nil, nil, fmt.Errorf("env var %s: %w", id, err)
 			}
 			linked := make(map[string]string)
 			if ref := resolver.Resolve("object_id", objectID); ref != "" {
@@ -1400,7 +1386,7 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 			return nil, nil, fmt.Errorf("list env vars for organization %s: %w", orgID, err)
 		}
 		for i := range orgVars {
-			ev := &orgVars[i]
+			ev := orgVars[i].Value
 			id, objectID := ev.Id.String(), ev.ObjectId.String()
 			if seen[id] {
 				continue
@@ -1412,6 +1398,9 @@ func buildEnvVarBlocks(ctx context.Context, projects []openapi.Project, orgID st
 				"name":        ev.Name,
 				"object_type": string(ev.ObjectType),
 				"object_id":   objectID,
+			}
+			if err := addSecretMetadata(fields, orgVars[i].Fields["metadata"]); err != nil {
+				return nil, nil, fmt.Errorf("env var %s: %w", id, err)
 			}
 			linked := make(map[string]string)
 
@@ -1473,13 +1462,17 @@ func buildAISecretBlocks(ctx context.Context, orgID string, resolver *hcl.Refere
 	var blocks []hcl.ResourceBlock
 	var vars []hcl.VariableBlock
 
-	for _, s := range secrets {
+	for _, raw := range secrets {
+		s := raw.Value
 		if s.OrgId.String() != orgID {
 			continue
 		}
 		id := s.Id.String()
 		name := hcl.ResourceNameFromIDAndLabel(id, s.Name)
 		fields := map[string]any{"name": s.Name}
+		if err := addSecretMetadata(fields, raw.Fields["metadata"]); err != nil {
+			return nil, nil, fmt.Errorf("AI secret %s: %w", id, err)
+		}
 		linked := make(map[string]string)
 
 		if secretType, ok := client.Optional(s.Type); ok {
@@ -1511,6 +1504,19 @@ func buildAISecretBlocks(ctx context.Context, orgID string, resolver *hcl.Refere
 // Helpers
 // =============================================================================
 
+// addSecretMetadata writes nonempty metadata. The provider stores an empty
+// remote object as null, so writing "{}" would plan a spurious change.
+func addSecretMetadata(fields map[string]any, raw json.RawMessage) error {
+	metadata, err := canonicalJSONObject(raw)
+	if err != nil {
+		return fmt.Errorf("metadata: %w", err)
+	}
+	if metadata != "" && metadata != "{}" {
+		fields["metadata"] = metadata
+	}
+	return nil
+}
+
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -1520,16 +1526,42 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+// canonicalJSON re-encodes raw with object keys sorted at every level, the
+// same spelling the provider stores in state. Numbers keep their exact digits.
 func canonicalJSON(raw json.RawMessage) (string, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
 	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := decoder.Decode(&value); err != nil {
 		return "", err
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return "", errors.New("unexpected data after JSON value")
 	}
 	canonical, err := json.Marshal(value)
 	if err != nil {
 		return "", err
 	}
 	return string(canonical), nil
+}
+
+// canonicalJSONObject canonicalizes an optional JSON object field, returning
+// "" when it is absent or null.
+func canonicalJSONObject(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 {
+		return "", nil
+	}
+	canonical, err := canonicalJSON(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid JSON: %w", err)
+	}
+	if canonical == "null" {
+		return "", nil
+	}
+	if !strings.HasPrefix(canonical, "{") {
+		return "", errors.New("must be a JSON object")
+	}
+	return canonical, nil
 }
 
 func resolveOrgID(ctx context.Context, projects []openapi.Project, explicit string) (string, error) {

@@ -56,6 +56,12 @@ resource "braintrust_ai_secret" "openai" {
   type           = "openai"
   secret         = var.openai_api_key
   secret_version = 1
+  metadata = jsonencode({
+    api_base             = "https://api.openai.com"
+    endpoint_path        = "/v1/chat/completions"
+    supportsStreaming    = true
+    excludeDefaultModels = false
+  })
 }
 
 resource "braintrust_ai_secret" "anthropic" {
@@ -64,6 +70,13 @@ resource "braintrust_ai_secret" "anthropic" {
   secret         = var.anthropic_api_key
   secret_version = 1
 }
+
+# Load the same metadata object from a configuration file instead:
+# metadata = file("${path.module}/provider.json")
+# metadata = jsonencode(yamldecode(file("${path.module}/provider.yaml")))
+# Updates replace metadata, including removing nested keys. Omitting metadata
+# leaves it unmanaged; set jsonencode({}) to clear it. Metadata is sensitive but
+# stored in state; use secret for API keys.
 
 # For project-level AI provider credentials (visible under Project Settings >
 # "Project AI providers"), use braintrust_env_var with secret_type instead:
@@ -89,6 +102,7 @@ resource "braintrust_ai_secret" "anthropic" {
 
 > **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
+- `metadata` (String, Sensitive) Provider-specific configuration as a JSON object. Use jsonencode({...}), file("provider.json"), or jsonencode(yamldecode(file("provider.yaml"))). Updates replace the entire object. Omitting this attribute leaves the remote metadata unmanaged; set it to jsonencode({}) to clear it. Stored in Terraform state, even though marked sensitive; put the provider key in secret instead.
 - `secret` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Write-only AI provider key. Requires secret_version. Use an ephemeral, sensitive input variable; changing this value alone does not rotate the key.
 - `secret_version` (Number) Non-sensitive, non-ephemeral positive version stored in state. Requires secret. Change this version to write the configured secret; omit both fields after import to leave the key untouched.
 - `type` (String) The AI provider type (e.g. "openai", "anthropic", "azure", "google").

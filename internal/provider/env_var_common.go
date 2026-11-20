@@ -16,15 +16,19 @@ type envVarModel struct {
 	Name           types.String `tfsdk:"name"`
 	Value          types.String `tfsdk:"value"`
 	ValueVersion   types.Int64  `tfsdk:"value_version"`
+	Metadata       types.String `tfsdk:"metadata"`
 	Created        types.String `tfsdk:"created"`
 	Used           types.String `tfsdk:"used"`
 	SecretType     types.String `tfsdk:"secret_type"`
 	SecretCategory types.String `tfsdk:"secret_category"`
 }
 
-// mapEnvVarToModel maps an SDK env var to the Terraform model.
+type rawEnvVar = client.Raw[openapi.EnvVar]
+
+// mapEnvVarToModel maps an SDK env var and its raw metadata to the Terraform model.
 // The write-only value is always cleared before returning state.
-func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
+func mapEnvVarToModel(raw *rawEnvVar, model *envVarModel) {
+	envVar := raw.Value
 	model.ID = types.StringValue(envVar.Id.String())
 	model.ObjectType = types.StringValue(string(envVar.ObjectType))
 	model.ObjectID = types.StringValue(envVar.ObjectId.String())
@@ -37,13 +41,14 @@ func mapEnvVarToModel(envVar *openapi.EnvVar, model *envVarModel) {
 	} else {
 		model.SecretCategory = types.StringNull()
 	}
+	model.Metadata = secretMetadataState(raw.Fields["metadata"], model.Metadata)
 	model.Value = types.StringNull()
 }
 
-func getEnvVar(ctx context.Context, c *client.Client, id string) (*openapi.EnvVar, error) {
+func getEnvVar(ctx context.Context, c *client.Client, id string) (*rawEnvVar, error) {
 	resp, err := c.API.GetEnvVarIdWithResponse(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return client.JSON(resp.JSON200)
+	return client.DecodeRaw(resp.JSON200, resp.Body)
 }

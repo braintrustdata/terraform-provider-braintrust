@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/braintrustdata/braintrust-sdk-go/openapi"
 	"github.com/braintrustdata/terraform-provider-braintrust/internal/client"
@@ -60,6 +61,7 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"Creating a secret whose name already exists in Braintrust **overwrites** it. " +
 			"Import existing secrets before managing them.",
 		Attributes: map[string]schema.Attribute{
+			"metadata":   secretMetadataAttribute("secret"),
 			"id":         computedStringAttribute("Unique identifier for the AI secret (UUID)."),
 			"org_id":     computedStringAttribute("Unique identifier for the organization."),
 			"created":    computedStringAttribute("Date of AI secret creation."),
@@ -124,6 +126,14 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
+	metadata, err := functionJSONObject(plan.Metadata, "metadata")
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
+		return
+	}
+
+	planned := plan.Metadata
+
 	// Use PUT (replace) so that if an AI secret with this name already exists,
 	// we update it rather than silently returning the old one.
 	createReq := openapi.CreateAISecret{
@@ -137,10 +147,15 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 		"type": plan.Type.ValueString(),
 	})
 
-	replaceResp, err := client.Write(r.client.API.PutAiSecretWithResponse(ctx, createReq))
-	var created *openapi.AISecret
+	body, err := client.JSONBody(createReq, map[string]json.RawMessage{"metadata": metadata})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Braintrust AI Secret", err.Error())
+		return
+	}
+	replaceResp, err := client.Write(r.client.API.PutAiSecretWithBodyWithResponse(ctx, client.JSONContentType, body))
+	var created *rawAISecret
 	if err == nil {
-		created, err = client.Written(replaceResp.JSON200)
+		created, err = client.WrittenRaw(replaceResp.JSON200, replaceResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -151,19 +166,20 @@ func (r *aiSecretResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	// Re-read to get the full state.
-	secret, err := getAISecret(ctx, r.client, created.Id.String())
+	secret, err := getAISecret(ctx, r.client, created.Value.Id.String())
 	if err != nil {
 		mapAISecretToModel(created, &plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 		resp.Diagnostics.AddError(
 			"Error Reading Braintrust AI Secret After Create",
-			"AI secret was created (ID: "+created.Id.String()+") but could not be read: "+err.Error(),
+			"AI secret was created (ID: "+created.Value.Id.String()+") but could not be read: "+err.Error(),
 		)
 		return
 	}
 
 	mapAISecretToModel(secret, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	checkSecretMetadataApplied(planned, plan.Metadata, &resp.Diagnostics)
 }
 
 func (r *aiSecretResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -217,6 +233,19 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	metadata, changed, err := secretMetadataPatch(plan.Metadata, state.Metadata)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("metadata"), "Invalid Metadata", err.Error())
+		return
+	}
+	raw := map[string]json.RawMessage{}
+	if changed {
+		// PATCH deep-merges JSON fields unless asked to replace them.
+		raw["metadata"] = metadata
+		raw["shallow_replace_json_fields"] = json.RawMessage(`["metadata"]`)
+	}
+	planned := plan.Metadata
+
 	updateReq := openapi.PatchAISecret{
 		// Always send name (it may have changed).
 		Name: nullable.NewNullableWithValue(plan.Name.ValueString()),
@@ -229,10 +258,15 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 
 	tflog.Debug(ctx, "Updating AI secret", map[string]any{"id": state.ID.ValueString()})
 
-	updateResp, err := client.Write(r.client.API.PatchAiSecretIdWithResponse(ctx, state.ID.ValueString(), updateReq))
-	var secret *openapi.AISecret
+	body, err := client.JSONBody(updateReq, raw)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Braintrust AI Secret", err.Error())
+		return
+	}
+	updateResp, err := client.Write(r.client.API.PatchAiSecretIdWithBodyWithResponse(ctx, state.ID.ValueString(), client.JSONContentType, body))
+	var secret *rawAISecret
 	if err == nil {
-		secret, err = client.Written(updateResp.JSON200)
+		secret, err = client.WrittenRaw(updateResp.JSON200, updateResp.Body)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -244,6 +278,7 @@ func (r *aiSecretResource) Update(ctx context.Context, req resource.UpdateReques
 
 	mapAISecretToModel(secret, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	checkSecretMetadataApplied(planned, plan.Metadata, &resp.Diagnostics)
 }
 
 func (r *aiSecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

@@ -8,8 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type rawAISecret = client.Raw[openapi.AISecret]
+
 // aiSecretModel is the Terraform data model for the AI secret resource.
 type aiSecretModel struct {
+	Metadata      types.String `tfsdk:"metadata"`
 	ID            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Secret        types.String `tfsdk:"secret"`
@@ -23,7 +26,9 @@ type aiSecretModel struct {
 
 // mapAISecretToModel maps an SDK AI secret (GET response) to the Terraform model.
 // The write-only secret is always cleared before returning state.
-func mapAISecretToModel(secret *openapi.AISecret, model *aiSecretModel) {
+func mapAISecretToModel(raw *rawAISecret, model *aiSecretModel) {
+	secret := raw.Value
+	model.Metadata = secretMetadataState(raw.Fields["metadata"], model.Metadata)
 	model.ID = types.StringValue(secret.Id.String())
 	model.Name = types.StringValue(secret.Name)
 	model.OrgID = types.StringValue(secret.OrgId.String())
@@ -34,10 +39,10 @@ func mapAISecretToModel(secret *openapi.AISecret, model *aiSecretModel) {
 	model.Secret = types.StringNull()
 }
 
-func getAISecret(ctx context.Context, c *client.Client, id string) (*openapi.AISecret, error) {
+func getAISecret(ctx context.Context, c *client.Client, id string) (*rawAISecret, error) {
 	resp, err := c.API.GetAiSecretIdWithResponse(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return client.JSON(resp.JSON200)
+	return client.DecodeRaw(resp.JSON200, resp.Body)
 }

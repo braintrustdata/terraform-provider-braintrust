@@ -231,10 +231,14 @@ resource "braintrust_ai_secret" "openai" {
   type           = "openai"
   secret         = var.openai_api_key
   secret_version = 1
+  metadata = jsonencode({
+    api_base          = "https://api.openai.com"
+    endpoint_path     = "/v1/chat/completions"
+    supportsStreaming = true
+  })
 }
 
-# A plain project environment variable. Set secret_type to make it a
-# project-level AI provider credential instead.
+# A plain project environment variable, separate from AI provider credentials.
 # Increment value_version whenever changing value.
 resource "braintrust_env_var" "api_base_url" {
   object_type   = "project"
@@ -243,6 +247,29 @@ resource "braintrust_env_var" "api_base_url" {
   value         = "https://api.example.com"
   value_version = 1
 }
+
+# Project-level custom AI provider. Metadata updates do not rotate the key;
+# increment value_version when changing value.
+resource "braintrust_env_var" "project_openai" {
+  object_type   = "project"
+  object_id     = braintrust_project.app.id
+  name          = "kitchen-sink-project-openai"
+  secret_type   = "openai"
+  value         = var.openai_api_key
+  value_version = 1
+  metadata = jsonencode({
+    api_base          = "https://api.openai.com"
+    endpoint_path     = "/v1/chat/completions"
+    supportsStreaming = true
+  })
+}
+
+# Either metadata object can instead be loaded from a configuration file:
+# metadata = file("${path.module}/provider.json")
+# metadata = jsonencode(yamldecode(file("${path.module}/provider.yaml")))
+# Metadata updates replace the entire object; omitting it leaves metadata
+# unmanaged, and jsonencode({}) clears it.
+# Metadata is sensitive but stored in state. Keep API keys in secret/value.
 
 # =============================================================================
 # Automations

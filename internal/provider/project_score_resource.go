@@ -309,5 +309,5 @@ func scoreJSONEqual(a, b types.String) bool {
 	if a.IsNull() || a.IsUnknown() || b.IsNull() || b.IsUnknown() {
 		return a.Equal(b)
 	}
-	return jsonRawToTFString(json.RawMessage(a.ValueString())).Equal(jsonRawToTFString(json.RawMessage(b.ValueString())))
+	return jsonState(json.RawMessage(a.ValueString()), b).Equal(b)
 }
