@@ -1,6 +1,7 @@
 name: Acceptance Tests
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [labeled, synchronize, opened, reopened]
   # release.yml runs these before publishing.
