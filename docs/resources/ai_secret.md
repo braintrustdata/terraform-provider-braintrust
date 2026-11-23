@@ -8,6 +8,7 @@ description: |-
   secret is write-only and is never stored in the resource's plan or state. Pass it through a variable with both ephemeral = true and sensitive = true to keep the input out of saved plans as well. secret_version must be a non-ephemeral positive integer and is stored in state.
   Set both secret and secret_version when supplying a key. Change the version to rotate it; changing only the secret does nothing. Metadata-only updates and removing the version do not resend or clear the remote key. The API cannot clear AI secrets, and Terraform cannot detect changes to their values made outside Terraform.
   After import, omit both fields to manage metadata without rotation. Configuring a version then writes the supplied secret. Upgrading older state discards its stored secret and starts with no version, without changing the remote key. Historical state snapshots and backups may still contain plaintext and must be protected. A masked preview_secret is available.
+  Metadata updates replace the secret object by name within its organization. The provider looks up the secret's organization first, so the API key or service token also needs read permission on that organization.
   Creating a secret whose name already exists in Braintrust overwrites it. Import existing secrets before managing them.
 ---
 
@@ -22,6 +23,8 @@ For **project-level** AI provider credentials (visible under Project Settings > 
 Set both `secret` and `secret_version` when supplying a key. Change the version to rotate it; changing only the secret does nothing. Metadata-only updates and removing the version do not resend or clear the remote key. The API cannot clear AI secrets, and Terraform cannot detect changes to their values made outside Terraform.
 
 After import, omit both fields to manage metadata without rotation. Configuring a version then writes the supplied secret. Upgrading older state discards its stored secret and starts with no version, without changing the remote key. Historical state snapshots and backups may still contain plaintext and must be protected. A masked `preview_secret` is available.
+
+Metadata updates replace the secret object by name within its organization. The provider looks up the secret's organization first, so the API key or service token also needs `read` permission on that organization.
 
 Creating a secret whose name already exists in Braintrust **overwrites** it. Import existing secrets before managing them.
 
