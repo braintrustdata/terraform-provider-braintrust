@@ -58,6 +58,9 @@ func (r *aiSecretResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"then writes the supplied secret. Upgrading older state discards its stored secret and starts " +
 			"with no version, without changing the remote key. Historical state snapshots and backups " +
 			"may still contain plaintext and must be protected. A masked `preview_secret` is available.\n\n" +
+			"Metadata updates replace the secret object by name within its organization. The provider " +
+			"looks up the secret's organization first, so the API key or service token also needs " +
+			"`read` permission on that organization.\n\n" +
 			"Creating a secret whose name already exists in Braintrust **overwrites** it. " +
 			"Import existing secrets before managing them.",
 		Attributes: map[string]schema.Attribute{
